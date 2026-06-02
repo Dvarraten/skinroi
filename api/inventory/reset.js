@@ -9,7 +9,7 @@
 // a personal-tracker setup this is good enough; if you ever expose this
 // publicly add an auth header check.
 
-import { saveState, DEFAULT_STATE } from '../_lib/state.js';
+import { loadState, saveState, DEFAULT_STATE } from '../_lib/state.js';
 import { getSessionSteamId } from '../_lib/auth.js';
 
 export default async function handler(req, res) {
@@ -29,7 +29,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    await saveState({ ...DEFAULT_STATE }, steamId);
+    const current = await loadState(steamId);
+    await saveState({
+      ...DEFAULT_STATE,
+      dismissedAssetIds: current.dismissedAssetIds || [],
+    }, steamId);
     return res.status(200).json({ ok: true, reset: true });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message || String(err) });
