@@ -10,6 +10,7 @@ import csmoneyIcon  from "../assets/platforms/csmoney.webp";
 import skinswapIcon from "../assets/platforms/skinswap.webp";
 import youpinIcon   from "../assets/platforms/youpin.webp";
 import dmarketIcon  from "../assets/platforms/dmarket.webp";
+import skinsIcon    from "../assets/platforms/skins.webp";
 
 // Colors sourced from SAP Fiori Morning Horizon chart palette
 // sapChart_OrderedColor_* from SAP/theming-base-content
@@ -20,8 +21,9 @@ const PLATFORM_CONFIG = {
   csmoney:  { label: "CS.MONEY", icon: csmoneyIcon  },
   skinswap: { label: "SkinSwap", icon: skinswapIcon },
   dmarket:  { label: "DMarket",  icon: dmarketIcon  },
-  youpin:   { label: "Youpin",   icon: youpinIcon   },
-  tradeit:  { label: "Tradeit",  icon: null         },
+  youpin:   { label: "Youpin",    icon: youpinIcon  },
+  skins:    { label: "Skins.com", icon: skinsIcon   },
+  tradeit:  { label: "Tradeit",   icon: null        },
   facebook: { label: "Facebook", icon: null         },
   other:    { label: "Other",    icon: null         },
 };

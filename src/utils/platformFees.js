@@ -18,6 +18,8 @@ export const getPlatformFee = (platform, customFee) => {
       return 0;
     case 'youpin':
       return 0.005;
+    case 'skins':
+      return 0.01;
     default:
       return 0;
   }

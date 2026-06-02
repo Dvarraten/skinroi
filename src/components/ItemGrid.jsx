@@ -14,6 +14,7 @@ import csmoneyIcon  from "../assets/platforms/csmoney.webp";
 import skinswapIcon from "../assets/platforms/skinswap.webp";
 import youpinIcon   from "../assets/platforms/youpin.webp";
 import dmarketIcon  from "../assets/platforms/dmarket.webp";
+import skinsIcon    from "../assets/platforms/skins.webp";
 
 // --- helpers ---
 
@@ -56,6 +57,7 @@ const SELL_PLATFORMS = [
   { value: "skinswap", label: "SkinSwap", icon: skinswapIcon, fee: "5%"   },
   { value: "dmarket",  label: "DMarket",  icon: dmarketIcon,  fee: "5%"   },
   { value: "youpin",   label: "Youpin",   icon: youpinIcon,   fee: "0.5%" },
+  { value: "skins",   label: "Skins.com", icon: skinsIcon,   fee: "1%"   },
   { value: "other",    label: "Other",    icon: null,         fee: "0%", emoji: "🔧" },
 ];
 
