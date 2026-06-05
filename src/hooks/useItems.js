@@ -191,7 +191,7 @@ export const useItems = (steamId) => {
     }));
   };
 
-  const handleAddTransaction = ({ type, platform, amount, feePercent }) => {
+  const handleAddTransaction = ({ type, platform, method, amount, feePercent }) => {
     const feeAmt = Math.round(amount * feePercent / 100 * 100) / 100;
     const now = Date.now();
     const PLATFORM_LABELS = {
@@ -215,6 +215,7 @@ export const useItems = (steamId) => {
       pending: false,
       isTransaction: true,
       transactionType: type,
+      transactionMethod: method || 'crypto',
       transactionAmount: amount,
       transactionFeePercent: feePercent,
       iconUrl: null,

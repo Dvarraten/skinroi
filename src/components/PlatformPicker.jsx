@@ -30,7 +30,7 @@ function PlatformIcon({ platform, size = 14 }) {
   );
 }
 
-export default function PlatformPicker({ value, onChange, theme, platforms }) {
+export default function PlatformPicker({ value, onChange, theme, platforms, compact = false }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, openUpward: false });
   const triggerRef = useRef(null);
@@ -89,18 +89,18 @@ export default function PlatformPicker({ value, onChange, theme, platforms }) {
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`w-full h-9 flex items-center justify-between gap-2 px-3 rounded-lg border text-sm font-medium transition-colors
+        className={`w-full ${compact ? 'h-7 px-2 text-xs' : 'h-9 px-3 text-sm'} flex items-center justify-between gap-2 rounded-lg border font-medium transition-colors
           ${theme.input} ${theme.text} hover:bg-white/5`}
       >
         <span className="flex items-center gap-2 min-w-0">
-          <PlatformIcon platform={selected} size={14} />
+          <PlatformIcon platform={selected} size={compact ? 12 : 14} />
           <span className="truncate">{selected.label}</span>
-          {selected.fee && (
+          {selected.fee && !compact && (
             <span className={`${theme.subtext} text-[10px]`}>· fee {selected.fee}</span>
           )}
         </span>
         <ChevronDown
-          size={14}
+          size={compact ? 11 : 14}
           className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>

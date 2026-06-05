@@ -29,15 +29,13 @@ function SteamIcon({ className }) {
 
 export default function Header({
   theme,
+  activePage = null,
   onAnalyticsClick,
   onAddItemClick,
   onHandleItemsClick,
   onTransactionClick,
-  showTransactions = false,
   onAboutClick,
   onHomeClick,
-  showAddItem = false,
-  showHandleItems = false,
   pendingCount = 0,
   user,
   onLogin,
@@ -104,51 +102,47 @@ export default function Header({
       <div className={`px-5 h-14 flex items-center justify-between rounded-2xl shadow-lg ${theme?.header || "bg-gradient-to-b from-[#0e1a32] to-[#070c16]"}`}>
         {/* LEFT: Logo + Nav */}
         <div className="flex items-center gap-8">
-          <img
-            src={theme?.name === 'Light' ? logoLightSrc : logoSrc}
-            alt="SkinROI"
-            style={{ height: "52px", width: "auto" }}
-          />
+          <button
+            type="button"
+            onClick={onHomeClick}
+            title="Home"
+            className="flex items-center hover:opacity-80 transition-opacity"
+          >
+            <img
+              src={theme?.name === 'Light' ? logoLightSrc : logoSrc}
+              alt="SkinROI"
+              style={{ height: "52px", width: "auto" }}
+            />
+          </button>
           <nav className="hidden md:flex items-center gap-6">
-            {/* Home — always active since we're always on the main view */}
-            <button onClick={onHomeClick} className={`flex items-center gap-1.5 ${navBtn(true)}`}>
-              <Home size={15} />
-              Home
-              <span className="absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 w-full" style={{ backgroundColor: dotColor }} />
-            </button>
-            <button onClick={onAddItemClick} className={`flex items-center gap-1.5 ${navBtn(showAddItem)}`}>
-              <PackagePlus size={15} />
-              Add Item
-              <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${showAddItem ? "w-full" : "w-0 group-hover:w-full"}`} style={{ backgroundColor: dotColor }} />
-            </button>
-            <button
-              onClick={onHandleItemsClick}
-              className={`flex items-center gap-1.5 ${navBtn(showHandleItems)}`}
-            >
-              <Inbox size={15} />
-              <span>Handle Items</span>
-              {pendingCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-                  {pendingCount > 99 ? "99+" : pendingCount}
-                </span>
-              )}
-              <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${showHandleItems ? "w-full" : "w-0 group-hover:w-full"}`} style={{ backgroundColor: dotColor }} />
-            </button>
-            <button onClick={onTransactionClick} className={`flex items-center gap-1.5 ${navBtn(showTransactions)}`}>
-              <ArrowDownUp size={15} />
-              Transactions
-              <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${showTransactions ? "w-full" : "w-0 group-hover:w-full"}`} style={{ backgroundColor: dotColor }} />
-            </button>
-            <button onClick={onAnalyticsClick} className={`flex items-center gap-1.5 ${navBtn(false)}`}>
-              <BarChart3 size={15} />
-              Analytics
-              <span className="absolute bottom-0 left-0 h-[2px] w-0 rounded-full transition-all duration-200 group-hover:w-full" style={{ backgroundColor: dotColor }} />
-            </button>
-            <button onClick={onAboutClick} className={`flex items-center gap-1.5 ${navBtn(false)}`}>
-              <Info size={15} />
-              About
-              <span className="absolute bottom-0 left-0 h-[2px] w-0 rounded-full transition-all duration-200 group-hover:w-full" style={{ backgroundColor: dotColor }} />
-            </button>
+            {(() => {
+              const items = [
+                { key: 'home',         label: 'Home',         icon: Home,        onClick: onHomeClick,        badge: 0 },
+                { key: 'addItem',      label: 'Add Item',     icon: PackagePlus, onClick: onAddItemClick,     badge: 0 },
+                { key: 'handleItems',  label: 'Handle Items', icon: Inbox,       onClick: onHandleItemsClick, badge: pendingCount },
+                { key: 'transactions', label: 'Transactions', icon: ArrowDownUp, onClick: onTransactionClick, badge: 0 },
+                { key: 'analytics',    label: 'Analytics',    icon: BarChart3,   onClick: onAnalyticsClick,   badge: 0 },
+                { key: 'about',        label: 'About',        icon: Info,        onClick: onAboutClick,       badge: 0 },
+              ];
+              return items.map(({ key, label, icon: Icon, onClick, badge }) => {
+                const active = key === 'home' ? !activePage : activePage === key;
+                return (
+                  <button key={key} onClick={onClick} className={`flex items-center gap-1.5 ${navBtn(active)}`}>
+                    <Icon size={15} />
+                    <span>{label}</span>
+                    {badge > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
+                    <span
+                      className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${active ? 'w-full' : 'w-0 group-hover:w-full'}`}
+                      style={{ backgroundColor: dotColor }}
+                    />
+                  </button>
+                );
+              });
+            })()}
           </nav>
         </div>
 

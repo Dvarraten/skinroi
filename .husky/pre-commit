@@ -1,0 +1,58 @@
+#!/usr/bin/env sh
+
+# ─── 1. Block files that look like secrets ────────────────────────────────
+forbidden_pattern='(^|/)(\.env([.][^/]+)?|.*\.pem|.*\.key|.*\.pfx|.*\.p12|credentials\.[a-z]+|secrets?\.(json|yaml|yml|txt)|service-account[^/]*\.json|id_(rsa|dsa|ed25519|ecdsa)([.][^/]+)?|.*\.crt|\.npmrc)$'
+
+forbidden=$(git diff --cached --name-only --diff-filter=ACM | grep -E "$forbidden_pattern" || true)
+if [ -n "$forbidden" ]; then
+  echo "x  Refusing to commit files that look like secrets:"
+  echo "$forbidden" | sed 's/^/    /'
+  echo ""
+  echo "   Remove them from staging: git restore --staged <file>"
+  echo "   Or add to .gitignore if they shouldn't be tracked."
+  exit 1
+fi
+
+# ─── 2. Scan added lines for known secret formats ─────────────────────────
+# Looks at lines added in this commit (lines starting with '+', excluding '+++' headers).
+# Patterns target the actual key formats - not variable names - so legitimate
+# references like `process.env.STEAM_API_KEY` won't false-positive.
+secrets=$(git diff --cached -U0 --diff-filter=ACM | grep -E '^\+' | grep -Ev '^\+\+\+' | grep -E \
+  -e 'AKIA[0-9A-Z]{16}' \
+  -e 'aws_secret_access_key[[:space:]]*=[[:space:]]*[A-Za-z0-9/+=]{20,}' \
+  -e 'sk-ant-[A-Za-z0-9_-]{20,}' \
+  -e 'sk-proj-[A-Za-z0-9_-]{40,}' \
+  -e 'sk_(live|test)_[A-Za-z0-9]{20,}' \
+  -e 'rk_(live|test)_[A-Za-z0-9]{20,}' \
+  -e 'xox[abprs]-[A-Za-z0-9-]{20,}' \
+  -e 'AIza[0-9A-Za-z_-]{35}' \
+  -e 'ghp_[A-Za-z0-9]{36}' \
+  -e 'github_pat_[A-Za-z0-9_]{82}' \
+  -e 'gho_[A-Za-z0-9]{36}' \
+  -e 'glpat-[A-Za-z0-9_-]{20}' \
+  -e 'npm_[A-Za-z0-9]{36}' \
+  -e 'dckr_pat_[A-Za-z0-9_-]{27}' \
+  -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+  || true)
+
+if [ -n "$secrets" ]; then
+  echo "x  Possible API key / secret detected in staged content:"
+  echo "$secrets" | sed 's/^/    /'
+  echo ""
+  echo "   Review the diff and remove the secret before committing."
+  exit 1
+fi
+
+# ─── 3. Lint staged JS/JSX ────────────────────────────────────────────────
+staged_js=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|jsx)$' || true)
+if [ -n "$staged_js" ]; then
+  echo "-> Linting staged JS/JSX..."
+  echo "$staged_js" | xargs npx eslint --max-warnings=0
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo "x  ESLint failed - fix errors above before committing."
+    exit 1
+  fi
+fi
+
+exit 0

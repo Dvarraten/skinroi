@@ -1,7 +1,6 @@
-// Analytics overlay — cumulative P&L line chart (7d / 30d / all-time),
-// weekly and monthly profit summaries, and a 90-day sale heatmap.
+// Analytics page — cumulative P&L line chart (7d / 30d / all-time),
+// weekly and monthly profit summaries, and a 30-day sale heatmap.
 import React, { useMemo } from "react";
-import { X } from "lucide-react";
 import { PROFIT_COLOR, LOSS_COLOR } from "../themes/themes";
 import {
   LineChart,
@@ -19,7 +18,6 @@ export default function ProfitChart({
   setChartPeriod,
   stats = {},
   theme,
-  onClose,
   items = [],
 }) {
   const totalInvested = stats?.totalInvested ?? 0;
@@ -90,31 +88,13 @@ export default function ProfitChart({
   ];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onMouseDown={(e) => { e.currentTarget.dataset.closeIntent = e.target === e.currentTarget ? '1' : '0'; }}
-        onClick={(e) => { if (e.currentTarget.dataset.closeIntent === '1') onClose(); }}
-      />
-
-      <div
-        className={`relative w-full max-w-2xl max-h-[85vh] flex flex-col ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-2xl overflow-hidden`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div
-          className={`flex items-center justify-between px-6 py-4 border-b ${theme.panelBorder} shrink-0`}
-        >
+    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+      <div className={`max-w-3xl mx-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
+        <div className={`flex items-center px-6 py-4 border-b ${theme.panelBorder}`}>
           <h2 className={`font-semibold ${theme.text}`}>Profit Analytics</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            <X size={18} />
-          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="p-6 space-y-6">
           {/* Period selector + total in period */}
           <div className="flex items-center gap-2">
             {PERIODS.map((p) => (

@@ -1,22 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
+import { X, ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertTriangle, Clock, CheckCircle, Search } from 'lucide-react';
+import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
 import SteamQRSetup from './SteamQRSetup';
-
-import PricePair from './PricePair';
 import PlatformPicker from './PlatformPicker';
+import { TabButton } from './TabsAndSearchbar';
 import { PLATFORMS } from '../utils/platforms';
+import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
+
+const SORTS = [
+  { label: 'Date', desc: 'date-new', asc: 'date-old' },
+  { label: 'Name', desc: 'name-za',  asc: 'name-az'  },
+];
 
 const STEAM_IMG_BASE = 'https://community.akamai.steamstatic.com/economy/image/';
 
-// ─── Name matching ──────────────────────────────────────────────────────────
-// Steam ships full names like "Charm | Quick Silver" or "★ StatTrak™ Karambit |
-// Fade (Factory New)". Users often track them under shorter handles ("Quick
-// Silver", "Karambit Fade", "Fade"). To catch these, tokenise both sides and
-// score the overlap.
+// ─── Name matching utilities ────────────────────────────────────────────────
 const NAME_STOPWORDS = new Set([
   'stattrak', 'souvenir', 'the',
-  // Wear levels — already pulled out via the (Wear) suffix strip below, but
-  // listed here too in case someone writes them inline.
   'factory', 'new', 'minimal', 'wear', 'field', 'tested', 'well', 'worn',
   'battle', 'scarred',
 ]);
@@ -26,56 +26,39 @@ function tokenizeName(name) {
     .toLowerCase()
     .replace(/★/g, ' ')
     .replace(/™/g, ' ')
-    .replace(/\([^)]*\)/g, ' ')        // strip "(Field-Tested)" etc.
-    .replace(/[|/\-.,:'"]/g, ' ')      // word-breaking punctuation
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[|/\-.,:'"]/g, ' ')
     .split(/\s+/)
     .filter((t) => t.length >= 2 && !NAME_STOPWORDS.has(t));
 }
 
-// Steam names follow "<weapon> | <skin> (<wear>)". The skin part is the
-// distinguishing piece — matching on it avoids "AK-47 | Asiimov" being
-// scored as a hit against every AK-47 in the tracker.
 function getSkinPart(name) {
   if (!name) return null;
-  // Strip the trailing "(Wear)" suffix.
   const stripped = name.replace(/\s*\([^)]*\)\s*$/, '').trim();
   const pipeIdx = stripped.indexOf('|');
-  if (pipeIdx === -1) return null; // no skin segment
+  if (pipeIdx === -1) return null;
   return stripped.slice(pipeIdx + 1).trim();
 }
 
-// Returns a score in [0, 1] expressing how well `trackerName` lines up with
-// `steamName`. The score is the fraction of *Steam skin* tokens that appear
-// somewhere in the tracker name — that way "Asiimov" or "AK-47 Asiimov" or
-// "AK-47 | Asiimov" all match an outgoing AK-47 | Asiimov, but a tracker
-// item called "AK-47 | Redline" does NOT match (it'd score 0/1 = 0).
 const WEAR_LEVELS = ['Factory New', 'Minimal Wear', 'Field-Tested', 'Well-Worn', 'Battle-Scarred'];
 function getWearLevel(name) {
   return WEAR_LEVELS.find(w => (name || '').includes(w)) ?? null;
 }
 
 function nameMatchScore(steamName, trackerName) {
-  // Wear levels must match when both names specify one — MW ≠ BS even if the skin name is identical.
   const sw = getWearLevel(steamName);
   const tw = getWearLevel(trackerName);
   if (sw && tw && sw !== tw) return 0;
-
   const steamSkin = getSkinPart(steamName);
-
   if (steamSkin) {
     const steamSkinTokens = tokenizeName(steamSkin);
     if (steamSkinTokens.length === 0) return 0;
-    // Compare against the tracker's skin part if it has one, otherwise the
-    // whole tracker name (so a user who typed just "Asiimov" still matches).
     const trackerCmp = getSkinPart(trackerName) ?? trackerName;
     const trackerTokens = new Set(tokenizeName(trackerCmp));
     if (trackerTokens.size === 0) return 0;
     const matched = steamSkinTokens.filter((t) => trackerTokens.has(t)).length;
     return matched / steamSkinTokens.length;
   }
-
-  // Steam name has no skin segment (vanilla knives, agents, stickers …).
-  // Fall back to whole-name comparison.
   const steamTokens = new Set(tokenizeName(steamName));
   const trackerTokens = tokenizeName(trackerName);
   if (trackerTokens.length === 0 || steamTokens.size === 0) return 0;
@@ -83,11 +66,20 @@ function nameMatchScore(steamName, trackerName) {
   return matched / trackerTokens.length;
 }
 
+function formatCandidateLabel(c) {
+  const base = `${c.itemName} · $${c.purchasePrice.toFixed(2)}`;
+  if (c.matchType === 'fuzzy' && typeof c.matchScore === 'number') {
+    const pct = Math.round(c.matchScore * 100);
+    return `${base} (${pct}% match)`;
+  }
+  return base;
+}
 
-function ItemImage({ iconUrl, alt }) {
+function ItemImage({ iconUrl, alt, size = 36 }) {
+  const px = `${size}px`;
   if (!iconUrl) {
     return (
-      <div className="w-12 h-12 rounded bg-white/5 flex items-center justify-center text-[10px] text-slate-500">
+      <div style={{ width: px, height: px }} className="rounded bg-white/5 flex items-center justify-center text-[10px] text-slate-500 flex-shrink-0">
         ?
       </div>
     );
@@ -96,143 +88,69 @@ function ItemImage({ iconUrl, alt }) {
     <img
       src={`${STEAM_IMG_BASE}${iconUrl}/96fx96f`}
       alt={alt || ''}
-      className="w-12 h-12 rounded bg-white/5 object-contain flex-shrink-0"
+      style={{ width: px, height: px }}
+      className="rounded bg-white/5 object-contain flex-shrink-0"
       loading="lazy"
     />
   );
 }
 
-function IncomingRow({ entry, onAdd, onDismiss, theme, exchangeRate, currencySymbol, displayCurrency }) {
-  const [usdPrice, setUsdPrice] = useState('');
-  const [cnyPrice, setCnyPrice] = useState('');
-  const [platform, setPlatform] = useState('csfloat');
-  const [customFee, setCustomFee] = useState('');
-  const [onHold, setOnHold] = useState(true);
-  const [notes, setNotes] = useState('');
-  const [confirming, setConfirming] = useState(false);
-
-  const submit = () => {
-    const v = parseFloat(usdPrice);
-    if (!v || v <= 0) return;
-    setConfirming(true);
-    const expectedDelivery = onHold
-      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-      : null;
-    onAdd({
-      itemName: entry.marketHashName,
-      purchasePrice: v,
-      platform,
-      pending: onHold,
-      expectedDelivery,
-      notes,
-      iconUrl: entry.iconUrl
-        ? `https://community.akamai.steamstatic.com/economy/image/${entry.iconUrl}/96fx96f`
-        : null,
-    });
-  };
-
-
+// ─── Inline compact USD + local currency pair ──────────────────────────────
+function PricePairCompact({ usdValue, localValue, onUsdChange, onLocalChange, theme, exchangeRate, currencySymbol, placeholderUsd = 'USD', placeholderLocal }) {
+  const inputCls = `h-7 ${theme.input} rounded-lg pr-2 text-xs font-mono ${theme.text} focus:outline-none border w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
   return (
-    <div className={`flex flex-col gap-3 p-3 rounded-lg ${theme.card} border ${theme.cardBorder}`}>
-      <div className="flex items-start gap-3">
-        <ItemImage iconUrl={entry.iconUrl} alt={entry.marketHashName} />
-        <div className="min-w-0 flex-1">
-          <div className={`text-sm font-semibold ${theme.text} truncate`}>
-            {entry.marketHashName}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            Seen {new Date(entry.detectedAt).toLocaleString()}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => onDismiss(entry.assetid, 'incoming')}
-          className="text-slate-500 hover:text-slate-200 p-1 rounded hover:bg-white/5"
-          title="Dismiss (don't track)"
-        >
-          <X size={14} />
-        </button>
+    <div className="flex items-center gap-1">
+      <div className="relative w-[88px]">
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-mono pointer-events-none">$</span>
+        <input
+          type="number" step="0.01" min="0"
+          value={usdValue}
+          onChange={(e) => onUsdChange(e.target.value)}
+          placeholder={placeholderUsd}
+          className={`${inputCls} pl-5`}
+        />
       </div>
-
-      <div className="flex flex-col gap-2">
-          <PricePair
-            usdValue={usdPrice}
-            cnyValue={cnyPrice}
-            onChange={({ usd, cny }) => { setUsdPrice(usd); setCnyPrice(cny); }}
-            onCnyTyped={() => setPlatform('youpin')}
-            exchangeRate={exchangeRate}
-            theme={theme}
-            currencySymbol={currencySymbol}
-            displayCurrency={displayCurrency}
-          />
-          <div className="flex gap-2">
-            <PlatformPicker
-              value={platform}
-              onChange={(val) => { setPlatform(val); setCustomFee(val === 'other' ? '0' : ''); }}
-              theme={theme}
-              platforms={PLATFORMS}
-            />
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notes…"
-              className={`flex-1 h-9 ${theme.input} rounded-lg px-3 text-sm ${theme.text} placeholder-slate-600 focus:outline-none border`}
-            />
-          </div>
-          {platform === 'other' && (
-            <div className="flex items-center gap-1.5">
-              <input
-                type="number" min="0" max="100" step="0.1"
-                value={customFee}
-                onChange={(e) => setCustomFee(e.target.value)}
-                placeholder="Fee %"
-                className={`w-24 h-9 ${theme.input} rounded-lg px-3 ${theme.text} text-sm focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-              />
-              <span className={`text-sm ${theme.subtext}`}>%</span>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setOnHold(h => !h)}
-              className={`relative group flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium border transition-all
-                ${theme.card} ${theme.cardBorder}
-                ${onHold ? 'text-warn' : `${theme.subtext} ${theme.textHover}`}`}
-            >
-              <Clock size={15} />
-              Protected
-              <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 bg-warn ${onHold ? 'w-full' : 'w-0 group-hover:w-full'}`} />
-            </button>
-            <button
-              type="button"
-              disabled={confirming || !parseFloat(usdPrice)}
-              onClick={submit}
-              className={`relative group flex items-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition-all duration-200
-                ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text}
-                disabled:opacity-40 disabled:cursor-not-allowed`}
-            >
-              {confirming ? <><CheckCircle size={15} /> Added!</> : onHold ? 'Add as protected' : 'Add to tracker'}
-              <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${confirming ? 'w-full bg-profit' : `w-0 group-hover:w-full ${theme.dot}`}`} />
-            </button>
-          </div>
+      <div className="relative w-[88px]">
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-mono pointer-events-none">{currencySymbol}</span>
+        <input
+          type="number" step="0.01" min="0"
+          value={localValue}
+          onChange={(e) => onLocalChange(e.target.value)}
+          disabled={!exchangeRate}
+          placeholder={placeholderLocal || currencySymbol}
+          className={`${inputCls} ${currencySymbol.length > 1 ? 'pl-8' : 'pl-5'} ${!exchangeRate ? 'opacity-50' : ''}`}
+        />
       </div>
     </div>
   );
 }
 
-function GroupedIncomingRow({ entries, onAddAll, onDismissAll, theme, exchangeRate, currencySymbol, displayCurrency }) {
-  const [usdPrice, setUsdPrice] = useState('');
-  const [cnyPrice, setCnyPrice] = useState('');
-  const [platform, setPlatform] = useState('csfloat');
-  const [customFee, setCustomFee] = useState('');
-  const [onHold, setOnHold] = useState(true);
-  const [notes, setNotes] = useState('');
-  const [confirming, setConfirming] = useState(false);
+// ─── Compact incoming row (returns <tr>) ────────────────────────────────────
+function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, currencySymbol, displayCurrency }) {
   const rep = entries[0];
   const count = entries.length;
+  const [usdPrice, setUsdPrice] = useState('');
+  const [localPrice, setLocalPrice] = useState('');
+  const [platform, setPlatform] = useState('csfloat');
+  const [notes, setNotes] = useState('');
+  const [onHold, setOnHold] = useState(true);
+  const [confirming, setConfirming] = useState(false);
 
-  const submitAll = () => {
+  const handleUsdChange = (val) => {
+    setUsdPrice(val);
+    setLocalPrice(exchangeRate && val && !isNaN(val)
+      ? (parseFloat(val) * exchangeRate).toFixed(2) : '');
+  };
+
+  const handleLocalChange = (val) => {
+    setLocalPrice(val);
+    const usd = exchangeRate && val && !isNaN(val)
+      ? (parseFloat(val) / exchangeRate).toFixed(2) : '';
+    setUsdPrice(usd);
+    if (val) setPlatform('youpin');
+  };
+
+  const submit = () => {
     const v = parseFloat(usdPrice);
     if (!v || v <= 0) return;
     setConfirming(true);
@@ -246,127 +164,109 @@ function GroupedIncomingRow({ entries, onAddAll, onDismissAll, theme, exchangeRa
       pending: onHold,
       expectedDelivery,
       notes,
-      iconUrl: rep.iconUrl
-        ? `https://community.akamai.steamstatic.com/economy/image/${rep.iconUrl}/96fx96f`
-        : null,
+      iconUrl: rep.iconUrl ? `${STEAM_IMG_BASE}${rep.iconUrl}/96fx96f` : null,
     });
   };
 
   return (
-    <div className={`flex flex-col gap-3 p-3 rounded-lg ${theme.card} border ${theme.cardBorder}`}>
-      <div className="flex items-start gap-3">
-        <ItemImage iconUrl={rep.iconUrl} alt={rep.marketHashName} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className={`text-sm font-semibold ${theme.text} truncate`}>{rep.marketHashName}</div>
-            <span className={`shrink-0 text-[11px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white`}>×{count}</span>
+    <tr className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>
+      <td className="px-3 py-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <ItemImage iconUrl={rep.iconUrl} alt={rep.marketHashName} size={36} />
+          <div className="min-w-0 flex-1">
+            <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>
+              {rep.marketHashName}
+            </p>
+            <p className="text-[10px] text-slate-600 leading-tight">
+              {new Date(rep.detectedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </p>
           </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            {count} items — set one price to add all
-          </div>
+          {count > 1 && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white flex-shrink-0`}>
+              ×{count}
+            </span>
+          )}
         </div>
+      </td>
+
+      <td className="px-3 py-2 align-middle">
+        <PricePairCompact
+          usdValue={usdPrice}
+          localValue={localPrice}
+          onUsdChange={handleUsdChange}
+          onLocalChange={handleLocalChange}
+          theme={theme}
+          exchangeRate={exchangeRate}
+          currencySymbol={currencySymbol}
+          placeholderLocal={displayCurrency}
+        />
+      </td>
+
+      <td className="px-3 py-2 align-middle">
+        <div className="w-32">
+          <PlatformPicker value={platform} onChange={setPlatform} theme={theme} platforms={PLATFORMS} compact />
+        </div>
+      </td>
+
+      <td className="px-3 py-2 align-middle">
+        <input
+          type="text"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Notes"
+          className={`h-7 w-28 ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
+        />
+      </td>
+
+      <td className="px-2 py-2 align-middle text-center">
         <button
           type="button"
-          onClick={onDismissAll}
-          className="text-slate-500 hover:text-slate-200 p-1 rounded hover:bg-white/5"
-          title="Dismiss all"
+          onClick={() => setOnHold(h => !h)}
+          title={onHold ? 'Trade-protected (on hold)' : 'Not protected'}
+          className={`h-7 w-7 rounded-lg border inline-flex items-center justify-center transition-all ${theme.card} ${theme.cardBorder} ${onHold ? 'text-warn' : 'text-slate-600'}`}
         >
-          <X size={14} />
+          <Clock size={12} />
         </button>
-      </div>
+      </td>
 
-      <div className="flex flex-col gap-2">
-        <PricePair
-          usdValue={usdPrice}
-          cnyValue={cnyPrice}
-          onChange={({ usd, cny }) => { setUsdPrice(usd); setCnyPrice(cny); }}
-          onCnyTyped={() => setPlatform('youpin')}
-          exchangeRate={exchangeRate}
-          theme={theme}
-          currencySymbol={currencySymbol}
-          displayCurrency={displayCurrency}
-        />
-        <div className="flex gap-2">
-          <PlatformPicker
-            value={platform}
-            onChange={(val) => { setPlatform(val); setCustomFee(val === 'other' ? '0' : ''); }}
-            theme={theme}
-            platforms={PLATFORMS}
-          />
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notes…"
-            className={`flex-1 h-9 ${theme.input} rounded-lg px-3 text-sm ${theme.text} placeholder-slate-600 focus:outline-none border`}
-          />
-        </div>
-        {platform === 'other' && (
-          <div className="flex items-center gap-1.5">
-            <input
-              type="number" min="0" max="100" step="0.1"
-              value={customFee}
-              onChange={(e) => setCustomFee(e.target.value)}
-              placeholder="Fee %"
-              className={`w-24 h-9 ${theme.input} rounded-lg px-3 ${theme.text} text-sm focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-            />
-            <span className={`text-sm ${theme.subtext}`}>%</span>
-          </div>
-        )}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setOnHold(h => !h)}
-            className={`relative group flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium border transition-all
-              ${theme.card} ${theme.cardBorder}
-              ${onHold ? 'text-warn' : `${theme.subtext} ${theme.textHover}`}`}
-          >
-            <Clock size={15} />
-            Protected
-            <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 bg-warn ${onHold ? 'w-full' : 'w-0 group-hover:w-full'}`} />
-          </button>
-          <button
-            type="button"
-            disabled={confirming || !parseFloat(usdPrice)}
-            onClick={submitAll}
-            className={`relative group flex items-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition-all duration-200
-              ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text}
-              disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
-            {confirming
-              ? <><CheckCircle size={15} /> Added!</>
-              : onHold ? `Add ${count} as protected` : `Add all ${count}`}
-            <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${confirming ? 'w-full bg-profit' : `w-0 group-hover:w-full ${theme.dot}`}`} />
-          </button>
-        </div>
-      </div>
-    </div>
+      <td className="px-3 py-2 align-middle text-right">
+        <button
+          type="button"
+          disabled={confirming || !parseFloat(usdPrice)}
+          onClick={submit}
+          className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all inline-flex items-center gap-1
+            ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text}
+            disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          {confirming ? <><CheckCircle size={11} /> Added!</> : (count > 1 ? `Add ${count}` : 'Add')}
+        </button>
+      </td>
+
+      <td className="px-2 py-2 align-middle text-right">
+        <button
+          type="button"
+          onClick={() => onDismissGroup(entries.map(e => e.assetid))}
+          className="text-slate-600 hover:text-slate-300 p-1 rounded inline-flex"
+          title="Dismiss"
+        >
+          <X size={13} />
+        </button>
+      </td>
+    </tr>
   );
 }
 
-function formatCandidateLabel(c) {
-  const base = `${c.itemName} · $${c.purchasePrice.toFixed(2)}`;
-  if (c.matchType === 'fuzzy' && typeof c.matchScore === 'number') {
-    const pct = Math.round(c.matchScore * 100);
-    return `${base} (${pct}% match)`;
-  }
-  return base;
-}
-
+// ─── Compact outgoing row (returns React.Fragment with main + optional expansion row) ──
 function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, theme, exchangeRate, currencySymbol, displayCurrency }) {
   const [browseAll, setBrowseAll] = useState(candidates.length === 0);
   const [browseQuery, setBrowseQuery] = useState('');
-  const [selectedId, setSelectedId] = useState(
-    candidates[0]?.id ? String(candidates[0].id) : ''
-  );
+  const [selectedId, setSelectedId] = useState(candidates[0]?.id ? String(candidates[0].id) : '');
   const [usdSalePrice, setUsdSalePrice] = useState('');
-  const [cnySalePrice, setCnySalePrice] = useState('');
+  const [localSalePrice, setLocalSalePrice] = useState('');
   const [platform, setPlatform] = useState('csfloat');
   const [customFee, setCustomFee] = useState('');
   const [confirming, setConfirming] = useState(false);
 
-  // Items the user can pick from. Default = the smart candidates list, but
-  // "Browse all" toggles to a free-text search across everything active.
   const browseResults = useMemo(() => {
     const q = browseQuery.toLowerCase().trim();
     const all = allActiveItems || [];
@@ -378,16 +278,26 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
 
   const visibleCandidates = browseAll ? browseResults : candidates;
 
-  // Keep selected id valid as the visible list changes.
   useEffect(() => {
-    if (visibleCandidates.length === 0) {
-      setSelectedId('');
-      return;
-    }
+    if (visibleCandidates.length === 0) { setSelectedId(''); return; }
     if (!visibleCandidates.some((c) => String(c.id) === selectedId)) {
       setSelectedId(String(visibleCandidates[0].id));
     }
   }, [visibleCandidates, selectedId]);
+
+  const handleUsdChange = (val) => {
+    setUsdSalePrice(val);
+    setLocalSalePrice(exchangeRate && val && !isNaN(val)
+      ? (parseFloat(val) * exchangeRate).toFixed(2) : '');
+  };
+
+  const handleLocalChange = (val) => {
+    setLocalSalePrice(val);
+    const usd = exchangeRate && val && !isNaN(val)
+      ? (parseFloat(val) / exchangeRate).toFixed(2) : '';
+    setUsdSalePrice(usd);
+    if (val) setPlatform('youpin');
+  };
 
   const submit = () => {
     const id = parseInt(selectedId, 10);
@@ -397,174 +307,274 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
     onMatch({ trackedId: id, salePrice: v, platform, customFee: customFee || undefined, assetid: entry.assetid });
   };
 
-  // Are we showing only fuzzy matches (no exacts found)?
   const isFuzzyOnly =
-    !browseAll &&
-    candidates.length > 0 &&
-    candidates.every((c) => c.matchType === 'fuzzy');
+    !browseAll && candidates.length > 0 && candidates.every((c) => c.matchType === 'fuzzy');
+
+  const showExpansion = browseAll || isFuzzyOnly || platform === 'other';
 
   return (
-    <div className={`flex flex-col gap-3 p-3 rounded-lg ${theme.card} border ${theme.cardBorder}`}>
-      <div className="flex items-start gap-3">
-        <ItemImage iconUrl={entry.iconUrl} alt={entry.marketHashName} />
-        <div className="min-w-0 flex-1">
-          <div className={`text-sm font-semibold ${theme.text} truncate`}>
-            {entry.marketHashName}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            Gone since {new Date(entry.detectedAt).toLocaleString()}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => onDismiss(entry.assetid, 'outgoing')}
-          className="text-slate-500 hover:text-slate-200 p-1 rounded hover:bg-white/5"
-          title="Dismiss (not a sale I track)"
-        >
-          <X size={14} />
-        </button>
-      </div>
-
-      {isFuzzyOnly && (
-        <div className="text-[11px] text-warn bg-warn/10 rounded-md px-2 py-1">
-          No exact match — these are near-matches only. Use "Browse all" to confirm the right item before marking sold.
-        </div>
-      )}
-
-      {browseAll && (
-        <input
-          type="text"
-          value={browseQuery}
-          onChange={(e) => setBrowseQuery(e.target.value)}
-          placeholder={`Search active items (${(allActiveItems || []).length} total)…`}
-          className={`w-full ${theme.input} rounded-md px-3 py-1.5 ${theme.text} text-sm placeholder-slate-500 focus:outline-none border`}
-        />
-      )}
-
-      {visibleCandidates.length === 0 ? (
-        <div className="text-xs text-warn bg-warn/10 rounded-md px-2 py-1.5">
-          {browseAll
-            ? "No active items match that search. Try a different word, or dismiss if it wasn't a tracked sale."
-            : 'No tracked item matches this name. Use "Browse all" to pick one manually, or dismiss.'}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className={`w-full ${theme.input} rounded-md px-2 py-1.5 ${theme.text} text-sm focus:outline-none border`}
-          >
-            {visibleCandidates.map((c) => (
-              <option key={c.id} value={c.id}>
-                {formatCandidateLabel(c)}
-              </option>
-            ))}
-          </select>
-          <PricePair
-            usdValue={usdSalePrice}
-            cnyValue={cnySalePrice}
-            onChange={({ usd, cny }) => { setUsdSalePrice(usd); setCnySalePrice(cny); }}
-            onCnyTyped={() => setPlatform('youpin')}
-            exchangeRate={exchangeRate}
-            theme={theme}
-            currencySymbol={currencySymbol}
-            displayCurrency={displayCurrency}
-          />
-          <PlatformPicker
-            value={platform}
-            onChange={(val) => { setPlatform(val); setCustomFee(val === 'other' ? '0' : ''); }}
-            theme={theme}
-            platforms={PLATFORMS}
-          />
-          {platform === 'other' && (
-            <div className="flex items-center gap-1.5">
-              <input
-                type="number" min="0" max="100" step="0.1"
-                value={customFee}
-                onChange={(e) => setCustomFee(e.target.value)}
-                placeholder="Fee %"
-                className={`w-24 h-9 ${theme.input} rounded-lg px-3 ${theme.text} text-sm focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-              />
-              <span className={`text-sm ${theme.subtext}`}>%</span>
+    <React.Fragment>
+      <tr className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>
+        <td className="px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <ItemImage iconUrl={entry.iconUrl} alt={entry.marketHashName} size={36} />
+            <div className="min-w-0 flex-1">
+              <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>
+                {entry.marketHashName}
+              </p>
+              <p className="text-[10px] text-slate-600 leading-tight">
+                Gone {new Date(entry.detectedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
+          </div>
+        </td>
+
+        <td className="px-3 py-2 align-middle">
+          {visibleCandidates.length > 0 ? (
+            <select
+              value={selectedId}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className={`h-7 w-48 ${theme.input} rounded-lg px-2 text-xs ${theme.text} focus:outline-none border`}
+            >
+              {visibleCandidates.map((c) => (
+                <option key={c.id} value={c.id}>{formatCandidateLabel(c)}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-[10px] text-warn">No match — toggle Search →</span>
           )}
+        </td>
+
+        <td className="px-3 py-2 align-middle">
+          <PricePairCompact
+            usdValue={usdSalePrice}
+            localValue={localSalePrice}
+            onUsdChange={handleUsdChange}
+            onLocalChange={handleLocalChange}
+            theme={theme}
+            exchangeRate={exchangeRate}
+            currencySymbol={currencySymbol}
+            placeholderUsd="Sold"
+            placeholderLocal={displayCurrency}
+          />
+        </td>
+
+        <td className="px-3 py-2 align-middle">
+          <div className="w-32">
+            <PlatformPicker value={platform} onChange={(val) => { setPlatform(val); setCustomFee(val === 'other' ? '0' : ''); }} theme={theme} platforms={PLATFORMS} compact />
+          </div>
+        </td>
+
+        <td className="px-2 py-2 align-middle text-center">
+          <button
+            type="button"
+            onClick={() => { setBrowseAll((prev) => !prev); setBrowseQuery(''); }}
+            title={browseAll ? 'Back to suggestions' : 'Browse all tracked items'}
+            className={`h-7 w-7 rounded-lg border inline-flex items-center justify-center transition-all ${theme.card} ${theme.cardBorder} ${browseAll ? theme.text : 'text-slate-600'}`}
+          >
+            <Search size={11} />
+          </button>
+        </td>
+
+        <td className="px-3 py-2 align-middle text-right">
           <button
             type="button"
             disabled={confirming || !parseFloat(usdSalePrice) || !selectedId || isFuzzyOnly}
             onClick={submit}
-            title={isFuzzyOnly ? 'No confident match — use "Browse all" to pick the item manually' : undefined}
-            className={`relative group w-full flex items-center justify-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition-all duration-200 ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text} disabled:opacity-40 disabled:cursor-not-allowed`}
+            title={isFuzzyOnly ? 'No confident match — toggle Search to pick manually' : undefined}
+            className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all inline-flex items-center gap-1
+              ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text}
+              disabled:opacity-40 disabled:cursor-not-allowed`}
           >
-            {confirming ? <><CheckCircle size={15} /> Marked sold!</> : 'Mark sold'}
-            <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${confirming ? 'w-full bg-profit' : 'w-0 group-hover:w-full ' + theme.dot}`} />
+            {confirming ? <><CheckCircle size={11} /> Sold!</> : 'Mark sold'}
           </button>
-        </div>
-      )}
+        </td>
 
-      <button
-        type="button"
-        onClick={() => {
-          setBrowseAll((prev) => !prev);
-          setBrowseQuery('');
-        }}
-        className={`self-start text-[11px] underline-offset-2 hover:underline ${theme.subtext} ${theme.textHover}`}
-      >
-        {browseAll ? '← Back to suggestions' : 'Browse all tracked items →'}
-      </button>
+        <td className="px-2 py-2 align-middle text-right">
+          <button
+            type="button"
+            onClick={() => onDismiss(entry.assetid, 'outgoing')}
+            className="text-slate-600 hover:text-slate-300 p-1 rounded inline-flex"
+            title="Dismiss"
+          >
+            <X size={13} />
+          </button>
+        </td>
+      </tr>
+
+      {/* Expansion row (browse search / fuzzy warning / custom fee) */}
+      {showExpansion && (
+        <tr className={`border-b ${theme.cardBorder}`}>
+          <td colSpan={7} className="px-3 pb-2.5 pt-0">
+            <div className="ml-12 flex items-center gap-2 flex-wrap">
+              {browseAll && (
+                <input
+                  type="text"
+                  value={browseQuery}
+                  onChange={(e) => setBrowseQuery(e.target.value)}
+                  placeholder={`Search active items (${(allActiveItems || []).length} total)…`}
+                  className={`flex-1 max-w-md h-7 ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
+                />
+              )}
+              {isFuzzyOnly && !browseAll && (
+                <span className="text-[10px] text-warn">
+                  Near-matches only. Toggle Search to confirm the right item.
+                </span>
+              )}
+              {platform === 'other' && (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number" min="0" max="100" step="0.1"
+                    value={customFee}
+                    onChange={(e) => setCustomFee(e.target.value)}
+                    placeholder="Fee"
+                    className={`w-16 h-7 ${theme.input} rounded-lg px-2 ${theme.text} text-xs font-mono focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                  />
+                  <span className={`text-[10px] ${theme.subtext}`}>%</span>
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
+  );
+}
+
+// ─── Analytics ──────────────────────────────────────────────────────────────
+function HandleStats({ items, incomingCount, outgoingCount, theme }) {
+  const activity = useMemo(() => {
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('en-US', { month: 'short' });
+      months.push({ key, label, bought: 0, sold: 0 });
+    }
+    for (const it of items) {
+      if (it.isTransaction) continue;
+      if (it.datePurchased) {
+        const m = (it.datePurchased + '').slice(0, 7);
+        const found = months.find(x => x.key === m);
+        if (found) found.bought += 1;
+      }
+      if (it.sold && it.dateSold) {
+        const m = (it.dateSold + '').slice(0, 7);
+        const found = months.find(x => x.key === m);
+        if (found) found.sold += 1;
+      }
+    }
+    return months;
+  }, [items]);
+
+  const totalReceived = items.filter(i => !i.isTransaction).length;
+  const totalSold = items.filter(i => i.sold && !i.isTransaction).length;
+  const monthBought = activity[activity.length - 1]?.bought ?? 0;
+  const monthSold = activity[activity.length - 1]?.sold ?? 0;
+
+  const statCards = [
+    { label: 'Incoming queue', value: incomingCount, hint: 'pending review', icon: ArrowDownCircle, color: 'text-profit' },
+    { label: 'Outgoing queue', value: outgoingCount, hint: 'awaiting match', icon: ArrowUpCircle, color: 'text-loss' },
+    { label: 'This month', value: `${monthBought}↓ / ${monthSold}↑`, hint: 'bought / sold', plain: true },
+    { label: 'All-time', value: `${totalReceived}↓ / ${totalSold}↑`, hint: 'received / sold', plain: true },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {statCards.map((card, i) => (
+        <div key={i} className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
+          <div className="flex items-center gap-2 mb-1">
+            {card.icon && <card.icon size={12} className={card.color} />}
+            <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>{card.label}</p>
+          </div>
+          <p className={`text-lg font-mono font-semibold tabular-nums ${card.plain ? theme.text : card.color}`}>
+            {card.value}
+          </p>
+          <p className={`text-xs ${theme.subtext}`}>{card.hint}</p>
+        </div>
+      ))}
+
+      <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-3 py-2.5 flex flex-col`}>
+        <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext} mb-1`}>
+          Activity · 6 mo
+        </p>
+        <div className="flex-1 min-h-[60px]">
+          <ResponsiveContainer width="100%" height={62}>
+            <BarChart data={activity} margin={{ top: 4, right: 0, bottom: 0, left: 0 }} barCategoryGap={2}>
+              <CartesianGrid stroke={theme.chartGrid} vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 9, fill: theme.chartAxis }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{ background: theme.chartTooltipBg, border: `1px solid ${theme.chartTooltipBorder}`, borderRadius: 6, fontSize: 11, padding: '4px 8px' }}
+                labelStyle={{ color: '#94a3b8', fontSize: 10 }}
+                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+              />
+              <Bar dataKey="bought" fill={PROFIT_COLOR} radius={[2, 2, 0, 0]} maxBarSize={10} />
+              <Bar dataKey="sold" fill={LOSS_COLOR} radius={[2, 2, 0, 0]} maxBarSize={10} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }
 
+function EmptyState({ theme, text }) {
+  return (
+    <div className={`text-center py-10 text-sm ${theme.subtext}`}>{text}</div>
+  );
+}
+
+// ─── Main page ──────────────────────────────────────────────────────────────
 export default function HandleItemsModal({
-  open,
-  onClose,
   theme,
-  pending,
-  incoming,
-  outgoing,
+  incoming = [],
+  outgoing = [],
   lastSync,
   lastSyncOk,
   lastError,
   reachable,
   busy,
   hasInitialSnapshot,
-  pollIntervalMin,
   onSync,
   onDismiss,
-  items,
+  items = [],
   addItemDirect,
   sellItemDirect,
   exchangeRate,
   currencySymbol = '¥',
   displayCurrency = 'CNY',
-  usdAmount,
-  rmbAmount,
-  handleUsdChange,
-  handleRmbChange,
-  embedded = false,
-  hasTokenSetup = null,
-  tokenExpired = false,
   hasRefreshToken = false,
-  refreshTokenExp = null,
   refreshTokenStatus,
   tradeHoldDismissed = false,
   onDismissTradeHold,
 }) {
   const [tab, setTab] = useState('incoming');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('date-new');
 
-  // Lock body scroll while open as a modal — never lock when embedded.
-  useEffect(() => {
-    if (embedded) return;
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [open, embedded]);
+  const switchTab = (newTab) => {
+    setTab(newTab);
+    setSearchTerm('');
+    setSortBy(newTab === 'outgoing' ? 'name-az' : 'date-new');
+  };
 
-  // Index active (non-pending, non-sold) tracked items by market_hash_name
-  // for outgoing matching.
+  const isSortActive = (sort) => sortBy === sort.desc || sortBy === sort.asc;
+  const handleSortClick = (sort) => {
+    if (sortBy === sort.desc) setSortBy(sort.asc);
+    else if (sortBy === sort.asc) setSortBy(sort.desc);
+    else setSortBy(sort.desc);
+  };
+  const sortArrow = (sort) => {
+    if (sortBy === sort.desc) return ' ↓';
+    if (sortBy === sort.asc) return ' ↑';
+    return '';
+  };
+
   const activeByName = useMemo(() => {
     const map = new Map();
     for (const it of items) {
-      if (it.sold || it.pending) continue;
+      if (it.sold || it.pending || it.isTransaction) continue;
       const key = (it.itemName || '').toLowerCase();
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(it);
@@ -575,24 +585,13 @@ export default function HandleItemsModal({
     return map;
   }, [items]);
 
-  // Flat list of every active tracked item — used as escape hatch when the
-  // user wants to manually pick a match.
   const activeItems = useMemo(
-    () =>
-      items
-        .filter((it) => !it.sold)
-        .sort((a, b) =>
-          (a.itemName || '').localeCompare(b.itemName || '')
-        ),
+    () => items
+      .filter((it) => !it.sold && !it.isTransaction)
+      .sort((a, b) => (a.itemName || '').localeCompare(b.itemName || '')),
     [items]
   );
 
-  // Returns suggestion candidates for an outgoing entry:
-  //   1. Exact-name matches (current behaviour)
-  //   2. If none, falls back to fuzzy token-overlap matches with score >= 0.5
-  //
-  // Each candidate is `{ ...item, matchType, matchScore? }` so the row can
-  // surface why something is being suggested.
   const candidatesFor = (entry) => {
     const key = (entry.marketHashName || '').toLowerCase();
     const exact = activeByName.get(key);
@@ -608,67 +607,94 @@ export default function HandleItemsModal({
     return scored.slice(0, 10);
   };
 
-  if (!embedded && !open) return null;
-
-
   const incomingCount = incoming.length;
   const outgoingCount = outgoing.length;
 
-  // The actual UI — header, status, tabs, body — captured as a single JSX
-  // tree so we can wrap it in either a modal frame or an inline panel.
-  const innerUi = (
-    <>
-      {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 border-b ${theme.panelBorder || theme.cardBorder} shrink-0`}>
-          <h3 className={`font-semibold ${theme.text}`}>Handle Items</h3>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-600">
+  const visibleIncomingGroups = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    const filtered = q
+      ? incoming.filter(e => (e.marketHashName || '').toLowerCase().includes(q))
+      : incoming;
+
+    const groups = [];
+    const seen = new Map();
+    for (const entry of filtered) {
+      const k = entry.marketHashName;
+      if (!seen.has(k)) { seen.set(k, []); groups.push(seen.get(k)); }
+      seen.get(k).push(entry);
+    }
+
+    return groups.sort((a, b) => {
+      const x = a[0], y = b[0];
+      switch (sortBy) {
+        case 'date-old': return (x.detectedAt || 0) - (y.detectedAt || 0);
+        case 'name-az':  return (x.marketHashName || '').localeCompare(y.marketHashName || '');
+        case 'name-za':  return (y.marketHashName || '').localeCompare(x.marketHashName || '');
+        case 'date-new':
+        default:         return (y.detectedAt || 0) - (x.detectedAt || 0);
+      }
+    });
+  }, [incoming, searchTerm, sortBy]);
+
+  const visibleOutgoing = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    const filtered = q
+      ? outgoing.filter(e => (e.marketHashName || '').toLowerCase().includes(q))
+      : outgoing;
+    const arr = [...filtered];
+    switch (sortBy) {
+      case 'date-old': return arr.sort((x, y) => (x.detectedAt || 0) - (y.detectedAt || 0));
+      case 'name-az':  return arr.sort((x, y) => (x.marketHashName || '').localeCompare(y.marketHashName || '') || (x.detectedAt || 0) - (y.detectedAt || 0));
+      case 'name-za':  return arr.sort((x, y) => (y.marketHashName || '').localeCompare(x.marketHashName || '') || (x.detectedAt || 0) - (y.detectedAt || 0));
+      case 'date-new':
+      default:         return arr.sort((x, y) => (y.detectedAt || 0) - (x.detectedAt || 0));
+    }
+  }, [outgoing, searchTerm, sortBy]);
+
+  const tableHeaderCls = `text-[10px] uppercase tracking-wide font-semibold ${theme.subtext}`;
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+      <div className="max-w-7xl mx-auto space-y-4">
+
+        {/* Status header */}
+        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-3 flex items-center justify-between`}>
+          <div className="flex items-center gap-3">
+            <h2 className={`font-semibold ${theme.text}`}>Handle Items</h2>
+            <span className={`text-[11px] ${theme.subtext}`}>
               {hasInitialSnapshot && lastSync
-                ? `Last Sync: ${new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                ? `Last sync: ${new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                 : !hasInitialSnapshot ? 'No snapshot yet' : ''}
             </span>
-            <button
-              type="button"
-              onClick={onSync}
-              disabled={busy}
-              className={`relative group flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-medium border transition-all
-                ${theme.card} ${theme.cardBorder} ${busy ? theme.text : `${theme.subtext} ${theme.textHover}`}
-                disabled:opacity-50`}
-            >
-              <RefreshCw size={12} className={busy ? 'animate-spin' : ''} />
-              {busy ? 'Syncing…' : 'Sync Inventory'}
-              <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${theme.dot} ${busy ? 'w-full' : 'w-0 group-hover:w-full'}`} />
-            </button>
-            {!embedded && (
-              <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors p-1">
-                <X size={18} />
-              </button>
-            )}
           </div>
+          <button
+            type="button"
+            onClick={onSync}
+            disabled={busy}
+            className={`flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium border transition-all
+              ${theme.card} ${theme.cardBorder} ${busy ? theme.text : `${theme.subtext} ${theme.textHover}`}
+              disabled:opacity-50`}
+          >
+            <RefreshCw size={12} className={busy ? 'animate-spin' : ''} />
+            {busy ? 'Syncing…' : 'Sync inventory'}
+          </button>
         </div>
 
-
-        {/* Error / unreachable banner — only shown when something's off. */}
+        {/* Error banner */}
         {(reachable === false || lastSyncOk === false) && (
-          <div className="px-4 py-2 text-[11px] flex items-center gap-1.5 flex-wrap">
+          <div className={`px-4 py-2 rounded-xl border text-[11px] flex items-center gap-1.5 flex-wrap ${reachable === false ? 'border-amber-500/30 bg-amber-500/5 text-amber-300' : 'border-red-500/30 bg-red-500/5 text-red-300'}`}>
+            <AlertTriangle size={12} />
             {reachable === false ? (
-              <span className="flex items-center gap-1.5 text-amber-300">
-                <AlertTriangle size={12} />
-                Local backend not reachable on localhost:3001 — start it with{' '}
-                <code className="bg-white/5 px-1 rounded">cd server && npm start</code>
-              </span>
+              <>Local backend not reachable on localhost:3001 — start it with <code className="bg-white/5 px-1 rounded">cd server &amp;&amp; npm start</code></>
             ) : (
-              <span className="flex items-center gap-1.5 text-red-300">
-                <AlertTriangle size={12} />
-                Sync failed: {lastError}
-              </span>
+              <>Sync failed: {lastError}</>
             )}
           </div>
         )}
 
-        {/* Token setup — shown when no refresh token and not dismissed */}
+        {/* Token setup */}
         {!hasRefreshToken && !tradeHoldDismissed && (
-          <div className="px-4 py-3 border-b" style={{borderColor: 'inherit'}}>
+          <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-4`}>
             <SteamQRSetup theme={theme} onComplete={refreshTokenStatus} expired={false} hasRefreshToken={false} refreshTokenExp={null} />
             <button
               type="button"
@@ -680,153 +706,154 @@ export default function HandleItemsModal({
           </div>
         )}
 
+        {/* Analytics */}
+        <HandleStats items={items} incomingCount={incomingCount} outgoingCount={outgoingCount} theme={theme} />
+
         {/* Tabs */}
-        <div className="flex border-b border-transparent">
-          <button
-            type="button"
-            onClick={() => setTab('incoming')}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-              tab === 'incoming'
-                ? `${theme.text} bg-white/5 border-b-2 border-profit`
-                : `text-slate-400 ${theme.textHover}`
-            }`}
-          >
-            <ArrowDownCircle size={14} className="text-profit" />
-            Incoming
-            {incomingCount > 0 && (
-              <span className="bg-profit/20 text-profit text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                {incomingCount}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('outgoing')}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-              tab === 'outgoing'
-                ? `${theme.text} bg-white/5 border-b-2 border-loss`
-                : `text-slate-400 ${theme.textHover}`
-            }`}
-          >
-            <ArrowUpCircle size={14} className="text-loss" />
-            Outgoing
-            {outgoingCount > 0 && (
-              <span className="bg-loss/20 text-loss text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                {outgoingCount}
-              </span>
-            )}
-          </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <TabButton
+            label="Incoming"
+            count={incomingCount}
+            isActive={tab === 'incoming'}
+            onClick={() => switchTab('incoming')}
+            theme={theme}
+            accentColor={theme.accentColor}
+            badgeClass={
+              incomingCount > 0
+                ? 'bg-profit/20 text-profit'
+                : tab === 'incoming' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
+            }
+          />
+          <TabButton
+            label="Outgoing"
+            count={outgoingCount}
+            isActive={tab === 'outgoing'}
+            onClick={() => switchTab('outgoing')}
+            theme={theme}
+            accentColor={theme.accentColor}
+            badgeClass={
+              outgoingCount > 0
+                ? 'bg-loss/20 text-loss'
+                : tab === 'outgoing' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
+            }
+          />
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Search + sort */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={tab === 'incoming' ? `Search ${incomingCount} incoming items…` : `Search ${outgoingCount} outgoing items…`}
+              className={`w-full pl-8 pr-3 py-2 ${theme.card} border ${theme.cardBorder} rounded-lg text-sm ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors`}
+            />
+          </div>
+          <div className={`flex items-center rounded-lg border ${theme.cardBorder} overflow-hidden`}>
+            {SORTS.map((sort, i) => (
+              <button
+                key={sort.label}
+                onClick={() => handleSortClick(sort)}
+                className={`px-3 py-[7px] text-xs font-medium transition-colors whitespace-nowrap ${
+                  i > 0 ? `border-l ${theme.cardBorder}` : ''
+                } ${
+                  isSortActive(sort)
+                    ? `${theme.card} ${theme.textSecondary}`
+                    : `text-slate-600 hover:text-slate-300 ${theme.itemHoverBg}`
+                }`}
+              >
+                {sort.label}{sortArrow(sort)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
           {tab === 'incoming' && (
-            <>
-              {incoming.length === 0 ? (
-                <EmptyState
-                  theme={theme}
-                  text="No new items detected. You're all caught up."
-                />
-              ) : (() => {
-                // Group incoming by marketHashName so duplicate items render as one row
-                const groups = [];
-                const seen = new Map();
-                for (const entry of incoming) {
-                  const k = entry.marketHashName;
-                  if (!seen.has(k)) { seen.set(k, []); groups.push(seen.get(k)); }
-                  seen.get(k).push(entry);
-                }
-                return groups.map(group => group.length === 1 ? (
-                  <IncomingRow
-                    key={`in-${group[0].assetid}`}
-                    entry={group[0]}
-                    theme={theme}
-                    exchangeRate={exchangeRate}
-                    currencySymbol={currencySymbol}
-                    displayCurrency={displayCurrency}
-                    onAdd={(payload) => {
-                      addItemDirect(payload);
-                      onDismiss(group[0].assetid, 'incoming');
-                    }}
-                    onDismiss={onDismiss}
-                  />
-                ) : (
-                  <GroupedIncomingRow
-                    key={`group-${group[0].marketHashName}`}
-                    entries={group}
-                    theme={theme}
-                    exchangeRate={exchangeRate}
-                    currencySymbol={currencySymbol}
-                    displayCurrency={displayCurrency}
-                    onAddAll={(payload) => {
-                      group.forEach(() => addItemDirect(payload));
-                      onDismiss(group.map(e => e.assetid), 'incoming');
-                    }}
-                    onDismissAll={() => onDismiss(group.map(e => e.assetid), 'incoming')}
-                  />
-                ));
-              })()}
-            </>
+            incoming.length === 0 ? (
+              <EmptyState theme={theme} text="No new items detected. You're all caught up." />
+            ) : visibleIncomingGroups.length === 0 ? (
+              <EmptyState theme={theme} text={`No incoming items match "${searchTerm}".`} />
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className={`border-b ${theme.cardBorder}`}>
+                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Item</th>
+                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Price</th>
+                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Platform</th>
+                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Notes</th>
+                    <th className={`text-center px-2 py-2 ${tableHeaderCls}`}>Hold</th>
+                    <th className={`text-right px-3 py-2 ${tableHeaderCls}`}>Action</th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleIncomingGroups.map((group, i) => (
+                    <IncomingRow
+                      key={`in-${group[0].marketHashName}-${group[0].assetid}-${i}`}
+                      entries={group}
+                      theme={theme}
+                      exchangeRate={exchangeRate}
+                      currencySymbol={currencySymbol}
+                      displayCurrency={displayCurrency}
+                      onAddAll={(payload) => {
+                        group.forEach(() => addItemDirect(payload));
+                        onDismiss(group.map(e => e.assetid), 'incoming');
+                      }}
+                      onDismissGroup={(ids) => onDismiss(ids, 'incoming')}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            )
           )}
 
           {tab === 'outgoing' && (
             outgoing.length === 0 ? (
               <EmptyState theme={theme} text="No items have left your inventory since last sync." />
+            ) : visibleOutgoing.length === 0 ? (
+              <EmptyState theme={theme} text={`No outgoing items match "${searchTerm}".`} />
             ) : (
-              outgoing.map((entry) => (
-                <OutgoingRow
-                  key={`out-${entry.assetid}`}
-                  entry={entry}
-                  candidates={candidatesFor(entry)}
-                  allActiveItems={activeItems}
-                  theme={theme}
-                  exchangeRate={exchangeRate}
-                  currencySymbol={currencySymbol}
-                  displayCurrency={displayCurrency}
-                  onMatch={({ trackedId, salePrice, platform, customFee, assetid }) => {
-                    const ok = sellItemDirect(trackedId, salePrice, platform, customFee);
-                    if (ok) onDismiss(assetid, 'outgoing');
-                  }}
-                  onDismiss={onDismiss}
-                />
-              ))
+              <table className="w-full">
+                <thead>
+                  <tr className={`border-b ${theme.cardBorder}`}>
+                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Item</th>
+                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Tracked match</th>
+                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Sale price</th>
+                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Platform</th>
+                    <th className={`text-center px-2 py-2 ${tableHeaderCls}`}>Search</th>
+                    <th className={`text-right px-3 py-2 ${tableHeaderCls}`}>Action</th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleOutgoing.map((entry) => (
+                    <OutgoingRow
+                      key={`out-${entry.assetid}`}
+                      entry={entry}
+                      candidates={candidatesFor(entry)}
+                      allActiveItems={activeItems}
+                      theme={theme}
+                      exchangeRate={exchangeRate}
+                      currencySymbol={currencySymbol}
+                      displayCurrency={displayCurrency}
+                      onMatch={({ trackedId, salePrice, platform, customFee, assetid }) => {
+                        const ok = sellItemDirect(trackedId, salePrice, platform, customFee);
+                        if (ok) onDismiss(assetid, 'outgoing');
+                      }}
+                      onDismiss={onDismiss}
+                    />
+                  ))}
+                </tbody>
+              </table>
             )
           )}
         </div>
-    </>
-  );
 
-  if (embedded) {
-    return (
-      <div
-        id="section-handle"
-        className={`relative w-full min-h-[480px] ${theme.panel} ${theme.panelBorder} rounded-xl border shadow-lg flex flex-col overflow-hidden`}
-      >
-        {innerUi}
       </div>
-    );
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onMouseDown={(e) => { e.currentTarget.dataset.closeIntent = e.target === e.currentTarget ? '1' : '0'; }}
-      onClick={(e) => { if (e.currentTarget.dataset.closeIntent === '1') onClose(); }}
-    >
-      <div
-        className={`relative w-full max-w-3xl h-[85vh] overflow-hidden ${theme.panel || theme.card} ${theme.cardBorder} rounded-2xl border shadow-2xl flex flex-col`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {innerUi}
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ theme, text }) {
-  return (
-    <div className={`text-center py-10 text-sm ${theme.subtext || 'text-slate-400'}`}>
-      {text}
     </div>
   );
 }

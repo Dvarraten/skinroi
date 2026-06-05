@@ -67,20 +67,73 @@ export default function AddItemForm({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Item Name */}
-        <div>
-          <label className={label}>Item Name</label>
-          <ItemAutoComplete
-            value={formData.itemName}
-            onChange={(val) => setFormData({ ...formData, itemName: val })}
-            placeholder="Search…"
-            theme={theme}
-          />
+      <div className="flex flex-col gap-4">
+        {/* Item Name + Quantity row */}
+        <div className="flex items-end gap-3">
+          <div className="flex-1 min-w-0">
+            <label className={label}>Item Name</label>
+            <ItemAutoComplete
+              value={formData.itemName}
+              onChange={(val) => setFormData({ ...formData, itemName: val })}
+              placeholder="Search…"
+              theme={theme}
+            />
+          </div>
+          <div className="shrink-0 w-[112px]">
+            <label className={label}>
+              Qty
+              {formData.quantity > 1 && formData.purchasePrice && (
+                <span className="ml-1.5 text-profit normal-case font-mono tracking-normal text-[10px]">
+                  ${(parseFloat(formData.purchasePrice) * formData.quantity).toFixed(2)}
+                </span>
+              )}
+            </label>
+            <div className={`flex items-center ${inputH} rounded-lg border ${theme.input} overflow-hidden`}>
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData({
+                    ...formData,
+                    quantity: Math.max(1, (parseInt(formData.quantity) || 1) - 1),
+                  })
+                }
+                className={`h-full w-8 flex items-center justify-center text-sm ${theme.subtext} ${theme.textHover} hover:bg-white/5 transition-colors`}
+                aria-label="Decrease quantity"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min="1"
+                max="999"
+                value={formData.quantity}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    quantity: Math.max(1, parseInt(e.target.value) || 1),
+                  })
+                }
+                className={`flex-1 h-full min-w-0 bg-transparent text-center text-sm font-mono ${theme.text} focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData({
+                    ...formData,
+                    quantity: (parseInt(formData.quantity) || 1) + 1,
+                  })
+                }
+                className={`h-full w-8 flex items-center justify-center text-sm ${theme.subtext} ${theme.textHover} hover:bg-white/5 transition-colors`}
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Purchase Price — USD + CNY linked pair */}
-        <div className="md:col-span-2">
+        <div>
           <label className={label}>Purchase Price</label>
           <PricePair
             usdValue={formData.purchasePrice}
@@ -97,7 +150,7 @@ export default function AddItemForm({
           />
         </div>
 
-        {/* Platform */}
+        {/* Platform — full width so long names fit */}
         <div>
           <label className={label}>Platform</label>
           <PlatformPicker
@@ -120,61 +173,8 @@ export default function AddItemForm({
           )}
         </div>
 
-        {/* Quantity */}
+        {/* Notes */}
         <div>
-          <label className={label}>
-            Quantity
-            {formData.quantity > 1 && formData.purchasePrice && (
-              <span className="ml-2 text-profit normal-case font-mono tracking-normal">
-                = $
-                {(
-                  parseFloat(formData.purchasePrice) * formData.quantity
-                ).toFixed(2)}{" "}
-                total
-              </span>
-            )}
-          </label>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() =>
-                setFormData({
-                  ...formData,
-                  quantity: Math.max(1, (parseInt(formData.quantity) || 1) - 1),
-                })
-              }
-              className={`${theme.card} hover:bg-white/10 ${theme.text} ${inputH} w-9 rounded-lg flex items-center justify-center text-base font-bold transition-colors shrink-0 border ${theme.cardBorder}`}
-            >
-              −
-            </button>
-            <input
-              type="number"
-              min="1"
-              max="999"
-              value={formData.quantity}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  quantity: Math.max(1, parseInt(e.target.value) || 1),
-                })
-              }
-              className={`w-full ${inputH} ${theme.input} rounded-lg px-3 text-sm font-mono ${theme.text} text-center focus:outline-none transition-colors border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-            />
-            <button
-              onClick={() =>
-                setFormData({
-                  ...formData,
-                  quantity: (parseInt(formData.quantity) || 1) + 1,
-                })
-              }
-              className={`${theme.card} hover:bg-white/10 ${theme.text} ${inputH} w-9 rounded-lg flex items-center justify-center text-base font-bold transition-colors shrink-0 border ${theme.cardBorder}`}
-            >
-              +
-            </button>
-          </div>
-        </div>
-
-        {/* Notes — full width */}
-        <div className="md:col-span-2">
           <label className={label}>Notes</label>
           <input
             type="text"

@@ -297,8 +297,6 @@ function ItemCard({
     });
   };
 
-  const [deleteConfirming, setDeleteConfirming] = useState(false);
-
   const onDelete = () => {
     setExiting(true);
     setTimeout(() => handleDeleteItem(item.id), 400);
@@ -364,22 +362,22 @@ function ItemCard({
           </div>
         )}
 
-        {/* Top-right action: X cancel when sell open, trash on hover otherwise */}
-        {!selectMode && (
-          <div className={`absolute top-1.5 right-1.5 z-20 transition-opacity duration-150 ${sellOpen || deleteConfirming ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-            {sellOpen ? (
-              <button
-                type="button"
-                onClick={() => setSellOpen(false)}
-                className="p-1.5 rounded-lg transition-all text-red-400/50 hover:text-red-400 hover:bg-red-500/10 active:text-red-500 active:bg-red-500/20"
-              >
-                <X size={13} />
-              </button>
-            ) : (
-              <DeleteButton onDelete={onDelete} onConfirmingChange={setDeleteConfirming} />
-            )}
+        {/* Top-right action: X cancel-sell when sell open, trash in select mode */}
+        {sellOpen ? (
+          <div className="absolute top-1.5 right-1.5 z-30">
+            <button
+              type="button"
+              onClick={() => setSellOpen(false)}
+              className="p-1.5 rounded-lg transition-all text-red-400/50 hover:text-red-400 hover:bg-red-500/10 active:text-red-500 active:bg-red-500/20"
+            >
+              <X size={13} />
+            </button>
           </div>
-        )}
+        ) : selectMode ? (
+          <div className="absolute top-1.5 right-1.5 z-30" onClick={(e) => e.stopPropagation()}>
+            <DeleteButton onDelete={onDelete} />
+          </div>
+        ) : null}
 
         {/* Select checkbox */}
         {selectMode && !item.sold && (
@@ -877,8 +875,10 @@ function ListRow({
                     <X size={12} />
                   </button>
                 )}
-                {!selectMode && !sellOpen && (
-                  <DeleteButton onDelete={() => handleDeleteItem(item.id)} />
+                {selectMode && !sellOpen && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <DeleteButton onDelete={() => handleDeleteItem(item.id)} />
+                  </div>
                 )}
               </>
             )}

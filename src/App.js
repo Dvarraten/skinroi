@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
 import { themes } from './themes/themes';
 import './index.css';
 
@@ -15,7 +14,6 @@ import { importFromCSV } from './utils/importCSV';
 import Header from './components/Header';
 import ThemePicker from './components/ThemePicker';
 import ItemGrid from './components/ItemGrid';
-import AddItemForm from './components/AddItemForm';
 import ProfitChart from './components/ProfitChart';
 import TabsAndSearchbar from './components/TabsAndSearchbar';
 import PortfolioHero from './components/PortfolioHero';
@@ -24,6 +22,7 @@ import CurrencyConverter from './components/Sidebar/CurrencyConverter';
 import HandleItemsModal from './components/HandleItemsModal';
 import AboutModal from './components/AboutModal';
 import TransactionModal from './components/TransactionModal';
+import AddItemPage from './components/AddItemPage';
 
 export default function CS2TradingTracker() {
   const { user, loading: authLoading, login, logout } = useAuth();
@@ -64,7 +63,7 @@ export default function CS2TradingTracker() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [tradeHoldDismissed, setTradeHoldDismissed] = useState(() => !!localStorage.getItem('skinroi-tradehold-dismissed'));
-  const [activeModal, setActiveModal] = useState(null); // null | 'analytics' | 'addItem' | 'handleItems' | 'about'
+  const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'analytics' | 'about'
   const [chartPeriod, setChartPeriod] = useState('30d');
   const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'bloomberg'); return themes[r] ? r : 'bloomberg'; });
   const [showThemePicker, setShowThemePicker] = useState(false);
@@ -74,13 +73,14 @@ export default function CS2TradingTracker() {
     return saved === 'list' ? 'list' : 'grid';
   });
 
-  const showAnalytics    = activeModal === 'analytics';
-  const showAddItem      = activeModal === 'addItem';
-  const showHandleItems  = activeModal === 'handleItems';
-  const showTransactions = activeModal === 'transactions';
-  const showAbout        = activeModal === 'about';
-  const openModal  = (name) => setActiveModal(prev => prev === name ? null : name);
-  const closeModal = () => setActiveModal(null);
+  const isHome           = !activePage;
+  const showAnalytics    = activePage === 'analytics';
+  const showAddItem      = activePage === 'addItem';
+  const showHandleItems  = activePage === 'handleItems';
+  const showTransactions = activePage === 'transactions';
+  const showAbout        = activePage === 'about';
+  const openPage  = (name) => setActivePage(prev => prev === name ? null : name);
+  const closePage = () => setActivePage(null);
 
   const themeStyles = themes[theme];
   const { profitChartData } = useChartData(items, chartPeriod);
@@ -104,11 +104,6 @@ export default function CS2TradingTracker() {
       setSortBy('newest');
     }
   }, [activeTab, sortBy]);
-
-  useEffect(() => {
-    document.body.style.overflow = showAnalytics ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [showAnalytics]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const now = Date.now();
@@ -194,30 +189,16 @@ export default function CS2TradingTracker() {
         />
       )}
 
-      {showAnalytics && (
-        <ProfitChart
-          profitChartData={profitChartData}
-          chartPeriod={chartPeriod}
-          setChartPeriod={setChartPeriod}
-          stats={stats}
-          theme={themeStyles}
-          items={items}
-          onClose={closeModal}
-        />
-      )}
-
       {/* ── Top header ────────────────────────────────────────────────────── */}
       <Header
         theme={themeStyles}
-        onAnalyticsClick={() => openModal('analytics')}
-        onAddItemClick={() => openModal('addItem')}
-        onHandleItemsClick={() => openModal('handleItems')}
-        onTransactionClick={() => openModal('transactions')}
-        showTransactions={showTransactions}
-        onAboutClick={() => openModal('about')}
-        onHomeClick={closeModal}
-        showAddItem={showAddItem}
-        showHandleItems={showHandleItems}
+        activePage={activePage}
+        onAnalyticsClick={() => openPage('analytics')}
+        onAddItemClick={() => openPage('addItem')}
+        onHandleItemsClick={() => openPage('handleItems')}
+        onTransactionClick={() => openPage('transactions')}
+        onAboutClick={() => openPage('about')}
+        onHomeClick={closePage}
         pendingCount={steamSync.pendingCount}
         user={user}
         onLogin={login}
@@ -254,7 +235,9 @@ export default function CS2TradingTracker() {
         </div>
       </Header>
 
-      {/* ── Portfolio hero band ───────────────────────────────────────────── */}
+      {/* ── Home view (hero + main content row) ─────────────────────────── */}
+      {isHome && (
+      <>
       <div className="shrink-0 px-6 pt-3 pb-0">
         <PortfolioHero
           stats={stats}
@@ -263,7 +246,6 @@ export default function CS2TradingTracker() {
         />
       </div>
 
-      {/* ── Main content row ─────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0 gap-6 px-6 py-4">
 
         {/* Item list — fills remaining width */}
@@ -337,50 +319,47 @@ export default function CS2TradingTracker() {
 
         </aside>
       </div>
-
-      {/* ── Add Item modal ────────────────────────────────────────────────── */}
-      {showAddItem && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onMouseDown={(e) => { e.currentTarget.dataset.closeIntent = e.target === e.currentTarget ? '1' : '0'; }}
-          onClick={(e) => { if (e.currentTarget.dataset.closeIntent === '1') closeModal(); }}
-        >
-          <div
-            className={`relative w-full max-w-xl max-h-[85vh] flex flex-col ${themeStyles.panel} border ${themeStyles.panelBorder} rounded-2xl shadow-2xl overflow-hidden`}
-          >
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${themeStyles.panelBorder} shrink-0`}>
-              <h2 className={`font-semibold ${themeStyles.text}`}>Add New Item</h2>
-              <button onClick={closeModal} className="text-slate-500 hover:text-slate-300 transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5">
-              <AddItemForm
-                formData={formData} setFormData={setFormData}
-                handleAddItem={handleAddItem} theme={themeStyles}
-                exchangeRate={exchangeRate} currencySymbol={currencySymbol} displayCurrency={displayCurrency} bare
-              />
-            </div>
-          </div>
-        </div>
+      </>
       )}
 
-      {showAbout && <AboutModal onClose={closeModal} theme={themeStyles} />}
-
-      {/* ── Transactions modal ───────────────────────────────────────────── */}
-      {showTransactions && (
-        <TransactionModal
-          onClose={closeModal}
-          onAdd={(tx) => { handleAddTransaction(tx); }}
-          theme={themeStyles}
+      {/* ── Add Item page ─────────────────────────────────────────────────── */}
+      {showAddItem && (
+        <AddItemPage
+          formData={formData} setFormData={setFormData}
+          handleAddItem={handleAddItem} theme={themeStyles}
+          exchangeRate={exchangeRate} currencySymbol={currencySymbol} displayCurrency={displayCurrency}
+          items={items}
         />
       )}
 
-      {/* ── Handle Items modal ────────────────────────────────────────────── */}
+      {/* ── About page ───────────────────────────────────────────────────── */}
+      {showAbout && <AboutModal theme={themeStyles} />}
+
+      {/* ── Transactions page ────────────────────────────────────────────── */}
+      {showTransactions && (
+        <TransactionModal
+          onAdd={(tx) => { handleAddTransaction(tx); }}
+          theme={themeStyles}
+          items={items}
+        />
+      )}
+
+      {/* ── Analytics page ───────────────────────────────────────────────── */}
+      {showAnalytics && (
+        <ProfitChart
+          profitChartData={profitChartData}
+          chartPeriod={chartPeriod}
+          setChartPeriod={setChartPeriod}
+          stats={stats}
+          theme={themeStyles}
+          items={items}
+        />
+      )}
+
+      {/* ── Handle Items page ────────────────────────────────────────────── */}
       {showHandleItems && (
         <HandleItemsModal
-          open={showHandleItems}
-          onClose={closeModal}
+          page
           theme={themeStyles}
           items={items}
           addItemDirect={addItemDirect}

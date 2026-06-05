@@ -22,7 +22,7 @@ const SORTS = {
   ],
 };
 
-function TabButton({ label, count, isActive, onClick, theme, accentColor, badgeClass }) {
+export function TabButton({ label, count, isActive, onClick, theme, accentColor, badgeClass }) {
   return (
     <button
       onClick={onClick}
