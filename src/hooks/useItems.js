@@ -191,6 +191,37 @@ export const useItems = (steamId) => {
     }));
   };
 
+  const handleAddTransaction = ({ type, platform, amount, feePercent }) => {
+    const feeAmt = Math.round(amount * feePercent / 100 * 100) / 100;
+    const now = Date.now();
+    const PLATFORM_LABELS = {
+      buff163: 'Buff163', csfloat: 'CSFloat', csmoney: 'CS.MONEY',
+      skinswap: 'SkinSwap', dmarket: 'DMarket', youpin: 'Youpin', skins: 'Skins.com',
+    };
+    const platformLabel = PLATFORM_LABELS[platform] || platform;
+    const newItem = {
+      id: now,
+      itemName: `${platformLabel} ${type === 'deposit' ? 'Deposit' : 'Withdrawal'}`,
+      purchasePrice: 0,
+      salePrice: 0,
+      profit: -feeAmt,
+      profitPercent: -feePercent,
+      sold: true,
+      soldAt: now,
+      dateSold: new Date(now).toISOString().split('T')[0],
+      datePurchased: new Date(now).toISOString().split('T')[0],
+      platform,
+      notes: '',
+      pending: false,
+      isTransaction: true,
+      transactionType: type,
+      transactionAmount: amount,
+      transactionFeePercent: feePercent,
+      iconUrl: null,
+    };
+    setItems(prev => [newItem, ...prev]);
+  };
+
   // Bulk delete by IDs (used by the select-mode toolbar).
   const handleBulkDelete = (ids) => {
     if (!ids || ids.length === 0) return;
@@ -238,5 +269,6 @@ export const useItems = (steamId) => {
     sellItemDirect,
     promotePendingItem,
     handleBulkDelete,
+    handleAddTransaction,
   };
 };

@@ -10,6 +10,7 @@ export default function ThemePicker({
   setTheme,
   theme,
   themes,
+  dropUp = false,
 }) {
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -23,7 +24,7 @@ export default function ThemePicker({
 
       {showThemePicker && (
         <div
-          className={`absolute right-0 mt-2 w-52 ${themeStyles.panel} border ${themeStyles.panelBorder} rounded-xl shadow-2xl z-50 overflow-hidden`}
+          className={`absolute right-0 ${dropUp ? 'bottom-full mb-2' : 'mt-2'} w-52 ${themeStyles.panel} border ${themeStyles.panelBorder} rounded-xl shadow-2xl z-50 overflow-hidden`}
         >
           <div
             className={`px-3 py-2 text-xs font-semibold uppercase tracking-widest ${themeStyles.subtext} border-b ${themeStyles.panelBorder}`}

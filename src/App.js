@@ -12,17 +12,18 @@ import { useSteamSync } from './hooks/useSteamSync';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
 
-import CurrencyConverter from './components/Sidebar/CurrencyConverter';
-import StatsCards from './components/StatsCards';
+import Header from './components/Header';
+import ThemePicker from './components/ThemePicker';
 import ItemGrid from './components/ItemGrid';
 import AddItemForm from './components/AddItemForm';
-import RecentSales from './components/RecentSales';
 import ProfitChart from './components/ProfitChart';
-import ThemePicker from './components/ThemePicker';
 import TabsAndSearchbar from './components/TabsAndSearchbar';
-import Header from './components/Header';
+import PortfolioHero from './components/PortfolioHero';
+import RecentSales from './components/RecentSales';
+import CurrencyConverter from './components/Sidebar/CurrencyConverter';
 import HandleItemsModal from './components/HandleItemsModal';
 import AboutModal from './components/AboutModal';
+import TransactionModal from './components/TransactionModal';
 
 export default function CS2TradingTracker() {
   const { user, loading: authLoading, login, logout } = useAuth();
@@ -34,7 +35,7 @@ export default function CS2TradingTracker() {
   const {
     items, setItems, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
-    addItemDirect, sellItemDirect, promotePendingItem, handleBulkDelete,
+    addItemDirect, sellItemDirect, promotePendingItem, handleBulkDelete, handleAddTransaction,
   } = useItems(user?.steamId);
 
   const handleImportCSV = (file) => {
@@ -68,11 +69,16 @@ export default function CS2TradingTracker() {
   const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'bloomberg'); return themes[r] ? r : 'bloomberg'; });
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [converterPinned, setConverterPinned] = useState(() => !!localStorage.getItem('skinroi-converter-pinned'));
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem('skinroi-view-mode');
+    return saved === 'list' ? 'list' : 'grid';
+  });
 
-  const showAnalytics  = activeModal === 'analytics';
-  const showAddItem    = activeModal === 'addItem';
-  const showHandleItems = activeModal === 'handleItems';
-  const showAbout      = activeModal === 'about';
+  const showAnalytics    = activeModal === 'analytics';
+  const showAddItem      = activeModal === 'addItem';
+  const showHandleItems  = activeModal === 'handleItems';
+  const showTransactions = activeModal === 'transactions';
+  const showAbout        = activeModal === 'about';
   const openModal  = (name) => setActiveModal(prev => prev === name ? null : name);
   const closeModal = () => setActiveModal(null);
 
@@ -80,13 +86,14 @@ export default function CS2TradingTracker() {
   const { profitChartData } = useChartData(items, chartPeriod);
 
   useEffect(() => { localStorage.setItem('cs2-theme', theme); }, [theme]);
+  useEffect(() => { localStorage.setItem('skinroi-view-mode', viewMode); }, [viewMode]);
   useEffect(() => {
     if (converterPinned) localStorage.setItem('skinroi-converter-pinned', '1');
     else localStorage.removeItem('skinroi-converter-pinned');
   }, [converterPinned]);
 
   const dismissTradeHold = () => { localStorage.setItem('skinroi-tradehold-dismissed', '1'); setTradeHoldDismissed(true); };
-  const enableTradeHold = () => { localStorage.removeItem('skinroi-tradehold-dismissed'); setTradeHoldDismissed(false); };
+  const enableTradeHold  = () => { localStorage.removeItem('skinroi-tradehold-dismissed'); setTradeHoldDismissed(false); };
 
   useEffect(() => {
     if (
@@ -103,7 +110,6 @@ export default function CS2TradingTracker() {
     return () => { document.body.style.overflow = ''; };
   }, [showAnalytics]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-promote pending items whose trade hold has expired
   useEffect(() => {
     const now = Date.now();
     items
@@ -117,18 +123,18 @@ export default function CS2TradingTracker() {
   }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stats = {
-    totalActive: items.filter(i => !i.sold).reduce((sum, i) => sum + i.purchasePrice, 0),
+    totalActive:      items.filter(i => !i.sold).reduce((sum, i) => sum + i.purchasePrice, 0),
     totalActiveCount: items.filter(i => !i.sold).length,
-    totalPending: items.filter(i => !i.sold && i.pending).length,
-    totalSold: items.filter(i => i.sold).reduce((sum, i) => sum + i.purchasePrice + i.profit, 0),
-    totalSoldCount: items.filter(i => i.sold).length,
-    totalProfit: items.filter(i => i.sold).reduce((sum, i) => sum + i.profit, 0),
-    totalInvested: items.reduce((sum, i) => sum + i.purchasePrice, 0),
+    totalPending:     items.filter(i => !i.sold && i.pending).length,
+    totalSold:        items.filter(i => i.sold).reduce((sum, i) => sum + i.purchasePrice + i.profit, 0),
+    totalSoldCount:   items.filter(i => i.sold).length,
+    totalProfit:      items.filter(i => i.sold).reduce((sum, i) => sum + i.profit, 0),
+    totalInvested:    items.reduce((sum, i) => sum + i.purchasePrice, 0),
   };
 
   const filteredItems = items.filter(item => {
     const matchesTab =
-      activeTab === 'active' ? !item.sold
+      activeTab === 'active'  ? !item.sold
       : activeTab === 'pending' ? (!item.sold && !!item.pending)
       : item.sold;
     const matchesSearch =
@@ -141,16 +147,16 @@ export default function CS2TradingTracker() {
     it.soldAt ?? (it.dateSold ? new Date(it.dateSold).getTime() : 0);
 
   const sortedItems = [...filteredItems].sort((a, b) => {
-    if (sortBy === 'newest') return activeTab === 'sold' ? soldTime(b) - soldTime(a) || (b.id - a.id) : b.id - a.id;
-    if (sortBy === 'oldest') return activeTab === 'sold' ? soldTime(a) - soldTime(b) || (a.id - b.id) : a.id - b.id;
-    if (sortBy === 'price-high') return b.purchasePrice - a.purchasePrice;
-    if (sortBy === 'price-low') return a.purchasePrice - b.purchasePrice;
-    if (sortBy === 'profit-high') return (b.profitPercent ?? -Infinity) - (a.profitPercent ?? -Infinity);
-    if (sortBy === 'profit-low') return (a.profitPercent ?? Infinity) - (b.profitPercent ?? Infinity);
+    if (sortBy === 'newest')             return activeTab === 'sold' ? soldTime(b) - soldTime(a) || (b.id - a.id) : b.id - a.id;
+    if (sortBy === 'oldest')             return activeTab === 'sold' ? soldTime(a) - soldTime(b) || (a.id - b.id) : a.id - b.id;
+    if (sortBy === 'price-high')         return b.purchasePrice - a.purchasePrice;
+    if (sortBy === 'price-low')          return a.purchasePrice - b.purchasePrice;
+    if (sortBy === 'profit-high')        return (b.profitPercent ?? -Infinity) - (a.profitPercent ?? -Infinity);
+    if (sortBy === 'profit-low')         return (a.profitPercent ?? Infinity)  - (b.profitPercent ?? Infinity);
     if (sortBy === 'profit-dollar-high') return (b.profit ?? -Infinity) - (a.profit ?? -Infinity);
-    if (sortBy === 'profit-dollar-low') return (a.profit ?? Infinity) - (b.profit ?? Infinity);
-    if (sortBy === 'delivery-soon') return (a.expectedDelivery ?? Infinity) - (b.expectedDelivery ?? Infinity);
-    if (sortBy === 'delivery-late') return (b.expectedDelivery ?? -Infinity) - (a.expectedDelivery ?? -Infinity);
+    if (sortBy === 'profit-dollar-low')  return (a.profit ?? Infinity)  - (b.profit ?? Infinity);
+    if (sortBy === 'delivery-soon')      return (a.expectedDelivery ?? Infinity)  - (b.expectedDelivery ?? Infinity);
+    if (sortBy === 'delivery-late')      return (b.expectedDelivery ?? -Infinity) - (a.expectedDelivery ?? -Infinity);
     return 0;
   });
 
@@ -161,8 +167,8 @@ export default function CS2TradingTracker() {
       return next;
     });
   };
-  const clearSelection = () => setSelectedIds(new Set());
-  const exitSelectMode = () => { setSelectMode(false); clearSelection(); };
+  const clearSelection  = () => setSelectedIds(new Set());
+  const exitSelectMode  = () => { setSelectMode(false); clearSelection(); };
   const confirmBulkDelete = () => {
     if (selectedIds.size === 0) return;
     if (!window.confirm(`Delete ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
@@ -171,7 +177,10 @@ export default function CS2TradingTracker() {
   };
 
   return (
-    <div className="min-h-screen" onClick={() => showThemePicker && setShowThemePicker(false)}>
+    <div
+      className="flex flex-col h-screen overflow-hidden"
+      onClick={() => showThemePicker && setShowThemePicker(false)}
+    >
       <div className={`fixed inset-0 -z-10 pointer-events-none ${themeStyles.bg}`} />
 
       {showWelcome && (
@@ -197,11 +206,14 @@ export default function CS2TradingTracker() {
         />
       )}
 
+      {/* ── Top header ────────────────────────────────────────────────────── */}
       <Header
         theme={themeStyles}
         onAnalyticsClick={() => openModal('analytics')}
         onAddItemClick={() => openModal('addItem')}
         onHandleItemsClick={() => openModal('handleItems')}
+        onTransactionClick={() => openModal('transactions')}
+        showTransactions={showTransactions}
         onAboutClick={() => openModal('about')}
         onHomeClick={closeModal}
         showAddItem={showAddItem}
@@ -242,40 +254,20 @@ export default function CS2TradingTracker() {
         </div>
       </Header>
 
-      <div className="flex gap-6 px-6 overflow-hidden" style={{ height: 'calc(100vh - 72px)' }}>
+      {/* ── Portfolio hero band ───────────────────────────────────────────── */}
+      <div className="shrink-0 px-6 pt-3 pb-0">
+        <PortfolioHero
+          stats={stats}
+          profitChartData={profitChartData}
+          theme={themeStyles}
+        />
+      </div>
 
-        {/* Sidebar — full height, internal scroll, no scrollbar */}
-        <aside className="w-[360px] shrink-0 flex flex-col gap-12 overflow-y-auto py-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* ── Main content row ─────────────────────────────────────────────── */}
+      <div className="flex flex-1 min-h-0 gap-6 px-6 py-4">
 
-          <StatsCards stats={stats} theme={themeStyles} />
-
-          <RecentSales items={items} theme={themeStyles} />
-
-          {/* Currency Converter (when pinned) */}
-          {converterPinned && (
-            <div>
-              <CurrencyConverter
-                usdAmount={usdAmount}
-                rmbAmount={rmbAmount}
-                sidebarRate={sidebarRate}
-                lastUpdated={lastUpdated}
-                handleUsdChange={handleUsdChange}
-                handleRmbChange={handleRmbChange}
-                theme={themeStyles}
-                currency1={currency1}
-                setCurrency1={setCurrency1}
-                currency1Symbol={currency1Symbol}
-                displayCurrency={displayCurrency}
-                setDisplayCurrency={setDisplayCurrency}
-                currencySymbol={currencySymbol}
-              />
-            </div>
-          )}
-
-        </aside>
-
-        {/* Main Content — tab bar is static, only item grid scrolls */}
-        <main className="flex-1 min-w-0 flex flex-col overflow-hidden pt-6">
+        {/* Item list — fills remaining width */}
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
           <div className="shrink-0 pb-2">
             <TabsAndSearchbar
@@ -289,10 +281,11 @@ export default function CS2TradingTracker() {
               onEnterSelectMode={() => setSelectMode(true)}
               onCancelSelectMode={exitSelectMode}
               onConfirmBulkDelete={confirmBulkDelete}
+              viewMode={viewMode} setViewMode={setViewMode}
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto pb-6">
+          <div className="flex-1 overflow-y-auto pb-2">
             <ItemGrid
               sellPlatform={sellPlatform} setSellData={setSellData}
               sellData={sellData} setSellPlatform={setSellPlatform}
@@ -306,12 +299,46 @@ export default function CS2TradingTracker() {
               exchangeRate={exchangeRate}
               currencySymbol={currencySymbol}
               displayCurrency={displayCurrency}
+              viewMode={viewMode}
             />
           </div>
         </main>
+
+        {/* Right aside — movers + currency (hidden below lg) */}
+        <aside className="hidden lg:flex w-[300px] shrink-0 flex-col gap-5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
+          <div>
+            <p className={`text-[10px] font-semibold uppercase tracking-wide ${themeStyles.subtext} mb-2 px-1`}>
+              Recent Sales
+            </p>
+            <RecentSales items={items} theme={themeStyles} />
+          </div>
+
+          <div>
+            <p className={`text-[10px] font-semibold uppercase tracking-wide ${themeStyles.subtext} mb-2 px-1`}>
+              Currency
+            </p>
+            <CurrencyConverter
+              usdAmount={usdAmount}
+              rmbAmount={rmbAmount}
+              sidebarRate={sidebarRate}
+              lastUpdated={lastUpdated}
+              handleUsdChange={handleUsdChange}
+              handleRmbChange={handleRmbChange}
+              theme={themeStyles}
+              currency1={currency1}
+              setCurrency1={setCurrency1}
+              currency1Symbol={currency1Symbol}
+              displayCurrency={displayCurrency}
+              setDisplayCurrency={setDisplayCurrency}
+              currencySymbol={currencySymbol}
+            />
+          </div>
+
+        </aside>
       </div>
 
-      {/* Add Item modal */}
+      {/* ── Add Item modal ────────────────────────────────────────────────── */}
       {showAddItem && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -340,7 +367,16 @@ export default function CS2TradingTracker() {
 
       {showAbout && <AboutModal onClose={closeModal} theme={themeStyles} />}
 
-      {/* Handle Items modal */}
+      {/* ── Transactions modal ───────────────────────────────────────────── */}
+      {showTransactions && (
+        <TransactionModal
+          onClose={closeModal}
+          onAdd={(tx) => { handleAddTransaction(tx); }}
+          theme={themeStyles}
+        />
+      )}
+
+      {/* ── Handle Items modal ────────────────────────────────────────────── */}
       {showHandleItems && (
         <HandleItemsModal
           open={showHandleItems}

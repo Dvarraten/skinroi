@@ -1,7 +1,7 @@
 // Tab bar (Active / Pending / Sold) with item counts, free-text search,
 // segmented sort control, stacked-view toggle, and bulk-delete select mode.
 import React from "react";
-import { Search, MousePointer2 } from "lucide-react";
+import { Search, MousePointer2, LayoutGrid, List } from "lucide-react";
 
 const SORTS = {
   active: [
@@ -47,6 +47,7 @@ function TabButton({ label, count, isActive, onClick, theme, accentColor, badgeC
 export default function TabsAndSearchbar({
   theme, setActiveTab, activeTab, stats, searchTerm, setSearchTerm, sortBy, setSortBy,
   selectMode, selectedIds, onEnterSelectMode, onCancelSelectMode, onConfirmBulkDelete,
+  viewMode, setViewMode,
 }) {
   const sorts = SORTS[activeTab] ?? SORTS.active;
 
@@ -129,6 +130,34 @@ export default function TabsAndSearchbar({
             </button>
           ))}
         </div>
+
+        {/* View toggle */}
+        {setViewMode && (
+          <div className={`flex items-center rounded-lg border ${theme.cardBorder} overflow-hidden`}>
+            <button
+              onClick={() => setViewMode('grid')}
+              title="Grid view"
+              className={`px-2 py-[7px] transition-colors ${
+                viewMode === 'grid'
+                  ? `${theme.card} ${theme.textSecondary}`
+                  : `text-slate-600 hover:text-slate-300 ${theme.itemHoverBg}`
+              }`}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              title="List view"
+              className={`px-2 py-[7px] border-l ${theme.cardBorder} transition-colors ${
+                viewMode === 'list'
+                  ? `${theme.card} ${theme.textSecondary}`
+                  : `text-slate-600 hover:text-slate-300 ${theme.itemHoverBg}`
+              }`}
+            >
+              <List size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Divider + Select — pushed to far right */}
         <div className="h-5 w-px bg-slate-600/40 ml-auto" />

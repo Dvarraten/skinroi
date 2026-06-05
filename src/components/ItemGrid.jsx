@@ -3,7 +3,7 @@
 // Trash icon revealed on card hover. Wear on second line. Notes chip top-left.
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Trash2, CheckCircle, ChevronDown, PackageCheck, ChevronRight, X, Lock, Unlock } from "lucide-react";
+import { Trash2, CheckCircle, ChevronDown, PackageCheck, ChevronRight, X, Lock, Unlock, ArrowDownUp } from "lucide-react";
 import { getPlatformFee } from "../utils/platformFees";
 import { PlatformBadge } from "./PlatformBadge";
 import { PROFIT_COLOR, LOSS_COLOR, WARN_COLOR } from "../themes/themes";
@@ -31,9 +31,31 @@ function parseItemName(name) {
 
 function ItemThumbnail({ item }) {
   const url = useItemImage({ directIconUrl: item.iconUrl, name: item.itemName });
+  if (item.isTransaction) {
+    return (
+      <div className="h-20 w-full flex items-center justify-center">
+        <ArrowDownUp size={28} className={item.transactionType === 'deposit' ? 'text-profit/60' : 'text-loss/60'} />
+      </div>
+    );
+  }
   if (!url) return <div className="w-14 h-14 rounded-lg bg-white/5" />;
   return (
     <img src={url} alt="" loading="lazy" className="h-20 w-full object-contain" />
+  );
+}
+
+function ListThumb({ item }) {
+  const url = useItemImage({ directIconUrl: item.iconUrl, name: item.itemName });
+  if (item.isTransaction) {
+    return (
+      <div className="w-9 h-9 rounded-md bg-white/5 flex items-center justify-center flex-shrink-0">
+        <ArrowDownUp size={15} className={item.transactionType === 'deposit' ? 'text-profit/70' : 'text-loss/70'} />
+      </div>
+    );
+  }
+  if (!url) return <div className="w-9 h-9 rounded-md bg-white/5 flex-shrink-0" />;
+  return (
+    <img src={url} alt="" loading="lazy" className="w-9 h-9 object-contain flex-shrink-0" />
   );
 }
 
@@ -400,7 +422,7 @@ function ItemCard({
             {baseName}
           </h3>
           <span className={`text-xs ${theme.subtext} font-normal block leading-tight mt-1`}>
-            {wear || ' '}
+            {wear || ' '}
           </span>
         </div>
 
@@ -519,6 +541,30 @@ function ItemCard({
                 </div>
               )}
             </>
+          ) : item.isTransaction ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                <span className={`capitalize font-semibold ${item.transactionType === 'deposit' ? 'text-profit' : 'text-loss'}`}>
+                  {item.transactionType}
+                </span>
+                <span className="text-slate-600">·</span>
+                <span className={`${theme.text} font-semibold`}>${item.transactionAmount?.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px]">
+                {item.platform ? <PlatformBadge platform={item.platform} size="xs" /> : null}
+                <span className="text-slate-500 ml-auto">
+                  {item.dateSold ? new Date(item.dateSold).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                </span>
+              </div>
+              <div className="rounded-md py-1.5 px-2 flex items-center justify-between bg-loss/10">
+                <span className="text-xs font-mono font-semibold text-loss">
+                  −${Math.abs(item.profit).toFixed(2)}
+                </span>
+                <span className="text-xs font-mono text-loss/70">
+                  fee {item.transactionFeePercent}%
+                </span>
+              </div>
+            </div>
           ) : (
             <div className="space-y-1.5">
               <div className="flex items-center gap-1 text-[11px] font-mono">
@@ -595,7 +641,7 @@ function StackedCard({ items, theme, accentHex, onExpand }) {
         <div className="mx-4 h-[3px] mb-3 opacity-0" style={{ backgroundColor: barColor }} />
         <div className="mb-1.5">
           <h3 className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>{baseName}</h3>
-          <span className={`text-xs ${theme.subtext} font-normal block leading-tight mt-1`}>{wear || ' '}</span>
+          <span className={`text-xs ${theme.subtext} font-normal block leading-tight mt-1`}>{wear || ' '}</span>
         </div>
         <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] mb-3">
           <span className={`font-mono ${theme.text} font-semibold`}>${rep.purchasePrice.toFixed(2)}</span>
@@ -619,6 +665,294 @@ function StackedCard({ items, theme, accentHex, onExpand }) {
   );
 }
 
+// --- ListRow ---
+// Single table row for list/ledger view. Returns two <tr> elements via Fragment
+// (main row + optional sell-form expansion row).
+
+function ListRow({
+  row, theme,
+  sellData, setSellData, sellPlatform, setSellPlatform,
+  handleSellItem, handleDeleteItem, promotePendingItem,
+  selectMode, selectedIds, onToggleSelect,
+  exchangeRate, currencySymbol, displayCurrency,
+  onExpandGroup,
+}) {
+  const [sellOpen, setSellOpen] = useState(false);
+  const [localSellAmount, setLocalSellAmount] = useState('');
+  const [customFee, setCustomFee] = useState('');
+  const [soldFeedback, setSoldFeedback] = useState(false);
+
+  const isStack = row.type === 'stack';
+  const item = isStack ? row.items[0] : row.item;
+  const count = isStack ? row.items.length : null;
+
+  const countdown = item.pending ? formatDeliveryCountdown(item.expectedDelivery) : null;
+  const { baseName, wear } = parseItemName(item.itemName);
+
+  const fee = !item.sold && sellData[item.id] && parseFloat(sellData[item.id]) > 0
+    ? getPlatformFee(sellPlatform[item.id] || 'csfloat', customFee || undefined) : null;
+  const estProfit = fee !== null ? parseFloat(sellData[item.id]) * (1 - fee) - item.purchasePrice : null;
+  const estProfitPct = estProfit !== null ? (estProfit / item.purchasePrice) * 100 : null;
+
+  const isSelected = !isStack && selectedIds && selectedIds.has(item.id);
+
+  const handleSellUsd = (val) => {
+    setSellData(prev => ({ ...prev, [item.id]: val }));
+    setLocalSellAmount(exchangeRate && val && !isNaN(val)
+      ? (parseFloat(val) * exchangeRate).toFixed(2) : '');
+  };
+
+  const handleSellLocal = (val) => {
+    setLocalSellAmount(val);
+    const usd = exchangeRate && val && !isNaN(val)
+      ? (parseFloat(val) / exchangeRate).toFixed(2) : '';
+    setSellData(prev => ({ ...prev, [item.id]: usd }));
+    if (val) setSellPlatform(prev => ({ ...prev, [item.id]: 'youpin' }));
+  };
+
+  const onSell = () => {
+    if (!sellData[item.id] || parseFloat(sellData[item.id]) <= 0) return;
+    setSoldFeedback(true);
+    setTimeout(() => {
+      handleSellItem(item.id, sellPlatform[item.id] || 'csfloat', customFee || undefined);
+      setSellOpen(false);
+    }, 300);
+  };
+
+  const rowCls = `border-b ${theme.cardBorder} transition-colors ${
+    selectMode && isSelected ? 'bg-red-500/10' : 'hover:bg-white/[0.02]'
+  } ${selectMode && !isStack && !item.sold ? 'cursor-pointer' : ''}`;
+
+  const handleRowClick = selectMode && !isStack && !item.sold
+    ? () => onToggleSelect(item.id)
+    : undefined;
+
+  return (
+    <React.Fragment>
+      <tr className={rowCls} onClick={handleRowClick}>
+        {/* Item */}
+        <td className="px-3 py-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {selectMode && !item.sold && !isStack && (
+              <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                isSelected ? 'bg-red-500 border-red-500' : 'border-white/30 bg-white/5'
+              }`}>
+                {isSelected && <CheckCircle size={10} className="text-white" />}
+              </div>
+            )}
+            <ListThumb item={item} />
+            <div className="min-w-0">
+              <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>{baseName}</p>
+              {wear && <p className={`text-[10px] ${theme.subtext} truncate leading-tight`}>{wear}</p>}
+            </div>
+            {count && count > 1 && (
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white leading-tight flex-shrink-0`}>
+                ×{count}
+              </span>
+            )}
+          </div>
+        </td>
+
+        {/* Cost */}
+        <td className="px-3 py-2 whitespace-nowrap">
+          <span className={`text-xs font-mono font-semibold ${item.isTransaction ? theme.subtext : theme.text}`}>
+            {item.isTransaction
+              ? `$${item.transactionAmount?.toFixed(2)}`
+              : `$${item.purchasePrice.toFixed(2)}`
+            }
+          </span>
+        </td>
+
+        {/* Acquired / Dates */}
+        <td className="px-3 py-2 whitespace-nowrap">
+          {item.isTransaction ? (
+            <span className="text-[10px] text-slate-500">
+              {item.dateSold ? new Date(item.dateSold).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+            </span>
+          ) : item.sold ? (
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] text-slate-500">
+                {item.datePurchased ? new Date(item.datePurchased).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+              </span>
+              <span className="text-[9px] text-slate-700">↓</span>
+              <span className="text-[10px] text-slate-500">
+                {item.dateSold ? new Date(item.dateSold).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+              </span>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-500">
+              {item.datePurchased ? new Date(item.datePurchased).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+            </span>
+          )}
+        </td>
+
+        {/* Platform */}
+        <td className="px-3 py-2">
+          {item.isTransaction ? (
+            item.platform ? <PlatformBadge platform={item.platform} size="xs" /> : <span className="text-slate-700 text-xs">—</span>
+          ) : item.sold ? (
+            <div className="flex flex-col gap-0.5">
+              {item.platform && <PlatformBadge platform={item.platform} size="xs" />}
+              {item.soldPlatform && <PlatformBadge platform={item.soldPlatform} size="xs" />}
+            </div>
+          ) : (
+            item.platform
+              ? <PlatformBadge platform={item.platform} size="xs" />
+              : <span className="text-slate-700 text-xs">—</span>
+          )}
+        </td>
+
+        {/* Status */}
+        <td className="px-3 py-2 whitespace-nowrap">
+          {item.sold && item.isTransaction ? (
+            <span className="inline-flex items-center rounded-md py-0.5 px-1.5 text-[10px] font-mono font-semibold bg-loss/10 text-loss">
+              fee {item.transactionFeePercent}%
+            </span>
+          ) : item.sold ? (
+            <span className={`inline-flex items-center rounded-md py-0.5 px-1.5 text-[10px] font-mono font-semibold ${item.profit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
+              {item.profit >= 0 ? '+' : ''}{item.profitPercent?.toFixed(1)}%
+            </span>
+          ) : item.pending && countdown ? (
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border inline-flex items-center gap-1 ${
+              countdown.overdue ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-black/50 text-warn border-warn/25'
+            }`}>
+              {countdown.overdue ? <Unlock size={9} /> : <Lock size={9} />}{countdown.label}
+            </span>
+          ) : (
+            <span className="text-slate-700 text-xs">—</span>
+          )}
+        </td>
+
+        {/* Action */}
+        <td className="px-3 py-2">
+          <div className="flex items-center gap-1.5 justify-end">
+            {item.sold ? (
+              <span className={`inline-flex items-center rounded-md py-0.5 px-1.5 text-[10px] font-mono font-semibold ${item.profit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
+                {item.profit >= 0 ? '+' : ''}${Math.abs(item.profit).toFixed(2)}
+              </span>
+            ) : item.pending ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); promotePendingItem && promotePendingItem(item.id); }}
+                  className={`flex items-center gap-1 px-2 h-7 rounded-lg text-[11px] font-medium ${theme.card} border ${theme.cardBorder} ${theme.textSecondary} ${theme.textHover} transition-colors`}
+                >
+                  <PackageCheck size={11} />
+                  Received
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); if (window.confirm('Cancel this pending purchase?')) handleDeleteItem(item.id); }}
+                  className={`px-2 h-7 rounded-lg text-[11px] ${theme.card} border ${theme.cardBorder} text-slate-600 hover:text-slate-300 transition-colors`}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : isStack ? (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onExpandGroup(); }}
+                className={`flex items-center gap-1 px-2 h-7 rounded-lg text-[11px] font-medium border transition-colors ${theme.card} ${theme.cardBorder} ${theme.textSecondary} ${theme.textHover}`}
+              >
+                Sell {count} items
+                <ChevronRight size={11} className="opacity-50" />
+              </button>
+            ) : (
+              <>
+                {!sellOpen ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setSellOpen(true); }}
+                    className={`flex items-center gap-1 px-2 h-7 rounded-lg text-[11px] font-medium border transition-colors ${theme.card} ${theme.cardBorder} ${theme.textSecondary} ${theme.textHover}`}
+                  >
+                    Sell
+                    <ChevronRight size={11} className="opacity-50" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setSellOpen(false); }}
+                    className="p-1.5 rounded-lg transition-all text-red-400/50 hover:text-red-400 hover:bg-red-500/10"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+                {!selectMode && !sellOpen && (
+                  <DeleteButton onDelete={() => handleDeleteItem(item.id)} />
+                )}
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+
+      {/* Inline sell form row */}
+      {sellOpen && (
+        <tr className={`border-b ${theme.cardBorder}`}>
+          <td colSpan={6} className="px-3 py-2.5">
+            <div className="max-w-sm ml-auto space-y-1.5">
+              <SellPlatformPicker
+                value={sellPlatform[item.id] || 'csfloat'}
+                onChange={(val) => { setSellPlatform(prev => ({ ...prev, [item.id]: val })); setCustomFee(val === 'other' ? '0' : ''); }}
+                theme={theme}
+              />
+              {(sellPlatform[item.id] || 'csfloat') === 'other' && (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number" min="0" max="100" step="0.1"
+                    value={customFee}
+                    onChange={(e) => setCustomFee(e.target.value)}
+                    placeholder="Fee"
+                    className={`flex-1 h-7 ${theme.inputSell} rounded-lg px-2 ${theme.text} text-xs font-mono focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                  />
+                  <span className={`text-xs ${theme.subtext} shrink-0`}>%</span>
+                </div>
+              )}
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto' }}>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-mono pointer-events-none">$</span>
+                  <input
+                    type="number" step="0.01"
+                    value={sellData[item.id] || ''}
+                    onChange={(e) => handleSellUsd(e.target.value)}
+                    className={`w-full h-8 ${theme.inputSell} rounded-lg pl-5 pr-2 ${theme.text} text-xs font-mono focus:outline-none transition-colors border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                    placeholder="USD"
+                    autoFocus
+                  />
+                </div>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-mono pointer-events-none">{currencySymbol}</span>
+                  <input
+                    type="number" step="0.01"
+                    value={localSellAmount}
+                    onChange={(e) => handleSellLocal(e.target.value)}
+                    disabled={!exchangeRate}
+                    className={`w-full h-8 ${theme.inputSell} rounded-lg ${currencySymbol.length > 1 ? 'pl-8' : 'pl-5'} pr-2 ${theme.text} text-xs font-mono focus:outline-none transition-colors border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${!exchangeRate ? 'opacity-50' : ''}`}
+                    placeholder={displayCurrency || currencySymbol}
+                  />
+                </div>
+                <button
+                  onClick={onSell}
+                  className={`px-2 h-8 rounded-lg text-xs font-medium transition-all duration-300 active:scale-95 flex items-center gap-1
+                    ${soldFeedback ? 'bg-profit text-white scale-95' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                >
+                  {soldFeedback ? <><CheckCircle size={12} /> Sold!</> : 'Sell'}
+                </button>
+              </div>
+              {estProfit !== null && (
+                <div className={`rounded-md py-1 px-2 text-xs font-mono font-semibold text-center ${estProfit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
+                  {estProfit >= 0 ? '+' : ''}${estProfit.toFixed(2)}
+                  <span className="opacity-60 ml-1">({estProfitPct >= 0 ? '+' : ''}{estProfitPct.toFixed(0)}%)</span>
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
+  );
+}
+
 // --- ItemGrid ---
 
 const INITIAL_VISIBLE = 60;
@@ -630,6 +964,7 @@ export default function ItemGrid({
   theme, sortedItems, searchTerm, activeTab,
   selectMode, selectedIds, onToggleSelect,
   exchangeRate, currencySymbol, displayCurrency,
+  viewMode = 'grid',
 }) {
   const accentHex = theme.dotColor;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -685,12 +1020,66 @@ export default function ItemGrid({
     : activeTab === 'pending' ? 'No pending purchases.'
     : 'No sold items yet.';
 
-  const commonCardProps = {
-    theme, accentHex, sellData, setSellData, sellPlatform, setSellPlatform,
+  const commonProps = {
+    theme, sellData, setSellData, sellPlatform, setSellPlatform,
     handleSellItem, handleDeleteItem, promotePendingItem,
-    selectMode, onToggleSelect, exchangeRate, currencySymbol, displayCurrency,
+    selectMode, selectedIds, onToggleSelect,
+    exchangeRate, currencySymbol, displayCurrency,
   };
 
+  const loadMore = hasMore ? (
+    <div ref={sentinelRef} className="w-full text-center py-6 text-xs text-slate-500">
+      Loading more… ({visibleCount} of {flatRows.length})
+    </div>
+  ) : flatRows.length > INITIAL_VISIBLE ? (
+    <div className="w-full text-center py-4 text-xs text-slate-600">
+      Showing all {flatRows.length} item{flatRows.length !== 1 ? 's' : ''}
+    </div>
+  ) : null;
+
+  // --- List view ---
+  if (viewMode === 'list') {
+    return (
+      <>
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className={`border-b ${theme.cardBorder}`}>
+              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Item</th>
+              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Cost</th>
+              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
+                {activeTab === 'sold' ? 'Dates' : 'Acquired'}
+              </th>
+              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Platform</th>
+              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Status</th>
+              <th className={`text-right px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
+                {activeTab === 'sold' ? 'P&L' : 'Action'}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map((row) => (
+              <ListRow
+                key={row.key}
+                row={row}
+                onExpandGroup={() => setExpandedGroups(prev => new Set([...prev, row.key]))}
+                {...commonProps}
+              />
+            ))}
+            {flatRows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <p className="text-base">{emptyText}</p>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        {loadMore}
+      </>
+    );
+  }
+
+  // --- Grid view (default) ---
   return (
     <>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
@@ -716,7 +1105,8 @@ export default function ItemGrid({
             index={index}
             isSelected={selectedIds && selectedIds.has(row.item.id)}
             initialSellOpen={row.expandedSell}
-            {...commonCardProps}
+            {...commonProps}
+            accentHex={accentHex}
           />
         ))}
 
@@ -727,16 +1117,7 @@ export default function ItemGrid({
         )}
       </div>
 
-      {hasMore && (
-        <div ref={sentinelRef} className="w-full text-center py-6 text-xs text-slate-500">
-          Loading more… ({visibleCount} of {flatRows.length})
-        </div>
-      )}
-      {!hasMore && flatRows.length > INITIAL_VISIBLE && (
-        <div className="w-full text-center py-4 text-xs text-slate-600">
-          Showing all {flatRows.length} item{flatRows.length !== 1 ? 's' : ''}
-        </div>
-      )}
+      {loadMore}
     </>
   );
 }

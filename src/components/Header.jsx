@@ -13,6 +13,7 @@ import {
   Info,
   CheckCircle,
   ArrowLeftRight,
+  ArrowDownUp,
   Home,
   ShieldCheck,
   PanelLeft,
@@ -31,6 +32,8 @@ export default function Header({
   onAnalyticsClick,
   onAddItemClick,
   onHandleItemsClick,
+  onTransactionClick,
+  showTransactions = false,
   onAboutClick,
   onHomeClick,
   showAddItem = false,
@@ -130,6 +133,11 @@ export default function Header({
                 </span>
               )}
               <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${showHandleItems ? "w-full" : "w-0 group-hover:w-full"}`} style={{ backgroundColor: dotColor }} />
+            </button>
+            <button onClick={onTransactionClick} className={`flex items-center gap-1.5 ${navBtn(showTransactions)}`}>
+              <ArrowDownUp size={15} />
+              Transactions
+              <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${showTransactions ? "w-full" : "w-0 group-hover:w-full"}`} style={{ backgroundColor: dotColor }} />
             </button>
             <button onClick={onAnalyticsClick} className={`flex items-center gap-1.5 ${navBtn(false)}`}>
               <BarChart3 size={15} />
