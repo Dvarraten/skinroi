@@ -53,5 +53,22 @@ export const useChartData = (items, chartPeriod) => {
       count: item.count
     }));
 
-  return { weeklyProfit, monthlyProfit, profitChartData };
+  // All-time aggregation — used by the hero chart regardless of chartPeriod
+  const allTimeData = soldItems.reduce((acc, item) => {
+    const date = item.dateSold || item.datePurchased;
+    if (!acc[date]) acc[date] = { date, profit: 0, count: 0 };
+    acc[date].profit += item.profit;
+    acc[date].count += 1;
+    return acc;
+  }, {});
+
+  const allTimeProfitChartData = Object.values(allTimeData)
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .map(item => ({
+      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      profit: parseFloat(item.profit.toFixed(2)),
+      count: item.count
+    }));
+
+  return { weeklyProfit, monthlyProfit, profitChartData, allTimeProfitChartData };
 };

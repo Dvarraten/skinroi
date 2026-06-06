@@ -7,8 +7,6 @@ import { PROFIT_COLOR, LOSS_COLOR } from "../themes/themes";
 export default function PortfolioHero({ stats, profitChartData, theme }) {
   const profit = stats.totalProfit;
   const roi = stats.totalInvested > 0 ? (profit / stats.totalInvested) * 100 : 0;
-  const isGain = profit >= 0;
-  const chartColor = isGain ? PROFIT_COLOR : LOSS_COLOR;
 
   const cumulativeData = useMemo(() =>
     profitChartData.reduce((acc, d) => {
@@ -16,6 +14,14 @@ export default function PortfolioHero({ stats, profitChartData, theme }) {
       return [...acc, { ...d, cumulative: Math.round((prev + d.profit) * 100) / 100 }];
     }, []),
   [profitChartData]);
+
+  // Derive color from the chart's actual end value so the gradient matches
+  // what the line shows, not the overall portfolio total.
+  const lastCumulative = cumulativeData.length > 0
+    ? cumulativeData[cumulativeData.length - 1].cumulative
+    : profit;
+  const isGain = lastCumulative >= 0;
+  const chartColor = isGain ? PROFIT_COLOR : LOSS_COLOR;
 
   return (
     <section className={`rounded-xl border ${theme.cardBorder} ${theme.card} flex items-stretch overflow-hidden`}>

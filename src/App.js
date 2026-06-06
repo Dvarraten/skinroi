@@ -83,7 +83,7 @@ export default function CS2TradingTracker() {
   const closePage = () => setActivePage(null);
 
   const themeStyles = themes[theme];
-  const { profitChartData } = useChartData(items, chartPeriod);
+  const { profitChartData, allTimeProfitChartData } = useChartData(items, chartPeriod);
 
   useEffect(() => { localStorage.setItem('cs2-theme', theme); }, [theme]);
   useEffect(() => { localStorage.setItem('skinroi-view-mode', viewMode); }, [viewMode]);
@@ -241,7 +241,7 @@ export default function CS2TradingTracker() {
       <div className="shrink-0 px-6 pt-3 pb-0">
         <PortfolioHero
           stats={stats}
-          profitChartData={profitChartData}
+          profitChartData={allTimeProfitChartData}
           theme={themeStyles}
         />
       </div>
