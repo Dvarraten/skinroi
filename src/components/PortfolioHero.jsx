@@ -24,7 +24,7 @@ export default function PortfolioHero({ stats, profitChartData, theme }) {
   const chartColor = isGain ? PROFIT_COLOR : LOSS_COLOR;
 
   return (
-    <section className={`rounded-xl border ${theme.cardBorder} ${theme.card} flex items-stretch overflow-hidden`}>
+    <section className={`max-w-4xl mx-auto w-full rounded-xl border ${theme.cardBorder} ${theme.card} flex items-stretch overflow-hidden`}>
 
       {/* Lead — headline value + delta chip */}
       <div className="px-4 py-3 flex flex-col justify-center gap-1.5 shrink-0 min-w-[170px]">
@@ -44,10 +44,10 @@ export default function PortfolioHero({ stats, profitChartData, theme }) {
         </div>
       </div>
 
-      {/* Chart — centrepiece, takes all remaining width */}
-      <div className="flex-1 min-w-0 flex items-center">
+      {/* Chart — compact sparkline, fixed width */}
+      <div className="w-[280px] shrink-0 flex items-center">
         {cumulativeData.length > 1 ? (
-          <ResponsiveContainer width="100%" height={80}>
+          <ResponsiveContainer width="100%" height={80} style={{ pointerEvents: 'none' }}>
             <AreaChart data={cumulativeData} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
@@ -73,8 +73,8 @@ export default function PortfolioHero({ stats, profitChartData, theme }) {
         )}
       </div>
 
-      {/* Secondary metrics — separated by hairline dividers */}
-      <div className="flex items-stretch shrink-0">
+      {/* Secondary metrics — pushed to the right */}
+      <div className="flex items-stretch shrink-0 ml-auto">
         <div className={`border-l ${theme.cardBorder} px-4 py-3 flex flex-col justify-center gap-0.5 min-w-[100px]`}>
           <p className={`text-[9px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Realised</p>
           <p className={`text-base font-mono font-semibold ${theme.text} tabular-nums leading-none`}>
