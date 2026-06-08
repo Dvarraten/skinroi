@@ -6,6 +6,7 @@ import PlatformPicker from './PlatformPicker';
 import { TabButton } from './TabsAndSearchbar';
 import { PLATFORMS } from '../utils/platforms';
 import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
+import { getPlatformFee } from '../utils/platformFees';
 
 const SORTS = [
   { label: 'Date', desc: 'date-new', asc: 'date-old' },
@@ -312,6 +313,16 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
 
   const showExpansion = browseAll || isFuzzyOnly || platform === 'other';
 
+  const selectedCandidate = visibleCandidates.find(c => String(c.id) === selectedId);
+  const saleAmt = parseFloat(usdSalePrice);
+  const fee = getPlatformFee(platform, customFee || undefined);
+  const estProfit = (selectedCandidate && saleAmt > 0)
+    ? Math.round(((saleAmt * (1 - fee)) - selectedCandidate.purchasePrice) * 100) / 100
+    : null;
+  const estProfitPct = (estProfit !== null && selectedCandidate?.purchasePrice > 0)
+    ? (estProfit / selectedCandidate.purchasePrice) * 100
+    : null;
+
   return (
     <React.Fragment>
       <tr className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>
@@ -357,6 +368,12 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
             placeholderUsd="Sold"
             placeholderLocal={displayCurrency}
           />
+          {estProfit !== null && (
+            <div className={`mt-1 rounded-md py-0.5 px-1.5 text-[10px] font-mono font-semibold text-center ${estProfit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
+              {estProfit >= 0 ? '+' : ''}${estProfit.toFixed(2)}
+              {estProfitPct !== null && <span className="opacity-60 ml-1">({estProfitPct >= 0 ? '+' : ''}{estProfitPct.toFixed(0)}%)</span>}
+            </div>
+          )}
         </td>
 
         <td className="px-3 py-2 align-middle">
@@ -382,8 +399,8 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
             disabled={confirming || !parseFloat(usdSalePrice) || !selectedId || isFuzzyOnly}
             onClick={submit}
             title={isFuzzyOnly ? 'No confident match — toggle Search to pick manually' : undefined}
-            className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all inline-flex items-center gap-1
-              ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text}
+            className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all duration-300 active:scale-95 inline-flex items-center gap-1
+              ${confirming ? 'bg-profit text-white border-transparent scale-95' : `${theme.card} ${theme.cardBorder} ${theme.text}`}
               disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {confirming ? <><CheckCircle size={11} /> Sold!</> : 'Mark sold'}
