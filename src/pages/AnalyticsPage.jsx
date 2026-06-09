@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-export default function ProfitChart({
+export default function AnalyticsPage({
   profitChartData,
   chartPeriod,
   setChartPeriod,

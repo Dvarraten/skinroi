@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertTriangle, Clock, CheckCircle, Search } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import SteamQRSetup from './SteamQRSetup';
-import PlatformPicker from './PlatformPicker';
-import { TabButton } from './TabsAndSearchbar';
-import RecentSales from './RecentSales';
+import SteamQRSetup from '../components/SteamQRSetup';
+import PlatformPicker from '../components/PlatformPicker';
+import { TabButton } from '../components/TabsAndSearchbar';
+import RecentSales from '../components/RecentSales';
 import { PLATFORMS } from '../utils/platforms';
 import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
@@ -544,7 +544,7 @@ function EmptyState({ theme, text }) {
 }
 
 // ─── Main page ──────────────────────────────────────────────────────────────
-export default function HandleItemsModal({
+export default function HandleItemsPage({
   theme,
   incoming = [],
   outgoing = [],

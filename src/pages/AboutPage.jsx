@@ -29,7 +29,7 @@ const FEATURES = [
   },
 ];
 
-export default function AboutModal({ theme }) {
+export default function AboutPage({ theme }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
       <div className={`max-w-2xl mx-auto ${theme?.panel} border ${theme?.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>

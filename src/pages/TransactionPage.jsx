@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from "react";
 import { ArrowDownUp, CheckCircle, ArrowDown, ArrowUp, Bitcoin, Landmark } from "lucide-react";
-import PlatformPicker from "./PlatformPicker";
-import { PlatformBadge } from "./PlatformBadge";
+import PlatformPicker from "../components/PlatformPicker";
+import { PlatformBadge } from "../components/PlatformBadge";
 import { PLATFORMS } from "../utils/platforms";
 
 const TX_PLATFORMS = PLATFORMS.filter(p => p.value !== 'other');
 
 const labelCls = "block text-xs text-slate-500 font-medium uppercase tracking-wide mb-1.5";
 
-export default function TransactionModal({ onAdd, theme, items = [] }) {
+export default function TransactionPage({ onAdd, theme, items = [] }) {
   const [type, setType] = useState('withdrawal');
   const [platform, setPlatform] = useState('csfloat');
   const [method, setMethod] = useState('crypto');

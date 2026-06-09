@@ -14,15 +14,15 @@ import { importFromCSV } from './utils/importCSV';
 import Header from './components/Header';
 import ThemePicker from './components/ThemePicker';
 import ItemGrid from './components/ItemGrid';
-import ProfitChart from './components/ProfitChart';
 import TabsAndSearchbar from './components/TabsAndSearchbar';
 import PortfolioHero from './components/PortfolioHero';
 import RecentSales from './components/RecentSales';
-import CurrencyConverter from './components/Sidebar/CurrencyConverter';
-import HandleItemsModal from './components/HandleItemsModal';
-import AboutModal from './components/AboutModal';
-import TransactionModal from './components/TransactionModal';
-import AddItemPage from './components/AddItemPage';
+import CurrencyConverter from './components/CurrencyConverter';
+import HandleItemsPage from './pages/HandleItemsPage';
+import AboutPage from './pages/AboutPage';
+import TransactionPage from './pages/TransactionPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import AddItemPage from './pages/AddItemPage';
 
 export default function CS2TradingTracker() {
   const { user, loading: authLoading, login, logout } = useAuth();
@@ -73,12 +73,12 @@ export default function CS2TradingTracker() {
     return saved === 'list' ? 'list' : 'grid';
   });
 
-  const isHome           = !activePage;
-  const showAnalytics    = activePage === 'analytics';
-  const showAddItem      = activePage === 'addItem';
-  const showHandleItems  = activePage === 'handleItems';
-  const showTransactions = activePage === 'transactions';
-  const showAbout        = activePage === 'about';
+  const isHome             = !activePage;
+  const isAnalyticsPage    = activePage === 'analytics';
+  const isAddItemPage      = activePage === 'addItem';
+  const isHandleItemsPage  = activePage === 'handleItems';
+  const isTransactionsPage = activePage === 'transactions';
+  const isAboutPage        = activePage === 'about';
   const openPage  = (name) => setActivePage(prev => prev === name ? null : name);
   const closePage = () => setActivePage(null);
 
@@ -96,8 +96,8 @@ export default function CS2TradingTracker() {
   const enableTradeHold  = () => { localStorage.removeItem('skinroi-tradehold-dismissed'); setTradeHoldDismissed(false); };
 
   useEffect(() => {
-    if (showHandleItems) steamSync.sync();
-  }, [showHandleItems]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isHandleItemsPage) steamSync.sync();
+  }, [isHandleItemsPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (
@@ -322,7 +322,7 @@ export default function CS2TradingTracker() {
       )}
 
       {/* ── Add Item page ─────────────────────────────────────────────────── */}
-      {showAddItem && (
+      {isAddItemPage && (
         <AddItemPage
           formData={formData} setFormData={setFormData}
           handleAddItem={handleAddItem} theme={themeStyles}
@@ -332,11 +332,11 @@ export default function CS2TradingTracker() {
       )}
 
       {/* ── About page ───────────────────────────────────────────────────── */}
-      {showAbout && <AboutModal theme={themeStyles} />}
+      {isAboutPage && <AboutPage theme={themeStyles} />}
 
       {/* ── Transactions page ────────────────────────────────────────────── */}
-      {showTransactions && (
-        <TransactionModal
+      {isTransactionsPage && (
+        <TransactionPage
           onAdd={(tx) => { handleAddTransaction(tx); }}
           theme={themeStyles}
           items={items}
@@ -344,8 +344,8 @@ export default function CS2TradingTracker() {
       )}
 
       {/* ── Analytics page ───────────────────────────────────────────────── */}
-      {showAnalytics && (
-        <ProfitChart
+      {isAnalyticsPage && (
+        <AnalyticsPage
           profitChartData={profitChartData}
           chartPeriod={chartPeriod}
           setChartPeriod={setChartPeriod}
@@ -356,9 +356,8 @@ export default function CS2TradingTracker() {
       )}
 
       {/* ── Handle Items page ────────────────────────────────────────────── */}
-      {showHandleItems && (
-        <HandleItemsModal
-          page
+      {isHandleItemsPage && (
+        <HandleItemsPage
           theme={themeStyles}
           items={items}
           addItemDirect={addItemDirect}

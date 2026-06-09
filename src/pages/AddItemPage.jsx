@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { PackagePlus, Package, CheckCircle2, Clock } from "lucide-react";
-import AddItemForm from "./AddItemForm";
-import { PlatformBadge } from "./PlatformBadge";
+import AddItemForm from "../components/AddItemForm";
+import { PlatformBadge } from "../components/PlatformBadge";
 import { useItemImage } from "../utils/itemImages";
 
 function HistoryThumb({ item }) {

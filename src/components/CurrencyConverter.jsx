@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Copy, Check, ChevronDown } from "lucide-react";
-import { CURRENCIES } from "../../hooks/useExchangeRate";
+import { CURRENCIES } from "../hooks/useExchangeRate";
 
 function CopyButton({ value }) {
   const [copied, setCopied] = useState(false);

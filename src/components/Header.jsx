@@ -21,7 +21,7 @@ import {
 import steamLogo from "../assets/platforms/steam.png";
 import logoSrc from "../utils/skinroi-logo.svg";
 import logoLightSrc from "../utils/skinroi-logo-light.svg";
-import CurrencyConverter from "./Sidebar/CurrencyConverter";
+import CurrencyConverter from "./CurrencyConverter";
 
 function SteamIcon({ className }) {
   return <img src={steamLogo} alt="" className={className} />;
