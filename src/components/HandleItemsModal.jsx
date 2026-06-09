@@ -4,6 +4,7 @@ import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } fro
 import SteamQRSetup from './SteamQRSetup';
 import PlatformPicker from './PlatformPicker';
 import { TabButton } from './TabsAndSearchbar';
+import RecentSales from './RecentSales';
 import { PLATFORMS } from '../utils/platforms';
 import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
@@ -672,7 +673,8 @@ export default function HandleItemsModal({
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-      <div className="max-w-7xl mx-auto space-y-4">
+      <div className="max-w-7xl mx-auto flex gap-6 items-start">
+        <div className="flex-1 min-w-0 space-y-4">
 
         {/* Status header */}
         <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-3 flex items-center justify-between`}>
@@ -869,7 +871,11 @@ export default function HandleItemsModal({
             )
           )}
         </div>
-
+        </div>
+        <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 sticky top-0">
+          <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext} mb-2 px-1`}>Recent Sales</p>
+          <RecentSales items={items} theme={theme} />
+        </div>
       </div>
     </div>
   );
