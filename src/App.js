@@ -96,6 +96,10 @@ export default function CS2TradingTracker() {
   const enableTradeHold  = () => { localStorage.removeItem('skinroi-tradehold-dismissed'); setTradeHoldDismissed(false); };
 
   useEffect(() => {
+    if (showHandleItems) steamSync.sync();
+  }, [showHandleItems]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (
       activeTab === 'active' &&
       (sortBy === 'profit-high' || sortBy === 'profit-low' ||
