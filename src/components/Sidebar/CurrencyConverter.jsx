@@ -94,7 +94,57 @@ export default function CurrencyConverter({
   handleUsdChange, handleRmbChange, theme,
   currency1, setCurrency1, currency1Symbol,
   displayCurrency, setDisplayCurrency, currencySymbol,
+  horizontal = false,
 }) {
+  if (horizontal) {
+    return (
+      <div className="grid grid-cols-2 gap-2 w-full">
+        {/* Field 1 */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <CurrencySelect value={currency1} onChange={setCurrency1} theme={theme} />
+            <CopyButton value={usdAmount} />
+          </div>
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-mono pointer-events-none z-10">
+              {currency1Symbol}
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={usdAmount}
+              onChange={(e) => handleUsdChange(e.target.value)}
+              placeholder="0.00"
+              className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currency1Symbol)} pr-2 py-1.5 rounded-lg text-xs font-mono ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors`}
+            />
+          </div>
+        </div>
+
+        {/* Field 2 */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <CurrencySelect value={displayCurrency} onChange={setDisplayCurrency} theme={theme} />
+            <CopyButton value={rmbAmount} />
+          </div>
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-mono pointer-events-none z-10">
+              {currencySymbol}
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={rmbAmount}
+              onChange={(e) => handleRmbChange(e.target.value)}
+              placeholder="0.00"
+              disabled={!sidebarRate}
+              className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currencySymbol)} pr-2 py-1.5 rounded-lg text-xs font-mono ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors ${!sidebarRate ? 'opacity-50' : ''}`}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       {/* Field 1: currency1 */}

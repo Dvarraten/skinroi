@@ -742,6 +742,7 @@ function ListRow({
             <div className="min-w-0">
               <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>{baseName}</p>
               {wear && <p className={`text-[10px] ${theme.subtext} truncate leading-tight`}>{wear}</p>}
+              {item.notes && <p className="text-[9px] font-medium text-warn truncate leading-tight mt-0.5">{item.notes}</p>}
             </div>
             {count && count > 1 && (
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white leading-tight flex-shrink-0`}>

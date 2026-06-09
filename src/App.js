@@ -235,71 +235,21 @@ export default function CS2TradingTracker() {
         </div>
       </Header>
 
-      {/* ── Home view (hero + main content row) ─────────────────────────── */}
+      {/* ── Home view ─────────────────────────────────────────────────────── */}
       {isHome && (
-      <>
-      <div className="shrink-0 px-6 pt-3 pb-0">
-        <PortfolioHero
-          stats={stats}
-          profitChartData={allTimeProfitChartData}
-          theme={themeStyles}
-        />
-      </div>
+      <div className="flex flex-1 min-h-0 flex-col gap-3 px-6 pt-3 pb-4 overflow-hidden">
 
-      <div className="flex flex-1 min-h-0 gap-6 px-6 py-4">
-
-        {/* Item list — fills remaining width */}
-        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
-
-          <div className="shrink-0 pb-2">
-            <TabsAndSearchbar
-              theme={themeStyles}
-              setActiveTab={setActiveTab} activeTab={activeTab}
+        {/* Row 1 — hero (centered) + currency converter (right, same height) */}
+        <div className="shrink-0 flex items-stretch gap-6">
+          <div className="flex-1 min-w-0">
+            <PortfolioHero
               stats={stats}
-              searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-              sortBy={sortBy} setSortBy={setSortBy}
-              selectMode={selectMode}
-              selectedIds={selectedIds}
-              onEnterSelectMode={() => setSelectMode(true)}
-              onCancelSelectMode={exitSelectMode}
-              onConfirmBulkDelete={confirmBulkDelete}
-              viewMode={viewMode} setViewMode={setViewMode}
+              profitChartData={allTimeProfitChartData}
+              theme={themeStyles}
             />
           </div>
-
-          <div className="flex-1 overflow-y-auto pb-2">
-            <ItemGrid
-              sellPlatform={sellPlatform} setSellData={setSellData}
-              sellData={sellData} setSellPlatform={setSellPlatform}
-              handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
-              promotePendingItem={promotePendingItem}
-              theme={themeStyles} items={items} sortedItems={sortedItems}
-              searchTerm={searchTerm} activeTab={activeTab}
-              selectMode={selectMode}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              exchangeRate={exchangeRate}
-              currencySymbol={currencySymbol}
-              displayCurrency={displayCurrency}
-              viewMode={viewMode}
-            />
-          </div>
-        </main>
-
-        {/* Right aside — movers + currency (hidden below lg) */}
-        <aside className="hidden lg:flex w-[300px] shrink-0 flex-col gap-5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-
-          <div>
-            <p className={`text-[10px] font-semibold uppercase tracking-wide ${themeStyles.subtext} mb-2 px-1`}>
-              Recent Sales
-            </p>
-            <RecentSales items={items} theme={themeStyles} />
-          </div>
-
-          <div>
-            <p className={`text-[10px] font-semibold uppercase tracking-wide ${themeStyles.subtext} mb-2 px-1`}>
-              Currency
-            </p>
+          <div className="hidden lg:flex w-[280px] shrink-0 flex-col justify-center gap-3">
+            <p className={`text-[9px] font-semibold uppercase tracking-widest ${themeStyles.subtext}`}>Currency Converter</p>
             <CurrencyConverter
               usdAmount={usdAmount}
               rmbAmount={rmbAmount}
@@ -316,10 +266,55 @@ export default function CS2TradingTracker() {
               currencySymbol={currencySymbol}
             />
           </div>
+        </div>
 
-        </aside>
+        {/* Row 2+3 — tabs + grid (left) and recent sales (right) */}
+        <div className="flex-1 min-h-0 flex gap-6 overflow-hidden">
+          <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden px-10">
+            <div className="shrink-0">
+              <TabsAndSearchbar
+                theme={themeStyles}
+                setActiveTab={setActiveTab} activeTab={activeTab}
+                stats={stats}
+                searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+                sortBy={sortBy} setSortBy={setSortBy}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onEnterSelectMode={() => setSelectMode(true)}
+                onCancelSelectMode={exitSelectMode}
+                onConfirmBulkDelete={confirmBulkDelete}
+                viewMode={viewMode} setViewMode={setViewMode}
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto pb-2">
+              <ItemGrid
+                sellPlatform={sellPlatform} setSellData={setSellData}
+                sellData={sellData} setSellPlatform={setSellPlatform}
+                handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
+                promotePendingItem={promotePendingItem}
+                theme={themeStyles} items={items} sortedItems={sortedItems}
+                searchTerm={searchTerm} activeTab={activeTab}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                exchangeRate={exchangeRate}
+                currencySymbol={currencySymbol}
+                displayCurrency={displayCurrency}
+                viewMode={viewMode}
+              />
+            </div>
+          </div>
+          <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div>
+              <p className={`text-[10px] font-semibold uppercase tracking-wide ${themeStyles.subtext} mb-2 px-1`}>
+                Recent Sales
+              </p>
+              <RecentSales items={items} theme={themeStyles} />
+            </div>
+          </div>
+        </div>
+
       </div>
-      </>
       )}
 
       {/* ── Add Item page ─────────────────────────────────────────────────── */}

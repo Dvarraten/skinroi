@@ -71,8 +71,7 @@ export default function TabsAndSearchbar({
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 flex-wrap mb-3">
+    <div className="flex items-center gap-2 flex-wrap">
         <TabButton
           label="Active" count={stats.totalActiveCount}
           isActive={activeTab === 'active'} onClick={() => switchTab('active')}
@@ -95,10 +94,10 @@ export default function TabsAndSearchbar({
           theme={theme} accentColor={theme.accentColor}
           badgeClass={activeTab === 'sold' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'}
         />
-      </div>
 
-      {/* Search + segmented sort + stacked toggle + select */}
-      <div className="flex items-center gap-2 flex-wrap">
+        <div className="h-5 w-px bg-slate-600/40 mx-1" />
+
+        {/* Search + segmented sort + view toggle + select */}
 
         {/* Search */}
         <div className="relative flex-1 min-w-[180px]">
@@ -187,7 +186,7 @@ export default function TabsAndSearchbar({
             </button>
           </>
         )}
-      </div>
     </div>
   );
 }
+
