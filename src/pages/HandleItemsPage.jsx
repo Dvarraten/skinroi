@@ -673,7 +673,7 @@ export default function HandleItemsPage({
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-      <div className="max-w-7xl mx-auto flex gap-6 items-start">
+      <div className="flex gap-6 items-start">
         <div className="flex-1 min-w-[600px] space-y-4">
 
         {/* Status header */}
