@@ -674,7 +674,7 @@ export default function HandleItemsPage({
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
       <div className="max-w-7xl mx-auto flex gap-6 items-start">
-        <div className="flex-1 min-w-0 space-y-4">
+        <div className="flex-1 min-w-[600px] space-y-4">
 
         {/* Status header */}
         <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-3 flex items-center justify-between`}>
