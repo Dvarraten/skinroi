@@ -790,6 +790,7 @@ export default function HandleItemsPage({
         </div>
 
         {/* Table */}
+        <div className="overflow-x-auto rounded-2xl">
         <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
           {tab === 'incoming' && (
             incoming.length === 0 ? (
@@ -872,7 +873,8 @@ export default function HandleItemsPage({
           )}
         </div>
         </div>
-        <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 sticky top-0">
+        </div>
+        <div className="hidden xl:flex w-[280px] shrink-0 flex-col gap-4 sticky top-0">
           <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext} mb-2 px-1`}>Recent Sales</p>
           <RecentSales items={items} theme={theme} />
         </div>
