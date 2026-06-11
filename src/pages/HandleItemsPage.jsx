@@ -790,7 +790,7 @@ export default function HandleItemsPage({
         </div>
 
         {/* Table */}
-        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
+        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-x-auto`}>
           {tab === 'incoming' && (
             incoming.length === 0 ? (
               <EmptyState theme={theme} text="No new items detected. You're all caught up." />
