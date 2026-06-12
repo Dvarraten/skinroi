@@ -89,12 +89,12 @@ export function useSteamSync() {
 
   const dismiss = useCallback(async (assetidOrIds, type) => {
     const assetids = Array.isArray(assetidOrIds) ? assetidOrIds : [assetidOrIds];
-    const ids = new Set(assetids);
+    const ids = new Set(assetids.map(String));
     // Single optimistic update for all ids so concurrent bulk dismisses are atomic.
     setState((prev) => ({
       ...prev,
       pending: prev.pending.filter(
-        (p) => !(ids.has(p.assetid) && (!type || p.type === type))
+        (p) => !(ids.has(String(p.assetid)) && (!type || p.type === type))
       ),
     }));
     // Sequential API calls — avoids server-side read-modify-write races.
