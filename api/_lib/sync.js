@@ -234,13 +234,7 @@ export async function runSync({ force = false, steamId = null } = {}) {
     // Also filter append itself against the tombstone (belt-and-suspenders).
     const cleanAppend = append.filter(p => !dismissed.has(p.assetid));
 
-    // Trim the tombstone: drop assetids that are no longer in the resulting
-    // pending list (they've been fully handled and won't race again).
     const finalPending = filteredPending.concat(cleanAppend);
-    const finalAssetIds = new Set(finalPending.map(p => p.assetid));
-    const trimmedDismissed = (fresh.dismissedAssetIds || []).filter(
-      id => !finalAssetIds.has(id)
-    );
 
     const next = {
       ...fresh,
@@ -250,7 +244,7 @@ export async function runSync({ force = false, steamId = null } = {}) {
         ...(fresh.processedTradeIds || []),
         ...processedTrades,
       ])].slice(-500),
-      dismissedAssetIds: trimmedDismissed,
+      dismissedAssetIds: fresh.dismissedAssetIds || [],
       lastTradeTime: Math.max(maxTime, fresh.lastTradeTime || 0),
       lastSync: startedAt,
       lastSyncOk: true,
