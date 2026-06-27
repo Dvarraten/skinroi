@@ -812,7 +812,7 @@ export default function HandleItemsPage({
                 <tbody>
                   {visibleIncomingGroups.map((group, i) => (
                     <IncomingRow
-                      key={`in-${group[0].marketHashName}-${group[0].assetid}-${i}`}
+                      key={`in-${group[0].assetid}`}
                       entries={group}
                       theme={theme}
                       exchangeRate={exchangeRate}
