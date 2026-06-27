@@ -34,6 +34,7 @@ export function useSteamSync() {
   const [hasRefreshToken, setHasRefreshToken] = useState(false);
   const [refreshTokenExp, setRefreshTokenExp] = useState(null);
   const aliveRef = useRef(true);
+  const syncInFlightRef = useRef(false);
 
   const fetchQrStatus = useCallback(async () => {
     try {
@@ -67,6 +68,8 @@ export function useSteamSync() {
   }, []);
 
   const sync = useCallback(async () => {
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
     setBusy(true);
     try {
       const res = await fetch(`${BASE}/api/inventory/sync`, { method: 'POST' });
@@ -83,6 +86,7 @@ export function useSteamSync() {
     } catch (err) {
       if (aliveRef.current) setReachable(false);
     } finally {
+      syncInFlightRef.current = false;
       if (aliveRef.current) setBusy(false);
     }
   }, [fetchState]);
