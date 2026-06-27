@@ -46,9 +46,11 @@ export default async function handler(req, res) {
       : existing;
 
     // Tombstone the assetid so the sync's fresh-reload path can't race it back
-    // into pending. Capped at 2000 entries; old ones expire naturally.
+    // into pending. Keyed as "type:assetid" so an incoming tombstone never
+    // blocks an outgoing detection of the same item. Capped at 2000 entries.
+    const tombstoneKey = type ? `${type}:${assetid}` : assetid;
     const dismissedAssetIds = [
-      ...new Set([...(state.dismissedAssetIds || []), assetid]),
+      ...new Set([...(state.dismissedAssetIds || []), tombstoneKey]),
     ].slice(-2000);
 
     // Fresh reload before saving so a concurrent sync write doesn't clobber us.
@@ -56,8 +58,6 @@ export default async function handler(req, res) {
     const newPending = fresh.pending.filter((p) =>
       type ? !(p.assetid === assetid && p.type === type) : p.assetid !== assetid
     );
-    const removed = before - (fresh.pending.length - newPending.length === 0 ? 0 : 1);
-
     const next = {
       ...fresh,
       pending: newPending,

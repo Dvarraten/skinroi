@@ -24,6 +24,16 @@ export function isStateStale(state) {
   return Date.now() - new Date(state.lastSync).getTime() > STALE_THRESHOLD_MS;
 }
 
+// Returns true if a pending item should be blocked by the tombstone set.
+// Typed tombstones ("incoming:assetid") only block their own type.
+// Legacy untyped tombstones only block incoming items, never outgoing.
+function isTombstoned(dismissed, p) {
+  const assetid = String(p.assetid);
+  if (dismissed.has(`${p.type}:${assetid}`)) return true;
+  if (p.type === 'incoming' && dismissed.has(assetid)) return true;
+  return false;
+}
+
 function buildDescIndex(descriptions = []) {
   const index = new Map();
   for (const d of descriptions) index.set(`${d.classid}_${d.instanceid}`, d);
@@ -99,8 +109,8 @@ export async function runSync({ force = false, steamId = null } = {}) {
         firstSyncAt: freshForInit.firstSyncAt || startedAt,
         snapshot,
         pending: freshForInit.pending
-          .filter(p => !dismissedForInit.has(p.assetid))
-          .concat(firstRunPending.filter(p => !dismissedForInit.has(p.assetid))),
+          .filter(p => !isTombstoned(dismissedForInit, p))
+          .concat(firstRunPending.filter(p => !isTombstoned(dismissedForInit, p))),
         lastTradeTime: Math.floor(Date.now() / 1000) - 24 * 60 * 60,
         lastSync: startedAt,
         lastSyncOk: true,
@@ -229,10 +239,10 @@ export async function runSync({ force = false, steamId = null } = {}) {
     // ensures a dismissed item is never written back into pending even if it
     // was still in fresh.pending at reload time.
     const dismissed = new Set(fresh.dismissedAssetIds || []);
-    const filteredPending = fresh.pending.filter(p => !dismissed.has(p.assetid));
+    const filteredPending = fresh.pending.filter(p => !isTombstoned(dismissed, p));
 
     // Also filter append itself against the tombstone (belt-and-suspenders).
-    const cleanAppend = append.filter(p => !dismissed.has(p.assetid));
+    const cleanAppend = append.filter(p => !isTombstoned(dismissed, p));
 
     const finalPending = filteredPending.concat(cleanAppend);
 
