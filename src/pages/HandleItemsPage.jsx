@@ -135,7 +135,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
   const [localPrice, setLocalPrice] = useState('');
   const [platform, setPlatform] = useState('csfloat');
   const [notes, setNotes] = useState('');
-  const [onHold, setOnHold] = useState(true);
+  const [onHold, setOnHold] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
   const handleUsdChange = (val) => {
