@@ -249,12 +249,12 @@ export default async function handler(req, res) {
       return changed ? merged : p;
     });
 
-    // Cap the processed set. 2000 entries is a decade+ of trades for a heavy
-    // trader; older entries falling off is fine because the extension only
-    // seeds each historical offer once and the tombstones catch dismissed
-    // items even if their tradeofferid rolls out of the set.
+    // Cap the processed set. 5000 entries comfortably covers a heavy trader
+    // for years; the baseline seed on first pair fills this with every
+    // historical tradeofferid, so trade-hold-expiry bumps on old trades
+    // can never resurface them via the extension.
     const nextProcessed = newOfferIds.length
-      ? [...new Set([...(state.processedTradeIds || []), ...newOfferIds])].slice(-2000)
+      ? [...new Set([...(state.processedTradeIds || []), ...newOfferIds])].slice(-5000)
       : state.processedTradeIds || [];
 
     const next = {

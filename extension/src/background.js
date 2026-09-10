@@ -13,6 +13,8 @@ import {
   saveDescCache,
   getInspectCache,
   saveInspectCache,
+  getHasSeededOffers,
+  setHasSeededOffers,
 } from './lib/storage.js';
 import {
   getSteamIdFromCookie,
@@ -20,6 +22,7 @@ import {
   fetchAcceptedTradeOffers,
   fetchInventoryDescriptions,
   normalizeAcceptedOffers,
+  collectAllAcceptedTradeIds,
 } from './lib/steam.js';
 import { enrichOffersWithInspect } from './lib/inspect.js';
 import { pushOffers } from './lib/skinroi.js';
@@ -113,21 +116,12 @@ async function runPoll({ manual = false } = {}) {
       return { skipped: 'fetch_failed' };
     }
 
-    // Count how many state=3 (Accepted) offers Steam returned and how many
-    // pass the pairedAt time filter. Lets us tell "no trade yet" apart from
-    // "trade found but filtered" apart from "trade found but no description".
     const acceptedRaw = raw.offers.filter((o) => Number(o.trade_offer_state) === 3);
-    const pairGraceSec = 60;
-    const minTimeSecForLog = pairedAt ? Math.floor(pairedAt / 1000) - pairGraceSec : 0;
-    const acceptedPostPair = acceptedRaw.filter(
-      (o) => !minTimeSecForLog || Number(o.time_created) >= minTimeSecForLog
-    );
     console.log(
       '[skinroi] poll',
       manual ? '(manual)' : '(alarm)',
       'raw:', raw.offers.length,
       'accepted:', acceptedRaw.length,
-      'post-pair:', acceptedPostPair.length,
       'pairedAt:', pairedAt ? new Date(pairedAt).toISOString() : 'null'
     );
 
@@ -170,26 +164,98 @@ async function runPoll({ manual = false } = {}) {
       console.warn('[skinroi] desc cache save failed', err?.message || err);
     }
 
-    // Only surface trades whose Steam-side `time_created` is after pairing.
-    // `time_updated` gets bumped by Steam when trade holds expire, so it's
-    // not reliable for the "did this happen post-pairing?" question.
-    // A 60-second grace covers trades completed seconds before pairing.
-    const pairGraceMs = 60 * 1000;
-    const minTimeSec = pairedAt ? Math.floor((pairedAt - pairGraceMs) / 1000) : 0;
+    const hasSeeded = await getHasSeededOffers();
 
-    const offers = normalizeAcceptedOffers(raw.offers, raw.descByKey, { minTimeSec });
-    // How many post-pair items were dropped for missing description?
-    const droppedForMissingDesc =
-      acceptedPostPair.reduce(
-        (n, o) =>
-          n +
-          ((o.items_to_receive?.length || 0) + (o.items_to_give?.length || 0)),
-        0
-      ) - offers.reduce((n, o) => n + o.items.length, 0);
+    // First sync after pairing: seed all pre-existing tradeofferids into
+    // processedTradeIds silently, and only surface trades whose `time_updated`
+    // is on-or-after `pairedAt` (with 60s grace) — those are the ones the
+    // user actually completed right around when they paired. Everything
+    // else is historical and gets marked processed so bumped time_updated
+    // on old trades (7-day hold expiries) can't resurface them.
+    if (!hasSeeded) {
+      const pairGraceMs = 60 * 1000;
+      const pairThresholdSec = pairedAt
+        ? Math.floor((pairedAt - pairGraceMs) / 1000)
+        : 0;
+      const recentRawOffers = acceptedRaw.filter(
+        (o) =>
+          !pairThresholdSec || Number(o.time_updated) >= pairThresholdSec
+      );
+      const historicalRawOffers = acceptedRaw.filter(
+        (o) => !recentRawOffers.includes(o)
+      );
+      console.log(
+        '[skinroi] baseline: seeding', historicalRawOffers.length,
+        'historical + surfacing', recentRawOffers.length, 'recent'
+      );
+
+      // Historical: send as baseline (tradeofferids only, no items needed).
+      if (historicalRawOffers.length > 0) {
+        const seeds = collectAllAcceptedTradeIds(historicalRawOffers);
+        try {
+          await pushOffers({ offers: seeds, baseline: true });
+        } catch (err) {
+          await safeLogError(`Baseline seed: ${err.message || err}`);
+          return { skipped: 'baseline_failed' };
+        }
+      }
+
+      // Recent: fully normalize and push as regular trades so they end up
+      // in Handle Items. Same enrichment path as subsequent polls.
+      const recentOffers = normalizeAcceptedOffers(recentRawOffers, raw.descByKey);
+      if (recentOffers.length > 0) {
+        try {
+          const inspectCache = await getInspectCache();
+          await enrichOffersWithInspect({
+            offers: recentOffers,
+            descByKey: raw.descByKey,
+            ownerSteamId: cookieSteamId,
+            cache: inspectCache,
+          });
+          await saveInspectCache(inspectCache);
+        } catch (err) {
+          console.warn('[skinroi] inspect enrichment failed', err?.message || err);
+        }
+        try {
+          const r = await pushOffers({ offers: recentOffers, baseline: false });
+          if ((r.accepted || 0) > 0) {
+            await pushActivity({
+              kind: 'push',
+              accepted: r.accepted,
+              total: recentOffers.length,
+            });
+          }
+        } catch (err) {
+          await safeLogError(`Recent push: ${err.message || err}`);
+          return { skipped: 'push_failed' };
+        }
+      }
+
+      await setHasSeededOffers(true);
+      await pushActivity({
+        kind: 'baseline',
+        message:
+          `Seeded ${historicalRawOffers.length} historical trade${
+            historicalRawOffers.length === 1 ? '' : 's'
+          }` +
+          (recentOffers.length > 0
+            ? ` + surfaced ${recentOffers.length} recent`
+            : ''),
+      });
+      return {
+        baseline: true,
+        seeded: historicalRawOffers.length,
+        recent: recentOffers.length,
+      };
+    }
+
+    // Post-baseline: push every accepted offer we can normalize. Backend
+    // dedupes by tradeofferid, so already-seeded offers are skipped and
+    // only truly-new trades produce pending rows.
+    const offers = normalizeAcceptedOffers(raw.offers, raw.descByKey);
     console.log(
       '[skinroi] normalized offers:', offers.length,
-      'descs:', raw.descByKey.size,
-      'items dropped (no desc):', droppedForMissingDesc
+      'descs:', raw.descByKey.size
     );
 
     // Enrich each item with float, paint seed, stickers, keychains via

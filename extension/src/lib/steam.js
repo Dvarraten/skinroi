@@ -169,9 +169,11 @@ export async function fetchInventoryDescriptions(steamId) {
 // Turn Steam's raw offer objects into the shape we push to the backend:
 //   { tradeofferid, acceptedAt, items: [{ type, assetid, marketHashName, iconUrl }] }
 //
-// `minTimeSec` (unix seconds) filters out offers accepted before that time —
-// pass the user's pairedAt so historical trades are ignored entirely.
-export function normalizeAcceptedOffers(rawOffers, descByKey, { minTimeSec = 0 } = {}) {
+// No time filter — trade detection relies on backend tradeofferid dedup
+// (processedTradeIds) which is seeded on first pair via a baseline push.
+// A time filter here would drop long-standing offers accepted after pairing
+// (their `time_created` predates the pair), which is a legitimate new trade.
+export function normalizeAcceptedOffers(rawOffers, descByKey) {
   const seenOfferIds = new Set();
   const out = [];
 
@@ -184,13 +186,8 @@ export function normalizeAcceptedOffers(rawOffers, descByKey, { minTimeSec = 0 }
     if (seenOfferIds.has(tradeofferid)) continue;
     seenOfferIds.add(tradeofferid);
 
-    // Use `time_created` (immutable) for the pre-pairing filter. Steam
-    // bumps `time_updated` when an offer's 7-day trade hold expires, which
-    // would let old trades sneak past a `time_updated`-based cutoff.
-    // `time_updated` still drives the display timestamp below.
     const createdSec = Number(raw.time_created) || 0;
     const updatedSec = Number(raw.time_updated) || createdSec;
-    if (minTimeSec > 0 && createdSec > 0 && createdSec < minTimeSec) continue;
     const acceptedAt =
       updatedSec > 0 ? new Date(updatedSec * 1000).toISOString() : new Date().toISOString();
 
@@ -202,6 +199,28 @@ export function normalizeAcceptedOffers(rawOffers, descByKey, { minTimeSec = 0 }
     out.push({ tradeofferid, acceptedAt, items });
   }
 
+  return out;
+}
+
+// For baseline seed: collect ALL state=3 tradeofferids (regardless of
+// description resolution) so the backend can mark them as processed and
+// subsequent polls only surface truly-new trades.
+export function collectAllAcceptedTradeIds(rawOffers) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of rawOffers || []) {
+    if (!raw || typeof raw !== 'object') continue;
+    if (Number(raw.trade_offer_state) !== STEAM_OFFER_STATE_ACCEPTED) continue;
+    const tradeofferid = raw.tradeofferid != null ? String(raw.tradeofferid).trim() : '';
+    if (!tradeofferid) continue;
+    if (seen.has(tradeofferid)) continue;
+    seen.add(tradeofferid);
+    const createdSec = Number(raw.time_created) || 0;
+    const updatedSec = Number(raw.time_updated) || createdSec;
+    const acceptedAt =
+      updatedSec > 0 ? new Date(updatedSec * 1000).toISOString() : new Date().toISOString();
+    out.push({ tradeofferid, acceptedAt, items: [] });
+  }
   return out;
 }
 
