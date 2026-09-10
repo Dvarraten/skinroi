@@ -41,9 +41,13 @@ Steam session cookies.
 
 ## Icons
 
-Icon files are not included in the repo — before publishing to the Chrome
-Web Store, drop `16.png`, `48.png`, and `128.png` into `extension/icons/`.
-For local development Chrome shows a default puzzle-piece icon.
+Bundled — rasterised from `public/skinroi-icon.svg` at 16/32/48/128 into
+`extension/icons/`. Regenerate any time the source SVG changes:
+
+```bash
+npm install --no-save sharp
+node -e "const s=require('sharp'),f=require('fs');const svg=f.readFileSync('public/skinroi-icon.svg');[16,32,48,128].forEach(n=>s(svg).resize(n,n).png().toFile('extension/icons/'+n+'.png'));"
+```
 
 ## Directory layout
 
