@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SkinROI Sync",
   "short_name": "SkinROI",
-  "version": "0.2.2",
+  "version": "0.2.4",
   "description": "CS2 trade sync for SkinROI. Detects accepted trades via Steam's trade-offer history so items appear in Handle Items exactly once.",
   "author": "SkinROI",
 
@@ -10,9 +10,10 @@
   "host_permissions": [
     "*://steamcommunity.com/*",
     "*://*.steampowered.com/*",
-    "https://skinroi.vercel.app/*",
+    "https://www.skinroi.com/*",
     "https://skinroi.com/*",
-    "https://*.skinroi.com/*",
+    "https://dvich-cs2-tracker.vercel.app/*",
+    "https://*.vercel.app/*",
     "http://localhost:3000/*",
     "http://localhost:3001/*"
   ],

@@ -2,7 +2,10 @@
 // popup's dev settings so the same build can point at localhost during
 // development or the deployed Vercel app.
 
-export const DEFAULT_BASE_URL = 'https://skinroi.vercel.app';
+// Primary custom domain; www is the one that serves the app directly
+// (apex skinroi.com issues a 307 to www, and Chrome strips the Bearer
+// header across cross-origin redirects).
+export const DEFAULT_BASE_URL = 'https://www.skinroi.com';
 export const EXT_VERSION = chrome.runtime.getManifest().version;
 
 // How often the background service worker polls Steam for changes.
