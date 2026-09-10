@@ -113,6 +113,24 @@ async function runPoll({ manual = false } = {}) {
       return { skipped: 'fetch_failed' };
     }
 
+    // Count how many state=3 (Accepted) offers Steam returned and how many
+    // pass the pairedAt time filter. Lets us tell "no trade yet" apart from
+    // "trade found but filtered" apart from "trade found but no description".
+    const acceptedRaw = raw.offers.filter((o) => Number(o.trade_offer_state) === 3);
+    const pairGraceSec = 60;
+    const minTimeSecForLog = pairedAt ? Math.floor(pairedAt / 1000) - pairGraceSec : 0;
+    const acceptedPostPair = acceptedRaw.filter(
+      (o) => !minTimeSecForLog || Number(o.time_created) >= minTimeSecForLog
+    );
+    console.log(
+      '[skinroi] poll',
+      manual ? '(manual)' : '(alarm)',
+      'raw:', raw.offers.length,
+      'accepted:', acceptedRaw.length,
+      'post-pair:', acceptedPostPair.length,
+      'pairedAt:', pairedAt ? new Date(pairedAt).toISOString() : 'null'
+    );
+
     // Merge descriptions from three sources into raw.descByKey:
     //   1. Steam's offer response (usually only a handful)
     //   2. User's live inventory (ctx 2 + ctx 16)
@@ -160,6 +178,19 @@ async function runPoll({ manual = false } = {}) {
     const minTimeSec = pairedAt ? Math.floor((pairedAt - pairGraceMs) / 1000) : 0;
 
     const offers = normalizeAcceptedOffers(raw.offers, raw.descByKey, { minTimeSec });
+    // How many post-pair items were dropped for missing description?
+    const droppedForMissingDesc =
+      acceptedPostPair.reduce(
+        (n, o) =>
+          n +
+          ((o.items_to_receive?.length || 0) + (o.items_to_give?.length || 0)),
+        0
+      ) - offers.reduce((n, o) => n + o.items.length, 0);
+    console.log(
+      '[skinroi] normalized offers:', offers.length,
+      'descs:', raw.descByKey.size,
+      'items dropped (no desc):', droppedForMissingDesc
+    );
 
     // Enrich each item with float, paint seed, stickers, keychains via
     // CSFloat's inspect API. Cached per-assetid in chrome.storage.local
