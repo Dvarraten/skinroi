@@ -11,10 +11,11 @@ const BASE = process.env.REACT_APP_STEAM_SYNC_URL || '';
 const FRONTEND_POLL_MS = 30 * 1000;
 
 // How long a locally-dismissed item stays in the client-side tombstone map.
-// Long enough that any in-flight state poll can't race and revive it, but
-// short enough that a legitimate re-trade of the same assetid (rare) still
-// eventually surfaces.
-const DISMISS_TOMBSTONE_MS = 60 * 1000;
+// Long enough that any in-flight state poll can't race and revive it, and
+// long enough that a lost dismiss retry has time to complete without the
+// item briefly flickering back. A legitimate re-trade of the same assetid
+// (rare, and only for outgoing→incoming reversals) waits this out.
+const DISMISS_TOMBSTONE_MS = 5 * 60 * 1000;
 
 const EMPTY_STATE = {
   lastSync: null,
@@ -80,8 +81,7 @@ export function useSteamSync() {
     const ids = new Set(assetids.map(String));
     // Optimistic UI update AND client-side tombstone so a concurrent state
     // poll can't revive the item before the server has finished writing.
-    const now = Date.now();
-    const expiry = now + DISMISS_TOMBSTONE_MS;
+    const expiry = Date.now() + DISMISS_TOMBSTONE_MS;
     for (const assetid of ids) {
       dismissedRef.current.set(tombstoneKey(assetid, type), expiry);
     }
@@ -91,17 +91,37 @@ export function useSteamSync() {
         (p) => !(ids.has(String(p.assetid)) && (!type || p.type === type))
       ),
     }));
-    for (const assetid of assetids) {
+
+    // Batch into one request — collapses N Redis load-modify-save races
+    // into a single atomic write, and keeps the network round-trip count
+    // constant no matter how many items the user marks in one action.
+    const items = [...ids].map((assetid) => ({ assetid, type: type || null }));
+    let attempt = 0;
+    const maxAttempts = 3;
+    while (attempt < maxAttempts) {
+      attempt += 1;
       try {
-        await fetch(`${BASE}/api/inventory/dismiss`, {
+        const res = await fetch(`${BASE}/api/inventory/dismiss`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assetid, type }),
+          body: JSON.stringify({ items }),
         });
+        if (res.ok) return;
+        // 4xx (except 429) means retrying won't help.
+        if (res.status !== 429 && res.status < 500) {
+          fetchState();
+          return;
+        }
       } catch {
-        fetchState();
+        // network hiccup — fall through to retry
+      }
+      if (attempt < maxAttempts) {
+        const backoff = 300 * attempt;
+        await new Promise((r) => setTimeout(r, backoff));
       }
     }
+    // All retries failed — refetch to reconcile state with the server.
+    fetchState();
   }, [fetchState]);
 
   useEffect(() => {

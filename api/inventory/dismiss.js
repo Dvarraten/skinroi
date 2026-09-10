@@ -1,9 +1,22 @@
-// POST /api/inventory/dismiss   body: { assetid: string, type?: 'incoming'|'outgoing' }
+// POST /api/inventory/dismiss
 //
-// Removes a pending event so it no longer shows in the modal.
+// Body shapes (both accepted):
+//   { assetid: string, type?: 'incoming'|'outgoing' }   — single dismiss (legacy)
+//   { items: [{ assetid: string, type?: 'incoming'|'outgoing' }, ...] } — batch
+//
+// Removes pending events so they no longer show in Handle Items. Batching
+// matters because multiple parallel single-dismiss calls race on Redis
+// load-modify-save; the client sends the whole set in one shot instead.
 
 import { loadState, saveState } from '../_lib/state.js';
 import { getSessionSteamId } from '../_lib/auth.js';
+
+function normaliseEntry(raw) {
+  const assetid = typeof raw?.assetid === 'string' ? raw.assetid : null;
+  const type = raw?.type === 'incoming' || raw?.type === 'outgoing' ? raw.type : null;
+  if (!assetid) return null;
+  return { assetid, type };
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -16,7 +29,6 @@ export default async function handler(req, res) {
     return res.status(401).json({ ok: false, error: 'not logged in' });
   }
 
-  // Vercel Node functions auto-parse JSON, but be defensive.
   const body =
     req.body && typeof req.body === 'object'
       ? req.body
@@ -24,44 +36,48 @@ export default async function handler(req, res) {
           try { return JSON.parse(req.body || '{}'); } catch { return {}; }
         })();
 
-  const assetid = typeof body.assetid === 'string' ? body.assetid : null;
-  const type = body.type === 'incoming' || body.type === 'outgoing' ? body.type : null;
+  const items = Array.isArray(body.items)
+    ? body.items.map(normaliseEntry).filter(Boolean)
+    : [normaliseEntry(body)].filter(Boolean);
 
-  if (!assetid) {
-    return res.status(400).json({ error: 'assetid (string) required' });
+  if (items.length === 0) {
+    return res.status(400).json({ error: 'assetid or items[] required' });
   }
 
   try {
+    // Single load-modify-save per batch — collapses N single-item race
+    // windows into one. Two truly-concurrent batches can still clobber
+    // each other; the client's dismiss tombstone covers that visually.
     const state = await loadState(steamId);
     const before = state.pending.length;
 
-    // Mark the dismissed item's trade as processed so sync never re-queues it.
-    const dismissedTradeIds = state.pending
-      .filter((p) => type ? (p.assetid === assetid && p.type === type) : p.assetid === assetid)
-      .map((p) => p.tradeid)
-      .filter(Boolean);
-    const existing = state.processedTradeIds || [];
-    const processedTradeIds = dismissedTradeIds.length
-      ? [...new Set([...existing, ...dismissedTradeIds])].slice(-500)
-      : existing;
+    const matches = (p, item) =>
+      p.assetid === item.assetid && (!item.type || p.type === item.type);
 
-    // Tombstone the assetid so the sync's fresh-reload path can't race it back
-    // into pending. Keyed as "type:assetid" so an incoming tombstone never
-    // blocks an outgoing detection of the same item. Capped at 2000 entries.
-    const tombstoneKey = type ? `${type}:${assetid}` : assetid;
+    const dismissedTradeIds = [];
+    for (const item of items) {
+      for (const p of state.pending) {
+        if (matches(p, item) && p.tradeid) dismissedTradeIds.push(p.tradeid);
+      }
+    }
+
+    const tombstones = items.map((it) =>
+      it.type ? `${it.type}:${it.assetid}` : it.assetid
+    );
     const dismissedAssetIds = [
-      ...new Set([...(state.dismissedAssetIds || []), tombstoneKey]),
+      ...new Set([...(state.dismissedAssetIds || []), ...tombstones]),
     ].slice(-2000);
 
-    // Fresh reload before saving so a concurrent sync write doesn't clobber us.
-    const fresh = await loadState(steamId);
-    const newPending = fresh.pending.filter((p) =>
-      type ? !(p.assetid === assetid && p.type === type) : p.assetid !== assetid
+    const newPending = state.pending.filter(
+      (p) => !items.some((it) => matches(p, it))
     );
+
     const next = {
-      ...fresh,
+      ...state,
       pending: newPending,
-      processedTradeIds: [...new Set([...(fresh.processedTradeIds || []), ...processedTradeIds])].slice(-500),
+      processedTradeIds: [
+        ...new Set([...(state.processedTradeIds || []), ...dismissedTradeIds]),
+      ].slice(-2000),
       dismissedAssetIds,
     };
     await saveState(next, steamId);
