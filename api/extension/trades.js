@@ -199,7 +199,24 @@ export default async function handler(req, res) {
     // or that Steam has since surfaced. Never regresses a good name to
     // Unknown — a fresh payload with an "Unknown CS2 Item" fallback is
     // treated as no update.
-    const patchedPending = state.pending.map((p) => {
+    // Clean up any legacy "Unknown CS2 Item (classid)" placeholders that
+    // an earlier build wrote before we started dropping unnamed items at
+    // push time. Only removes ones that AREN'T being rescued by a fresh
+    // named push in this batch — those get patched by the reconcile below.
+    const isUnknown = (p) =>
+      typeof p.marketHashName === 'string' &&
+      p.marketHashName.startsWith('Unknown CS2 Item');
+    const cleanedPending = state.pending.filter((p) => {
+      if (!isUnknown(p)) return true;
+      const fresh = reconcileMap.get(`${p.type}:${p.assetid}`);
+      const rescuable =
+        fresh &&
+        typeof fresh.marketHashName === 'string' &&
+        !fresh.marketHashName.startsWith('Unknown CS2 Item');
+      return rescuable;
+    });
+
+    const patchedPending = cleanedPending.map((p) => {
       const fresh = reconcileMap.get(`${p.type}:${p.assetid}`);
       if (!fresh) return p;
       const merged = { ...p };

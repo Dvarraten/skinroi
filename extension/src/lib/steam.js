@@ -216,15 +216,16 @@ function collectItems(rawItems, type, descByKey, sink) {
     if (!classid) continue;
     const instanceid = it.instanceid != null ? String(it.instanceid) : '0';
     const desc = descByKey.get(`${classid}_${instanceid}`);
-    const rawName = (desc?.market_hash_name || desc?.name || '').trim();
+    const marketHashName = (desc?.market_hash_name || desc?.name || '').trim();
 
     const assetid = it.assetid != null ? String(it.assetid) : '';
     if (!assetid) continue;
-
-    // Always surface the trade even if we couldn't find a description —
-    // better to show "Unknown CS2 Item" than lose the trade record entirely.
-    // The user can dismiss or manually resolve it from Handle Items.
-    const marketHashName = rawName || `Unknown CS2 Item (${classid})`;
+    // Drop items we can't name yet. Steam's inventory endpoint sometimes
+    // takes a few minutes to propagate a just-received item's description,
+    // especially for unique-classid items like Souvenir skins. The 2-min
+    // background poll retries automatically; users can add anything the
+    // extension permanently missed via the manual Add form.
+    if (!marketHashName) continue;
 
     sink.push({
       type,
