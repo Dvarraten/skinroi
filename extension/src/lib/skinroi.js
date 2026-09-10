@@ -2,7 +2,7 @@
 // auth, and error handling are consistent.
 
 import { EXT_VERSION } from './config.js';
-import { getPairing, clearPairing } from './storage.js';
+import { getPairing } from './storage.js';
 
 async function request(path, { method = 'GET', body = null, auth = false } = {}) {
   const { baseUrl, secret } = await getPairing();
@@ -17,16 +17,16 @@ async function request(path, { method = 'GET', body = null, auth = false } = {})
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401 && auth) {
-    // Secret was revoked server-side — wipe local pairing so the popup
-    // prompts the user to re-pair.
-    await clearPairing();
-    throw new Error('extension unpaired by server');
-  }
-
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    // Historically we wiped local pairing on any 401 to force re-pair.
+    // That was too aggressive — a single transient 401 (routing hiccup,
+    // Redis eventual consistency, etc.) would silently disconnect the
+    // extension. Just surface the error and let the user disconnect
+    // manually if the secret is genuinely revoked.
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
   return data;
 }
 
