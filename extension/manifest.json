@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SkinROI Sync",
   "short_name": "SkinROI",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "CS2 trade sync for SkinROI. Auto-populates float, paint seed, and stickers so trades land in Handle Items with full context.",
   "author": "SkinROI",
 

@@ -77,6 +77,14 @@ export async function fetchInspectMetadata(inspectLink) {
         : null,
     stickers: normalizeStickers(info.stickers),
     keychains: normalizeKeychains(info.keychains),
+    // Full name from CSFloat — useful as a fallback when Steam's inventory
+    // endpoint hasn't propagated the item's description yet (common right
+    // after a trade completes, especially for unique-classid items like
+    // Souvenir skins with tournament stickers baked in).
+    fullItemName:
+      typeof info.full_item_name === 'string' && info.full_item_name.trim()
+        ? info.full_item_name.trim()
+        : null,
   };
 }
 
@@ -170,5 +178,13 @@ function attachInspect(item, meta) {
   }
   if (Array.isArray(meta.keychains) && meta.keychains.length > 0) {
     item.keychains = meta.keychains;
+  }
+  // Rename "Unknown CS2 Item (classid)" fallback if CSFloat gave us a real name.
+  if (
+    meta.fullItemName &&
+    typeof item.marketHashName === 'string' &&
+    item.marketHashName.startsWith('Unknown CS2 Item')
+  ) {
+    item.marketHashName = meta.fullItemName;
   }
 }

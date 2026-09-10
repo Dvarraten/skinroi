@@ -162,6 +162,21 @@ export default async function handler(req, res) {
 
     const append = [];
     const newOfferIds = [];
+    // Reconcile map: type:assetid → freshest item payload from this push.
+    // Lets us upgrade existing pending items when the extension eventually
+    // resolves a name / float / stickers that weren't available at first
+    // detection (common for Souvenir skins whose descriptions take a beat
+    // to propagate to the inventory endpoint after a trade completes).
+    const reconcileMap = new Map();
+    for (const offer of offers) {
+      for (const item of offer.items) {
+        reconcileMap.set(`${item.type}:${item.assetid}`, {
+          ...item,
+          tradeid: offer.tradeofferid,
+          detectedAt: offer.acceptedAt,
+        });
+      }
+    }
 
     for (const offer of offers) {
       if (processed.has(offer.tradeofferid)) continue;
@@ -180,6 +195,43 @@ export default async function handler(req, res) {
       }
     }
 
+    // For pending items that already exist, patch fields that were missing
+    // or that Steam has since surfaced. Never regresses a good name to
+    // Unknown — a fresh payload with an "Unknown CS2 Item" fallback is
+    // treated as no update.
+    const patchedPending = state.pending.map((p) => {
+      const fresh = reconcileMap.get(`${p.type}:${p.assetid}`);
+      if (!fresh) return p;
+      const merged = { ...p };
+      let changed = false;
+      const isBetterName =
+        typeof fresh.marketHashName === 'string' &&
+        !fresh.marketHashName.startsWith('Unknown CS2 Item') &&
+        (typeof p.marketHashName !== 'string' ||
+          p.marketHashName.startsWith('Unknown CS2 Item'));
+      if (isBetterName) {
+        merged.marketHashName = fresh.marketHashName;
+        changed = true;
+      }
+      if (!p.iconUrl && fresh.iconUrl) {
+        merged.iconUrl = fresh.iconUrl;
+        changed = true;
+      }
+      for (const k of ['floatValue', 'paintSeed', 'paintIndex', 'defIndex']) {
+        if (p[k] == null && fresh[k] != null) {
+          merged[k] = fresh[k];
+          changed = true;
+        }
+      }
+      for (const k of ['stickers', 'keychains']) {
+        if ((!Array.isArray(p[k]) || p[k].length === 0) && Array.isArray(fresh[k]) && fresh[k].length > 0) {
+          merged[k] = fresh[k];
+          changed = true;
+        }
+      }
+      return changed ? merged : p;
+    });
+
     // Cap the processed set. 2000 entries is a decade+ of trades for a heavy
     // trader; older entries falling off is fine because the extension only
     // seeds each historical offer once and the tombstones catch dismissed
@@ -190,7 +242,7 @@ export default async function handler(req, res) {
 
     const next = {
       ...state,
-      pending: state.pending.concat(append),
+      pending: patchedPending.concat(append),
       processedTradeIds: nextProcessed,
       lastSync: startedAt,
       lastSyncOk: true,
