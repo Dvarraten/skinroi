@@ -77,6 +77,40 @@ function formatCandidateLabel(c) {
   return base;
 }
 
+function InspectBadges({ entry, theme }) {
+  const hasFloat = typeof entry.floatValue === 'number';
+  const stickers = Array.isArray(entry.stickers) ? entry.stickers : [];
+  const keychains = Array.isArray(entry.keychains) ? entry.keychains : [];
+  if (!hasFloat && stickers.length === 0 && keychains.length === 0) return null;
+  const stickerTip = stickers
+    .map((s) => s.name || `#${s.stickerId}`)
+    .concat(keychains.map((k) => `charm #${k.stickerId}`))
+    .join(', ');
+  return (
+    <div className="flex items-center gap-1.5 mt-0.5 leading-tight">
+      {hasFloat && (
+        <span className={`text-[10px] font-mono ${theme.subtext}`}>
+          fv {entry.floatValue.toFixed(4)}
+        </span>
+      )}
+      {typeof entry.paintSeed === 'number' && (
+        <span className={`text-[10px] font-mono ${theme.subtext}`}>
+          seed {entry.paintSeed}
+        </span>
+      )}
+      {(stickers.length > 0 || keychains.length > 0) && (
+        <span
+          className="text-[10px] font-mono text-warn"
+          title={stickerTip}
+        >
+          {stickers.length > 0 ? `${stickers.length}×✱` : ''}
+          {keychains.length > 0 ? ` ${keychains.length}×🔑` : ''}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ItemImage({ iconUrl, alt, size = 36 }) {
   const px = `${size}px`;
   if (!iconUrl) {
@@ -159,15 +193,25 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
     const expectedDelivery = onHold
       ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       : null;
-    onAddAll({
-      itemName: rep.marketHashName,
-      purchasePrice: v,
-      platform,
-      pending: onHold,
-      expectedDelivery,
-      notes,
-      iconUrl: rep.iconUrl ? `${STEAM_IMG_BASE}${rep.iconUrl}/96fx96f` : null,
-    });
+    // Add each item in the group individually so per-item inspect data
+    // (float, paint seed, stickers) rides through to the portfolio row.
+    onAddAll(
+      entries.map((entry) => ({
+        itemName: entry.marketHashName,
+        purchasePrice: v,
+        platform,
+        pending: onHold,
+        expectedDelivery,
+        notes,
+        iconUrl: entry.iconUrl ? `${STEAM_IMG_BASE}${entry.iconUrl}/96fx96f` : null,
+        floatValue: entry.floatValue,
+        paintSeed: entry.paintSeed,
+        paintIndex: entry.paintIndex,
+        defIndex: entry.defIndex,
+        stickers: entry.stickers,
+        keychains: entry.keychains,
+      }))
+    );
   };
 
   return (
@@ -182,6 +226,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
             <p className="text-[10px] text-slate-600 leading-tight">
               {new Date(rep.detectedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </p>
+            <InspectBadges entry={rep} theme={theme} />
           </div>
           {count > 1 && (
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white flex-shrink-0`}>
@@ -337,6 +382,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
               <p className="text-[10px] text-slate-600 leading-tight">
                 Gone {new Date(entry.detectedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </p>
+              <InspectBadges entry={entry} theme={theme} />
             </div>
           </div>
         </td>
@@ -634,10 +680,26 @@ export default function HandleItemsPage({
       ? incoming.filter(e => (e.marketHashName || '').toLowerCase().includes(q))
       : incoming;
 
+    // Group by name + paintSeed + sticker fingerprint. Items with distinct
+    // inspect data (float bucket, stickers) don't get lumped — otherwise
+    // the row would show only the rep's float even though the group's
+    // items differ. Items without inspect data (capsules, agents, keys)
+    // still group by name as before.
+    const inspectKey = (e) => {
+      const seed = e.paintSeed != null ? `p${e.paintSeed}` : '';
+      const stickers = Array.isArray(e.stickers) && e.stickers.length
+        ? 's' + e.stickers.map((s) => s.stickerId).sort((a, b) => a - b).join(',')
+        : '';
+      const keychains = Array.isArray(e.keychains) && e.keychains.length
+        ? 'k' + e.keychains.map((s) => s.stickerId).sort((a, b) => a - b).join(',')
+        : '';
+      return `${seed}|${stickers}|${keychains}`;
+    };
+
     const groups = [];
     const seen = new Map();
     for (const entry of filtered) {
-      const k = entry.marketHashName;
+      const k = `${entry.marketHashName}::${inspectKey(entry)}`;
       if (!seen.has(k)) { seen.set(k, []); groups.push(seen.get(k)); }
       seen.get(k).push(entry);
     }
@@ -809,9 +871,12 @@ export default function HandleItemsPage({
                       exchangeRate={exchangeRate}
                       currencySymbol={currencySymbol}
                       displayCurrency={displayCurrency}
-                      onAddAll={(payload) => {
-                        group.forEach(() => addItemDirect(payload));
-                        onDismiss(group.map(e => e.assetid), 'incoming');
+                      onAddAll={(payloads) => {
+                        // payloads is one entry per asset in the group so
+                        // per-item inspect data (float, seed, stickers) is
+                        // preserved on the resulting portfolio rows.
+                        for (const p of payloads) addItemDirect(p);
+                        onDismiss(group.map((e) => e.assetid), 'incoming');
                       }}
                       onDismissGroup={(ids) => onDismiss(ids, 'incoming')}
                     />

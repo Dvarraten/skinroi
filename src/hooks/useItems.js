@@ -152,6 +152,10 @@ export const useItems = (steamId) => {
   const addItemDirect = ({
     itemName, purchasePrice, platform = 'csfloat', notes = '',
     iconUrl = null, pending = false, expectedDelivery = null,
+    // Inspect metadata surfaced by the extension. Kept off the item unless
+    // the extension resolved them so old rows and manual adds stay clean.
+    floatValue = null, paintSeed = null, paintIndex = null, defIndex = null,
+    stickers = null, keychains = null,
   }) => {
     if (!itemName || !purchasePrice) return null;
     const newItem = {
@@ -169,6 +173,24 @@ export const useItems = (steamId) => {
       expectedDelivery,
       iconUrl,
     };
+    if (typeof floatValue === 'number' && Number.isFinite(floatValue)) {
+      newItem.floatValue = floatValue;
+    }
+    if (typeof paintSeed === 'number' && Number.isFinite(paintSeed)) {
+      newItem.paintSeed = paintSeed;
+    }
+    if (typeof paintIndex === 'number' && Number.isFinite(paintIndex)) {
+      newItem.paintIndex = paintIndex;
+    }
+    if (typeof defIndex === 'number' && Number.isFinite(defIndex)) {
+      newItem.defIndex = defIndex;
+    }
+    if (Array.isArray(stickers) && stickers.length > 0) {
+      newItem.stickers = stickers;
+    }
+    if (Array.isArray(keychains) && keychains.length > 0) {
+      newItem.keychains = keychains;
+    }
     setItems(prev => [newItem, ...prev]);
     return newItem.id;
   };

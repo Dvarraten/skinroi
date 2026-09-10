@@ -11,6 +11,8 @@ import {
   pushActivity,
   getDescCache,
   saveDescCache,
+  getInspectCache,
+  saveInspectCache,
 } from './lib/storage.js';
 import {
   getSteamIdFromCookie,
@@ -19,6 +21,7 @@ import {
   fetchInventoryDescriptions,
   normalizeAcceptedOffers,
 } from './lib/steam.js';
+import { enrichOffersWithInspect } from './lib/inspect.js';
 import { pushOffers } from './lib/skinroi.js';
 
 const ALARM_NAME = 'skinroi-poll';
@@ -157,6 +160,25 @@ async function runPoll({ manual = false } = {}) {
     const minTimeSec = pairedAt ? Math.floor((pairedAt - pairGraceMs) / 1000) : 0;
 
     const offers = normalizeAcceptedOffers(raw.offers, raw.descByKey, { minTimeSec });
+
+    // Enrich each item with float, paint seed, stickers, keychains via
+    // CSFloat's inspect API. Cached per-assetid in chrome.storage.local
+    // — a specific asset's inspect data never changes, so a hit skips
+    // the network call entirely.
+    if (offers.length > 0) {
+      try {
+        const inspectCache = await getInspectCache();
+        await enrichOffersWithInspect({
+          offers,
+          descByKey: raw.descByKey,
+          ownerSteamId: cookieSteamId,
+          cache: inspectCache,
+        });
+        await saveInspectCache(inspectCache);
+      } catch (err) {
+        console.warn('[skinroi] inspect enrichment failed', err?.message || err);
+      }
+    }
 
     let result;
     try {

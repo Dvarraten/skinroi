@@ -20,6 +20,13 @@ export const STEAM_POINTS_CONFIG =
 export const STEAM_GET_TRADE_OFFERS = 'https://api.steampowered.com/IEconService/GetTradeOffers/v1/';
 export const STEAM_GET_TRADE_HISTORY = 'https://api.steampowered.com/IEconService/GetTradeHistory/v1/';
 
+// CSFloat's public inspect endpoint — takes a Steam inspect_link, returns
+// float value, paint seed / index, stickers, keychains. Same API their own
+// browser extension uses. Rate limits are lenient for a personal trader
+// (a few trades per day), but we still throttle to be a good citizen.
+export const CSFLOAT_INSPECT_API = 'https://api.csfloat.com/';
+export const INSPECT_MIN_DELAY_MS = 250;
+
 // Only offers in state 3 (Accepted) count as completed trades — items have
 // transferred to inventory (possibly in trade-protected context 16 for the
 // 7-day hold, but the trade itself is done and the item is ours).
@@ -37,5 +44,6 @@ export const STORAGE_KEYS = {
   PAIRED_AT: 'skinroi_pairedAt',
   HAS_SEEDED_OFFERS: 'skinroi_hasSeededOffers',
   DESC_CACHE: 'skinroi_descCache',
+  INSPECT_CACHE: 'skinroi_inspectCache',
   ACTIVITY_LOG: 'activity_log',
 };

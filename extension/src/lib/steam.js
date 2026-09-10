@@ -229,6 +229,8 @@ function collectItems(rawItems, type, descByKey, sink) {
     sink.push({
       type,
       assetid,
+      classid,
+      instanceid,
       marketHashName,
       iconUrl: desc?.icon_url ? String(desc.icon_url) : '',
     });

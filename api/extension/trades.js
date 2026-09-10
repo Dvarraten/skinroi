@@ -49,6 +49,25 @@ function isTombstoned(dismissed, item) {
   return false;
 }
 
+function normaliseStickerList(raw, isKeychain = false) {
+  if (!Array.isArray(raw)) return undefined;
+  const out = [];
+  for (const s of raw) {
+    if (!s || typeof s !== 'object') continue;
+    const stickerId = Number(s.stickerId ?? s.sticker_id);
+    if (!Number.isFinite(stickerId)) continue;
+    const entry = {
+      stickerId,
+      slot: Number.isFinite(Number(s.slot)) ? Number(s.slot) : null,
+    };
+    if (typeof s.name === 'string') entry.name = s.name;
+    if (typeof s.wear === 'number' && Number.isFinite(s.wear)) entry.wear = s.wear;
+    if (isKeychain && Number.isFinite(Number(s.pattern))) entry.pattern = Number(s.pattern);
+    out.push(entry);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 function normaliseItem(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const type = raw.type === 'incoming' || raw.type === 'outgoing' ? raw.type : null;
@@ -58,12 +77,35 @@ function normaliseItem(raw) {
       : '';
   const marketHashName = typeof raw.marketHashName === 'string' ? raw.marketHashName.trim() : '';
   if (!type || !assetid || !marketHashName) return null;
-  return {
+
+  const item = {
     type,
     assetid,
     marketHashName,
     iconUrl: typeof raw.iconUrl === 'string' ? raw.iconUrl : '',
   };
+
+  // Optional inspect-derived fields. Kept off the item unless the extension
+  // actually resolved them, so pending entries stay compact for items the
+  // inspect API couldn't handle (agents, capsules, keys, etc.).
+  if (typeof raw.floatValue === 'number' && Number.isFinite(raw.floatValue)) {
+    item.floatValue = raw.floatValue;
+  }
+  if (typeof raw.paintSeed === 'number' && Number.isFinite(raw.paintSeed)) {
+    item.paintSeed = raw.paintSeed;
+  }
+  if (typeof raw.paintIndex === 'number' && Number.isFinite(raw.paintIndex)) {
+    item.paintIndex = raw.paintIndex;
+  }
+  if (typeof raw.defIndex === 'number' && Number.isFinite(raw.defIndex)) {
+    item.defIndex = raw.defIndex;
+  }
+  const stickers = normaliseStickerList(raw.stickers, false);
+  if (stickers) item.stickers = stickers;
+  const keychains = normaliseStickerList(raw.keychains, true);
+  if (keychains) item.keychains = keychains;
+
+  return item;
 }
 
 function normaliseOffer(raw, fallbackAt) {

@@ -89,6 +89,27 @@ export async function saveDescCache(map) {
   await set({ [STORAGE_KEYS.DESC_CACHE]: trimmed });
 }
 
+// Persistent inspect cache: assetid → { floatValue, paintSeed, paintIndex,
+// defIndex, stickers, keychains }. A specific asset's inspect data never
+// changes, so cached entries are permanently valid. Trimmed to a max size
+// (FIFO by insertion order — recent trades stay hot).
+const INSPECT_CACHE_MAX = 3000;
+
+export async function getInspectCache() {
+  const data = await get([STORAGE_KEYS.INSPECT_CACHE]);
+  const raw = data[STORAGE_KEYS.INSPECT_CACHE];
+  return raw && typeof raw === 'object' ? raw : {};
+}
+
+export async function saveInspectCache(map) {
+  const entries = Object.entries(map);
+  const trimmed =
+    entries.length > INSPECT_CACHE_MAX
+      ? Object.fromEntries(entries.slice(-INSPECT_CACHE_MAX))
+      : map;
+  await set({ [STORAGE_KEYS.INSPECT_CACHE]: trimmed });
+}
+
 const ACTIVITY_MAX = 50;
 
 export async function pushActivity(entry) {
