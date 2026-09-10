@@ -15,7 +15,6 @@ import {
   ArrowLeftRight,
   ArrowDownUp,
   Home,
-  ShieldCheck,
   PanelLeft,
 } from "lucide-react";
 import steamLogo from "../assets/platforms/steam.png";
@@ -42,9 +41,7 @@ export default function Header({
   onLogout,
   onExportCSV,
   onImportCSV,
-  hasRefreshToken = false,
-  tradeHoldDismissed = false,
-  onEnableTradeHold,
+  extensionConnected = false,
   // Currency converter props (for popover)
   usdAmount,
   rmbAmount,
@@ -292,20 +289,11 @@ export default function Header({
                       Analytics
                     </button>
                     <div className={`border-t ${theme?.panelBorder || 'border-white/10'} mt-1 pt-1`}>
-                      {hasRefreshToken && (
+                      {extensionConnected && (
                         <div className="flex items-center gap-3 px-4 py-2.5 text-sm text-emerald-400">
                           <CheckCircle size={15} />
-                          Trade sync active
+                          Extension connected
                         </div>
-                      )}
-                      {!hasRefreshToken && tradeHoldDismissed && onEnableTradeHold && (
-                        <button
-                          onClick={() => { onEnableTradeHold(); setDropdownOpen(false); }}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-blue-400 hover:text-blue-300 ${theme?.itemHoverBg || 'hover:bg-white/8'} transition-all`}
-                        >
-                          <ShieldCheck size={15} />
-                          Enable trade-hold detection
-                        </button>
                       )}
                       <button
                         onClick={() => { onLogout(); setDropdownOpen(false); }}

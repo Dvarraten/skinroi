@@ -62,7 +62,6 @@ export default function CS2TradingTracker() {
   const [activeTab, setActiveTab] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('newest');
-  const [tradeHoldDismissed, setTradeHoldDismissed] = useState(() => !!localStorage.getItem('skinroi-tradehold-dismissed'));
   const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'analytics' | 'about'
   const [chartPeriod, setChartPeriod] = useState('30d');
   const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'bloomberg'); return themes[r] ? r : 'bloomberg'; });
@@ -92,11 +91,8 @@ export default function CS2TradingTracker() {
     else localStorage.removeItem('skinroi-converter-pinned');
   }, [converterPinned]);
 
-  const dismissTradeHold = () => { localStorage.setItem('skinroi-tradehold-dismissed', '1'); setTradeHoldDismissed(true); };
-  const enableTradeHold  = () => { localStorage.removeItem('skinroi-tradehold-dismissed'); setTradeHoldDismissed(false); };
-
   useEffect(() => {
-    if (isHandleItemsPage) steamSync.sync();
+    if (isHandleItemsPage) steamSync.refreshState();
   }, [isHandleItemsPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -209,9 +205,7 @@ export default function CS2TradingTracker() {
         onLogout={logout}
         onExportCSV={() => exportToCSV(items)}
         onImportCSV={handleImportCSV}
-        hasRefreshToken={steamSync.hasRefreshToken}
-        tradeHoldDismissed={tradeHoldDismissed}
-        onEnableTradeHold={enableTradeHold}
+        extensionConnected={!!steamSync.extension?.connected}
         usdAmount={usdAmount}
         rmbAmount={rmbAmount}
         sidebarRate={sidebarRate}
@@ -371,10 +365,7 @@ export default function CS2TradingTracker() {
           handleUsdChange={handleUsdChange}
           handleRmbChange={handleRmbChange}
           {...steamSync}
-          onSync={steamSync.sync}
           onDismiss={steamSync.dismiss}
-          tradeHoldDismissed={tradeHoldDismissed}
-          onDismissTradeHold={dismissTradeHold}
         />
       )}
     </div>

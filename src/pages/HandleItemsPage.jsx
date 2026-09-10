@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertTriangle, Clock, CheckCircle, Search } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import SteamQRSetup from '../components/SteamQRSetup';
+import ExtensionPairPanel from '../components/ExtensionPairPanel';
 import PlatformPicker from '../components/PlatformPicker';
 import { TabButton } from '../components/TabsAndSearchbar';
 import RecentSales from '../components/RecentSales';
@@ -552,9 +552,6 @@ export default function HandleItemsPage({
   lastSyncOk,
   lastError,
   reachable,
-  busy,
-  hasInitialSnapshot,
-  onSync,
   onDismiss,
   items = [],
   addItemDirect,
@@ -562,11 +559,14 @@ export default function HandleItemsPage({
   exchangeRate,
   currencySymbol = '¥',
   displayCurrency = 'CNY',
-  hasRefreshToken = false,
-  refreshTokenStatus,
-  tradeHoldDismissed = false,
-  onDismissTradeHold,
+  extension = null,
+  refreshState,
 }) {
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try { await refreshState?.(); } finally { setRefreshing(false); }
+  };
   const [tab, setTab] = useState('incoming');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date-new');
@@ -681,21 +681,21 @@ export default function HandleItemsPage({
           <div className="flex items-center gap-3">
             <h2 className={`font-semibold ${theme.text}`}>Handle Items</h2>
             <span className={`text-[11px] ${theme.subtext}`}>
-              {hasInitialSnapshot && lastSync
-                ? `Last sync: ${new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                : !hasInitialSnapshot ? 'No snapshot yet' : ''}
+              {lastSync
+                ? `Last push: ${new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : 'Waiting for extension…'}
             </span>
           </div>
           <button
             type="button"
-            onClick={onSync}
-            disabled={busy}
+            onClick={handleRefresh}
+            disabled={refreshing}
             className={`flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium border transition-all
-              ${theme.card} ${theme.cardBorder} ${busy ? theme.text : `${theme.subtext} ${theme.textHover}`}
+              ${theme.card} ${theme.cardBorder} ${refreshing ? theme.text : `${theme.subtext} ${theme.textHover}`}
               disabled:opacity-50`}
           >
-            <RefreshCw size={12} className={busy ? 'animate-spin' : ''} />
-            {busy ? 'Syncing…' : 'Sync inventory'}
+            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
 
@@ -704,26 +704,17 @@ export default function HandleItemsPage({
           <div className={`px-4 py-2 rounded-xl border text-[11px] flex items-center gap-1.5 flex-wrap ${reachable === false ? 'border-amber-500/30 bg-amber-500/5 text-amber-300' : 'border-red-500/30 bg-red-500/5 text-red-300'}`}>
             <AlertTriangle size={12} />
             {reachable === false ? (
-              <>Local backend not reachable on localhost:3001 — start it with <code className="bg-white/5 px-1 rounded">cd server &amp;&amp; npm start</code></>
+              <>Backend unreachable — check your connection or try again.</>
             ) : (
-              <>Sync failed: {lastError}</>
+              <>Last push failed: {lastError}</>
             )}
           </div>
         )}
 
-        {/* Token setup */}
-        {!hasRefreshToken && !tradeHoldDismissed && (
-          <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-4`}>
-            <SteamQRSetup theme={theme} onComplete={refreshTokenStatus} expired={false} hasRefreshToken={false} refreshTokenExp={null} />
-            <button
-              type="button"
-              onClick={onDismissTradeHold}
-              className="mt-2 text-xs text-red-400 hover:text-red-300 transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        {/* Extension pairing / status */}
+        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-4`}>
+          <ExtensionPairPanel theme={theme} extension={extension} onChange={refreshState} />
+        </div>
 
         {/* Analytics */}
         <HandleStats items={items} incomingCount={incomingCount} outgoingCount={outgoingCount} theme={theme} />

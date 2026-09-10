@@ -33,3 +33,4 @@ yarn-error.log*
 
 # Claude Code local settings (may contain command history with secrets)
 .claude/
+.env*

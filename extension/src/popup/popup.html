@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SkinROI Sync</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="dot"></span>
+        <h1>SkinROI Sync</h1>
+      </div>
+      <span id="version" class="version"></span>
+    </header>
+
+    <section id="paired-section" class="hidden">
+      <div class="row">
+        <span class="label">Steam ID</span>
+        <span id="steam-id" class="value mono"></span>
+      </div>
+      <div class="row">
+        <span class="label">Paired</span>
+        <span id="paired-at" class="value"></span>
+      </div>
+      <div class="row">
+        <span class="label">Steam session</span>
+        <span id="steam-session" class="value"></span>
+      </div>
+
+      <button id="poll-now" class="primary">Sync now</button>
+      <button id="unpair" class="secondary">Disconnect</button>
+
+      <h2>Recent activity</h2>
+      <ul id="activity"></ul>
+    </section>
+
+    <section id="unpaired-section" class="hidden">
+      <p class="hint">
+        Open <a id="skinroi-link" href="#" target="_blank">SkinROI</a>, click
+        <strong>Connect Extension</strong>, then paste the code below.
+      </p>
+      <input id="code-input" type="text" placeholder="XXXX-XXXX" autocomplete="off" maxlength="9" />
+      <button id="pair" class="primary">Pair</button>
+      <p id="pair-error" class="error hidden"></p>
+    </section>
+
+    <details class="dev">
+      <summary>Advanced</summary>
+      <label>
+        SkinROI base URL
+        <input id="base-url" type="url" />
+      </label>
+      <button id="save-base-url" class="secondary small">Save</button>
+    </details>
+
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>
