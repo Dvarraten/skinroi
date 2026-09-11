@@ -66,13 +66,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return false;
 });
 
-// Wrap chrome.storage / fetch mistakes so no error is silently swallowed —
-// something ALWAYS ends up in the activity log, or in the SW console.
+// Route expected/handled errors through the popup activity log only.
+// Deliberately no console.error — that lights up chrome://extensions/?errors
+// with red badges for every transient Steam blip, which is scary noise for
+// something we already retry and recover from. Reserve console.error for
+// genuine unhandled bugs (below).
 async function safeLogError(msg) {
-  console.error('[skinroi]', msg);
   try {
     await pushActivity({ kind: 'error', message: String(msg).slice(0, 200) });
   } catch (e) {
+    // pushActivity itself failing IS a real bug — chrome.storage.local
+    // being broken means the extension can't do its job.
     console.error('[skinroi] pushActivity failed', e);
   }
 }
@@ -137,7 +141,7 @@ async function runPoll({ manual = false } = {}) {
         if (!raw.descByKey.has(k)) raw.descByKey.set(k, v);
       }
     } catch (err) {
-      console.warn('[skinroi] desc cache load failed', err?.message || err);
+      console.debug('[skinroi] desc cache load failed', err?.message || err);
     }
     try {
       const invDesc = await fetchInventoryDescriptions(cookieSteamId);
@@ -145,7 +149,7 @@ async function runPoll({ manual = false } = {}) {
         if (!raw.descByKey.has(k)) raw.descByKey.set(k, v);
       }
     } catch (err) {
-      console.warn('[skinroi] inventory desc lookup failed', err?.message || err);
+      console.debug('[skinroi] inventory desc lookup failed', err?.message || err);
     }
     // Persist the union so future syncs can name outgoing items.
     try {
@@ -161,7 +165,7 @@ async function runPoll({ manual = false } = {}) {
       }
       await saveDescCache(flat);
     } catch (err) {
-      console.warn('[skinroi] desc cache save failed', err?.message || err);
+      console.debug('[skinroi] desc cache save failed', err?.message || err);
     }
 
     const hasSeeded = await getHasSeededOffers();
@@ -214,7 +218,7 @@ async function runPoll({ manual = false } = {}) {
           });
           await saveInspectCache(inspectCache);
         } catch (err) {
-          console.warn('[skinroi] inspect enrichment failed', err?.message || err);
+          console.debug('[skinroi] inspect enrichment failed', err?.message || err);
         }
         try {
           const r = await pushOffers({ offers: recentOffers, baseline: false });
@@ -273,7 +277,7 @@ async function runPoll({ manual = false } = {}) {
         });
         await saveInspectCache(inspectCache);
       } catch (err) {
-        console.warn('[skinroi] inspect enrichment failed', err?.message || err);
+        console.debug('[skinroi] inspect enrichment failed', err?.message || err);
       }
     }
 
