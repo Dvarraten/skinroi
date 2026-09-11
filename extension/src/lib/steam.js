@@ -32,6 +32,26 @@ export async function getSteamIdFromCookie() {
   });
 }
 
+// Retry a fetch on network errors (TypeError: Failed to fetch). Chrome MV3
+// service workers can be killed mid-request, and steamcommunity.com blips
+// briefly — both throw as generic network errors. Two quick retries with
+// short backoff eliminate the vast majority of transient failures.
+async function fetchWithRetry(url, init, attempts = 3, baseDelayMs = 400) {
+  let lastErr;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fetch(url, init);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < attempts) {
+        const delay = baseDelayMs * attempt;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastErr || new Error('fetch failed');
+}
+
 // Fetch a session-derived WebAPI access token that grants access to
 // IEconService/GetTradeOffers for the logged-in user.
 //
@@ -40,7 +60,7 @@ export async function getSteamIdFromCookie() {
 // Fallback: parse `data-loyalty_webapi_token` from /my/home/ HTML.
 export async function fetchSessionAccessToken() {
   try {
-    const res = await fetch(STEAM_POINTS_CONFIG, {
+    const res = await fetchWithRetry(STEAM_POINTS_CONFIG, {
       credentials: 'include',
       redirect: 'follow',
     });
@@ -56,7 +76,10 @@ export async function fetchSessionAccessToken() {
     // fall through to HTML parse
   }
 
-  const home = await fetch(STEAM_HOME, { credentials: 'include', redirect: 'follow' });
+  const home = await fetchWithRetry(STEAM_HOME, {
+    credentials: 'include',
+    redirect: 'follow',
+  });
   if (!home.ok) throw new Error(`Steam session fetch failed: HTTP ${home.status}`);
   const html = await home.text();
   const m =
