@@ -9,6 +9,8 @@ import {
   clearPairing,
   setBaseUrl,
   getActivity,
+  getVerboseLogging,
+  setVerboseLogging,
 } from '../lib/storage.js';
 import { claimCode } from '../lib/skinroi.js';
 import { getSteamIdFromCookie } from '../lib/steam.js';
@@ -19,6 +21,7 @@ async function render() {
   const { baseUrl, secret, steamId, pairedAt } = await getPairing();
   $('#version').textContent = `v${EXT_VERSION}`;
   $('#base-url').value = baseUrl || DEFAULT_BASE_URL;
+  $('#verbose-logging').checked = await getVerboseLogging();
   $('#skinroi-link').href = baseUrl || DEFAULT_BASE_URL;
 
   if (secret && steamId) {
@@ -119,6 +122,10 @@ $('#save-base-url').addEventListener('click', async () => {
   if (!url) return;
   await setBaseUrl(url);
   await render();
+});
+
+$('#verbose-logging').addEventListener('change', async (e) => {
+  await setVerboseLogging(e.target.checked);
 });
 
 render();

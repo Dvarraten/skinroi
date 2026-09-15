@@ -193,3 +193,16 @@ details.dev input {
   font-size: 11px;
   padding: 4px 6px;
 }
+
+details.dev label.toggle-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+details.dev label.toggle-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}

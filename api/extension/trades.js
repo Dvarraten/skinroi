@@ -6,41 +6,74 @@
 // Body shape:
 //   {
 //     extVersion?: string,
-//     baseline?:   boolean,       // true = seed processedTradeIds only, no pending items
 //     offers: [
 //       {
 //         tradeofferid: string,   // Steam's canonical trade id (dedup key)
-//         acceptedAt:   string,   // ISO from time_updated / time_created
+//         acceptedAt:   string,   // ISO from GetTradeOffers time_updated (or time_init
+//                                 // for history-only trades). Used to determine whether
+//                                 // the trade is new (>= pairedAt) or historical.
 //         items: [
 //           {
 //             type: 'incoming' | 'outgoing',
 //             assetid: string,
 //             marketHashName: string,
-//             iconUrl?: string
+//             iconUrl?: string,
+//             floatValue?: number,
+//             paintSeed?: number,
+//             paintIndex?: number,
+//             defIndex?: number,
+//             stickers?: [...],
+//             keychains?: [...]
 //           }
 //         ]
 //       }
 //     ]
 //   }
 //
-// Dedupe strategy:
-//   * `state.processedTradeIds` — set of tradeofferids we've already surfaced.
-//     Prevents re-adding an offer's items on subsequent polls, and prevents
-//     the "trade hold expiry" double-detection: the same offer id can't
-//     produce two pending entries.
-//   * `state.dismissedAssetIds` — per-asset tombstones for user-dismissed
-//     items. Belt-and-suspenders if processedTradeIds ever gets truncated.
+// Dedup + surface strategy:
+//   The extension sends ALL accepted trades on every poll — both recent and
+//   historical — with no client-side time filter. The backend decides what to
+//   surface in Handle Items using the user's pairedAt timestamp (stored when
+//   the extension first claimed its pairing code):
 //
-// The `baseline: true` flag is used exactly once, right after pairing: the
-// backend records every historical tradeofferid but doesn't append pending
-// items, so the user doesn't see hundreds of old trades on first sync.
+//   • tradeofferid already in processedTradeIds
+//       → reconcile only (patch missing float/stickers on existing pending items)
+//
+//   • tradeofferid NOT in processedTradeIds, acceptedAt >= pairedAt - 60s
+//       → add to processedTradeIds + add items to pending (new trade!)
+//
+//   • tradeofferid NOT in processedTradeIds, acceptedAt < pairedAt - 60s
+//       → add to processedTradeIds only (historical trade, don't flood Handle Items)
+//
+//   This means on the very first poll after pairing, all historical trades are
+//   silently recorded in processedTradeIds without appearing in Handle Items.
+//   No baseline seed or hasSeeded flag is needed on the extension side.
+//   Re-installing the extension triggers the same flow automatically.
+//
+//   Hold-expiry false positives are prevented by the processedTradeIds dedup:
+//   when Steam bumps time_updated on a 7-day-hold expiry, the tradeofferid is
+//   already in processedTradeIds from the first time we saw it (when its
+//   time_updated was still before pairedAt), so it hits the reconcile-only path.
 
 import { loadState, saveState } from '../_lib/state.js';
 import {
   extractBearer,
   resolveSecret,
+  loadExtensionInfo,
   touchLastSeen,
 } from '../_lib/extension-store.js';
+
+// 60-second grace window before pairedAt so trades completed right before
+// pairing are still surfaced (covers the common case of pairing immediately
+// after completing a trade).
+const PAIR_GRACE_MS = 60_000;
+
+// Upper bound on how many tradeofferids we keep in processedTradeIds.
+// 50 000 comfortably covers a very active trader for many years. Entries are
+// kept as a LIFO ring — we drop the oldest when the cap is hit, which is
+// safe because old trades that fall off have been in pending long enough to
+// have been handled (or dismissed and tombstoned in dismissedAssetIds).
+const PROCESSED_TRADE_IDS_CAP = 50_000;
 
 function isTombstoned(dismissed, item) {
   const assetid = String(item.assetid);
@@ -149,12 +182,19 @@ export default async function handler(req, res) {
         })();
 
   const startedAt = new Date().toISOString();
-  const baseline = body.baseline === true;
   const extVersion = typeof body.extVersion === 'string' ? body.extVersion.slice(0, 32) : null;
   const rawOffers = Array.isArray(body.offers) ? body.offers : [];
   const offers = rawOffers.map((o) => normaliseOffer(o, startedAt)).filter(Boolean);
 
   try {
+    // Load pairedAt from ext-info. Used as the cutoff: trades accepted before
+    // this timestamp are recorded in processedTradeIds but not surfaced in
+    // pending. A missing pairedAt (should never happen in production) means we
+    // treat everything as new — safe default, the user just sees all trades.
+    const extInfo = await loadExtensionInfo(steamId);
+    const pairedAt = extInfo?.pairedAt ?? 0;
+    const pairThresholdMs = pairedAt > 0 ? pairedAt - PAIR_GRACE_MS : 0;
+
     const state = await loadState(steamId);
     const processed = new Set(state.processedTradeIds || []);
     const dismissed = new Set(state.dismissedAssetIds || []);
@@ -162,11 +202,10 @@ export default async function handler(req, res) {
 
     const append = [];
     const newOfferIds = [];
+
     // Reconcile map: type:assetid → freshest item payload from this push.
-    // Lets us upgrade existing pending items when the extension eventually
-    // resolves a name / float / stickers that weren't available at first
-    // detection (common for Souvenir skins whose descriptions take a beat
-    // to propagate to the inventory endpoint after a trade completes).
+    // Used below to upgrade existing pending items when the extension resolves
+    // a float / stickers that weren't available at first detection.
     const reconcileMap = new Map();
     for (const offer of offers) {
       for (const item of offer.items) {
@@ -179,9 +218,20 @@ export default async function handler(req, res) {
     }
 
     for (const offer of offers) {
-      if (processed.has(offer.tradeofferid)) continue;
+      if (processed.has(offer.tradeofferid)) {
+        // Already seen — reconcile only (handled below via patchedPending).
+        continue;
+      }
+
       newOfferIds.push(offer.tradeofferid);
-      if (baseline) continue; // seed only — no pending entries
+
+      // Determine whether this trade is new (surface in Handle Items) or
+      // historical (record in processedTradeIds to prevent future re-surfacing,
+      // but don't add items to pending).
+      const acceptedMs = offer.acceptedAt ? new Date(offer.acceptedAt).getTime() : 0;
+      const isNew = !pairThresholdMs || acceptedMs >= pairThresholdMs;
+      if (!isNew) continue;
+
       for (const item of offer.items) {
         if (isTombstoned(dismissed, item)) continue;
         const key = `${item.type}:${item.assetid}`;
@@ -195,27 +245,25 @@ export default async function handler(req, res) {
       }
     }
 
-    // For pending items that already exist, patch fields that were missing
-    // or that Steam has since surfaced. Never regresses a good name to
-    // Unknown — a fresh payload with an "Unknown CS2 Item" fallback is
-    // treated as no update.
-    // Clean up any legacy "Unknown CS2 Item (classid)" placeholders that
-    // an earlier build wrote before we started dropping unnamed items at
-    // push time. Only removes ones that AREN'T being rescued by a fresh
-    // named push in this batch — those get patched by the reconcile below.
+    // Remove any legacy "Unknown CS2 Item (classid)" placeholders written by
+    // older extension builds before we started dropping unnamed items at push
+    // time. Only keeps unknowns that are about to be rescued by a fresh named
+    // payload in this batch.
     const isUnknown = (p) =>
       typeof p.marketHashName === 'string' &&
       p.marketHashName.startsWith('Unknown CS2 Item');
     const cleanedPending = state.pending.filter((p) => {
       if (!isUnknown(p)) return true;
       const fresh = reconcileMap.get(`${p.type}:${p.assetid}`);
-      const rescuable =
+      return (
         fresh &&
         typeof fresh.marketHashName === 'string' &&
-        !fresh.marketHashName.startsWith('Unknown CS2 Item');
-      return rescuable;
+        !fresh.marketHashName.startsWith('Unknown CS2 Item')
+      );
     });
 
+    // Patch existing pending items with enriched fields that weren't available
+    // when the item was first detected (float, stickers, better name, icon).
     const patchedPending = cleanedPending.map((p) => {
       const fresh = reconcileMap.get(`${p.type}:${p.assetid}`);
       if (!fresh) return p;
@@ -241,7 +289,11 @@ export default async function handler(req, res) {
         }
       }
       for (const k of ['stickers', 'keychains']) {
-        if ((!Array.isArray(p[k]) || p[k].length === 0) && Array.isArray(fresh[k]) && fresh[k].length > 0) {
+        if (
+          (!Array.isArray(p[k]) || p[k].length === 0) &&
+          Array.isArray(fresh[k]) &&
+          fresh[k].length > 0
+        ) {
           merged[k] = fresh[k];
           changed = true;
         }
@@ -249,12 +301,10 @@ export default async function handler(req, res) {
       return changed ? merged : p;
     });
 
-    // Cap the processed set. 5000 entries comfortably covers a heavy trader
-    // for years; the baseline seed on first pair fills this with every
-    // historical tradeofferid, so trade-hold-expiry bumps on old trades
-    // can never resurface them via the extension.
     const nextProcessed = newOfferIds.length
-      ? [...new Set([...(state.processedTradeIds || []), ...newOfferIds])].slice(-5000)
+      ? [...new Set([...(state.processedTradeIds || []), ...newOfferIds])].slice(
+          -PROCESSED_TRADE_IDS_CAP
+        )
       : state.processedTradeIds || [];
 
     const next = {
@@ -270,9 +320,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      baseline,
       accepted: append.length,
-      seededOffers: baseline ? newOfferIds.length : 0,
       pending: next.pending,
     });
   } catch (err) {

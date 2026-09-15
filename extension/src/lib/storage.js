@@ -1,6 +1,5 @@
 // Thin promise-based wrapper around chrome.storage.local. All state the
-// extension persists (pairing secret, baseline flag, activity log) flows
-// through here.
+// extension persists (pairing secret, caches, activity log) flows through here.
 
 import { STORAGE_KEYS, DEFAULT_BASE_URL } from './config.js';
 
@@ -39,30 +38,16 @@ export async function savePairing({ secret, steamId }) {
   });
 }
 
-// Wipe pairing + baseline flag on unpair so a re-pair starts fresh.
 export async function clearPairing() {
   await remove([
     STORAGE_KEYS.SECRET,
     STORAGE_KEYS.STEAM_ID,
     STORAGE_KEYS.PAIRED_AT,
-    STORAGE_KEYS.HAS_SEEDED_OFFERS,
   ]);
 }
 
 export async function setBaseUrl(url) {
   await set({ [STORAGE_KEYS.BASE_URL]: url });
-}
-
-// Baseline flag — after first successful sync, the extension has told the
-// backend about every historical trade offer id (seeded processedTradeIds).
-// Subsequent syncs only surface offers whose id isn't already seeded.
-export async function getHasSeededOffers() {
-  const data = await get([STORAGE_KEYS.HAS_SEEDED_OFFERS]);
-  return Boolean(data[STORAGE_KEYS.HAS_SEEDED_OFFERS]);
-}
-
-export async function setHasSeededOffers(val) {
-  await set({ [STORAGE_KEYS.HAS_SEEDED_OFFERS]: !!val });
 }
 
 // Persistent description cache: classid_instanceid → { market_hash_name, icon_url }.
@@ -124,4 +109,13 @@ export async function pushActivity(entry) {
 export async function getActivity() {
   const data = await get([STORAGE_KEYS.ACTIVITY_LOG]);
   return Array.isArray(data[STORAGE_KEYS.ACTIVITY_LOG]) ? data[STORAGE_KEYS.ACTIVITY_LOG] : [];
+}
+
+export async function getVerboseLogging() {
+  const data = await get([STORAGE_KEYS.VERBOSE_LOGGING]);
+  return Boolean(data[STORAGE_KEYS.VERBOSE_LOGGING]);
+}
+
+export async function setVerboseLogging(val) {
+  await set({ [STORAGE_KEYS.VERBOSE_LOGGING]: !!val });
 }

@@ -1,16 +1,18 @@
 // Steam integration — reads the user's session cookie, extracts a WebAPI
 // access token from the logged-in Steam session, and fetches accepted
-// trades via IEconService/GetTradeOffers.
+// trades via IEconService/GetTradeOffers and IEconService/GetTradeHistory.
 //
-// Note: Steam's `GetTradeHistory/v1/` returns an empty response with the
-// session-derived tokens we can access, so we can't use it. `GetTradeOffers`
-// works with the pointssummary/loyalty token and returns each trade's
-// tradeofferid, state, and items list — enough for our dedup + surfacing.
+// Both APIs work with the session-derived loyalty token. GetTradeHistory
+// provides older trades that may have fallen outside GetTradeOffers' window,
+// and returns new_assetid (the item's assetid in the recipient's inventory
+// after the trade), which is the correct assetid for inspect links on
+// incoming items. Results from both are merged by tradeofferid in background.js.
 
 import {
   STEAM_HOME,
   STEAM_POINTS_CONFIG,
   STEAM_GET_TRADE_OFFERS,
+  STEAM_GET_TRADE_HISTORY,
   STEAM_OFFER_STATE_ACCEPTED,
   CS2_APP_ID,
 } from './config.js';
@@ -189,13 +191,83 @@ export async function fetchInventoryDescriptions(steamId) {
   return out;
 }
 
+// Fetch the user's complete trade history via IEconService/GetTradeHistory/v1/.
+// Paginates from newest to oldest using (start_after_tradeid, start_after_time)
+// cursors until Steam signals no more pages or we hit maxPages.
+//
+// Returns { trades: [...rawSteamHistoryTrades], descByKey: Map }.
+// Callers merge the returned descByKey into the shared descByKey map before
+// normalizing, so history descriptions are available alongside offer ones.
+export async function fetchTradeHistory(token, { maxPages = 50 } = {}) {
+  const descByKey = new Map();
+  const trades = [];
+  const seenTradeIds = new Set();
+
+  let startAfterTradeId = null;
+  let startAfterTime = null;
+
+  for (let page = 0; page < maxPages; page++) {
+    const params = new URLSearchParams({
+      access_token: token,
+      max_trades: '500',
+      get_descriptions: 'true',
+      language: 'english',
+    });
+    if (startAfterTradeId) params.set('start_after_tradeid', startAfterTradeId);
+    if (startAfterTime != null) params.set('start_after_time', String(startAfterTime));
+
+    const url = `${STEAM_GET_TRADE_HISTORY}?${params}`;
+    let res;
+    try {
+      res = await fetch(url);
+    } catch {
+      break;
+    }
+    if (!res.ok) break;
+
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      break;
+    }
+
+    const resp = json?.response ?? {};
+
+    for (const d of resp.descriptions || []) {
+      const classid = d.classid != null ? String(d.classid) : '';
+      if (!classid) continue;
+      const instanceid = d.instanceid != null ? String(d.instanceid) : '0';
+      const key = `${classid}_${instanceid}`;
+      if (!descByKey.has(key)) descByKey.set(key, d);
+    }
+
+    const pageTrades = Array.isArray(resp.trades) ? resp.trades : [];
+    let lastTrade = null;
+    for (const t of pageTrades) {
+      const tradeid = t?.tradeid != null ? String(t.tradeid) : '';
+      if (!tradeid || seenTradeIds.has(tradeid)) continue;
+      seenTradeIds.add(tradeid);
+      trades.push(t);
+      lastTrade = t;
+    }
+
+    if (!resp.more || pageTrades.length === 0 || !lastTrade) break;
+
+    startAfterTradeId = String(lastTrade.tradeid);
+    startAfterTime = Number(lastTrade.time_init) || null;
+  }
+
+  return { trades, descByKey };
+}
+
 // Turn Steam's raw offer objects into the shape we push to the backend:
 //   { tradeofferid, acceptedAt, items: [{ type, assetid, marketHashName, iconUrl }] }
 //
-// No time filter — trade detection relies on backend tradeofferid dedup
-// (processedTradeIds) which is seeded on first pair via a baseline push.
-// A time filter here would drop long-standing offers accepted after pairing
-// (their `time_created` predates the pair), which is a legitimate new trade.
+// No time filter — the backend compares acceptedAt against the user's pairedAt
+// and handles the historical-vs-new split. We send everything; the server
+// dedupes via processedTradeIds and only adds items to pending for trades
+// accepted on or after pairing.
 export function normalizeAcceptedOffers(rawOffers, descByKey) {
   const seenOfferIds = new Set();
   const out = [];
@@ -225,25 +297,38 @@ export function normalizeAcceptedOffers(rawOffers, descByKey) {
   return out;
 }
 
-// For baseline seed: collect ALL state=3 tradeofferids (regardless of
-// description resolution) so the backend can mark them as processed and
-// subsequent polls only surface truly-new trades.
-export function collectAllAcceptedTradeIds(rawOffers) {
+// Turn Steam's raw GetTradeHistory trade objects into the same
+// { tradeofferid, acceptedAt, items[] } shape as normalizeAcceptedOffers.
+//
+// GetTradeHistory uses `tradeid` (== tradeofferid) and `time_init` (when
+// initiated). For incoming items we use `new_assetid` — the assetid the
+// item has in our inventory after the trade, which is what inspect links
+// and the backend need. For outgoing items we use the original `assetid`
+// (which was in our inventory before the trade).
+export function normalizeTradeHistoryOffers(rawTrades, descByKey) {
+  const seenTradeIds = new Set();
   const out = [];
-  const seen = new Set();
-  for (const raw of rawOffers || []) {
-    if (!raw || typeof raw !== 'object') continue;
-    if (Number(raw.trade_offer_state) !== STEAM_OFFER_STATE_ACCEPTED) continue;
-    const tradeofferid = raw.tradeofferid != null ? String(raw.tradeofferid).trim() : '';
-    if (!tradeofferid) continue;
-    if (seen.has(tradeofferid)) continue;
-    seen.add(tradeofferid);
-    const createdSec = Number(raw.time_created) || 0;
-    const updatedSec = Number(raw.time_updated) || createdSec;
+
+  for (const t of rawTrades || []) {
+    if (!t || typeof t !== 'object') continue;
+    if (Number(t.status) !== STEAM_OFFER_STATE_ACCEPTED) continue;
+
+    const tradeofferid = t.tradeid != null ? String(t.tradeid).trim() : '';
+    if (!tradeofferid || seenTradeIds.has(tradeofferid)) continue;
+    seenTradeIds.add(tradeofferid);
+
+    const timeInit = Number(t.time_init) || 0;
     const acceptedAt =
-      updatedSec > 0 ? new Date(updatedSec * 1000).toISOString() : new Date().toISOString();
-    out.push({ tradeofferid, acceptedAt, items: [] });
+      timeInit > 0 ? new Date(timeInit * 1000).toISOString() : new Date().toISOString();
+
+    const items = [];
+    collectTradeHistoryItems(t.assets_received, 'incoming', descByKey, items);
+    collectTradeHistoryItems(t.assets_given, 'outgoing', descByKey, items);
+
+    if (items.length === 0) continue;
+    out.push({ tradeofferid, acceptedAt, items });
   }
+
   return out;
 }
 
@@ -267,6 +352,44 @@ function collectItems(rawItems, type, descByKey, sink) {
     // especially for unique-classid items like Souvenir skins. The 2-min
     // background poll retries automatically; users can add anything the
     // extension permanently missed via the manual Add form.
+    if (!marketHashName) continue;
+
+    sink.push({
+      type,
+      assetid,
+      classid,
+      instanceid,
+      marketHashName,
+      iconUrl: desc?.icon_url ? String(desc.icon_url) : '',
+    });
+  }
+}
+
+// Like collectItems but for GetTradeHistory asset lists, where incoming items
+// carry new_assetid (the assetid the item has in the recipient's inventory
+// after the trade). Using new_assetid for incoming items ensures inspect links
+// and the inspect cache key match what's actually in our inventory.
+function collectTradeHistoryItems(rawItems, type, descByKey, sink) {
+  if (!Array.isArray(rawItems)) return;
+  for (const it of rawItems) {
+    if (!it || typeof it !== 'object') continue;
+    const appidRaw = it.appid;
+    if (appidRaw != null && String(appidRaw) !== String(CS2_APP_ID)) continue;
+
+    const classid = it.classid != null ? String(it.classid) : '';
+    if (!classid) continue;
+    const instanceid = it.instanceid != null ? String(it.instanceid) : '0';
+    const desc = descByKey.get(`${classid}_${instanceid}`);
+    const marketHashName = (desc?.market_hash_name || desc?.name || '').trim();
+
+    // Incoming: use new_assetid (item is now in our inventory under this id).
+    // Outgoing: use assetid (was in our inventory before the trade).
+    const rawAssetid =
+      type === 'incoming' && it.new_assetid != null
+        ? it.new_assetid
+        : it.assetid;
+    const assetid = rawAssetid != null ? String(rawAssetid) : '';
+    if (!assetid) continue;
     if (!marketHashName) continue;
 
     sink.push({

@@ -37,15 +37,14 @@ export async function claimCode(code) {
   });
 }
 
-// Push a batch of normalized trade offers to the backend. `baseline: true` on
-// the first push tells the server to seed processedTradeIds without adding
-// pending items — so a freshly paired user doesn't see every historical
-// trade flood into Handle Items.
-export async function pushOffers({ offers, baseline = false }) {
+// Push a batch of normalized trade offers to the backend. The backend applies
+// the pairedAt cutoff server-side: trades accepted before pairing are silently
+// recorded in processedTradeIds without surfacing in Handle Items.
+export async function pushOffers({ offers }) {
   const payload = Array.isArray(offers) ? offers : [];
   return request('/api/extension/trades', {
     method: 'POST',
     auth: true,
-    body: { offers: payload, baseline: !!baseline, extVersion: EXT_VERSION },
+    body: { offers: payload, extVersion: EXT_VERSION },
   });
 }

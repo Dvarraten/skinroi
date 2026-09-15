@@ -42,8 +42,8 @@ export const STORAGE_KEYS = {
   SECRET: 'skinroi_secret',
   STEAM_ID: 'skinroi_steamId',
   PAIRED_AT: 'skinroi_pairedAt',
-  HAS_SEEDED_OFFERS: 'skinroi_hasSeededOffers',
   DESC_CACHE: 'skinroi_descCache',
   INSPECT_CACHE: 'skinroi_inspectCache',
   ACTIVITY_LOG: 'activity_log',
+  VERBOSE_LOGGING: 'skinroi_verboseLogging',
 };

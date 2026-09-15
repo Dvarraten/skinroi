@@ -1,9 +1,13 @@
 // Background service worker. Runs on a chrome.alarms schedule and reacts to
-// popup "Sync now" messages. Every tick, it pulls the user's accepted trade
-// offers from Steam's IEconService and pushes them to the SkinROI backend.
+// popup "Sync now" messages. Every tick it pulls the user's accepted trade
+// offers from Steam via both IEconService/GetTradeOffers and
+// IEconService/GetTradeHistory, merges them by tradeofferid, and pushes the
+// union to the SkinROI backend.
 //
-// The backend dedupes by tradeofferid, so trades never surface twice — no
-// more "item reappears when its 7-day hold expires" bug.
+// The backend handles the pairedAt cutoff: trades accepted before pairing are
+// silently recorded in processedTradeIds without surfacing in Handle Items.
+// Trades accepted on or after pairing go straight to pending. No baseline seed
+// or first-sync special-casing is needed on the extension side.
 
 import { POLL_INTERVAL_MIN } from './lib/config.js';
 import {
@@ -13,16 +17,16 @@ import {
   saveDescCache,
   getInspectCache,
   saveInspectCache,
-  getHasSeededOffers,
-  setHasSeededOffers,
+  getVerboseLogging,
 } from './lib/storage.js';
 import {
   getSteamIdFromCookie,
   fetchSessionAccessToken,
   fetchAcceptedTradeOffers,
   fetchInventoryDescriptions,
+  fetchTradeHistory,
   normalizeAcceptedOffers,
-  collectAllAcceptedTradeIds,
+  normalizeTradeHistoryOffers,
 } from './lib/steam.js';
 import { enrichOffersWithInspect } from './lib/inspect.js';
 import { pushOffers } from './lib/skinroi.js';
@@ -88,7 +92,10 @@ async function runPoll({ manual = false } = {}) {
   }
   pollInFlight = true;
   try {
-    const { secret, steamId: pairedSteamId, pairedAt } = await getPairing();
+    const verbose = await getVerboseLogging();
+    const dbg = verbose ? (...a) => console.log(...a) : () => {};
+
+    const { secret, steamId: pairedSteamId } = await getPairing();
     if (!secret) {
       if (manual) await safeLogError('Extension is not paired — enter a code first.');
       return { skipped: 'not_paired' };
@@ -112,6 +119,7 @@ async function runPoll({ manual = false } = {}) {
       return { skipped: 'no_token' };
     }
 
+    // ── GetTradeOffers ────────────────────────────────────────────────────────
     let raw;
     try {
       raw = await fetchAcceptedTradeOffers(token);
@@ -120,21 +128,13 @@ async function runPoll({ manual = false } = {}) {
       return { skipped: 'fetch_failed' };
     }
 
-    const acceptedRaw = raw.offers.filter((o) => Number(o.trade_offer_state) === 3);
-    console.log(
-      '[skinroi] poll',
-      manual ? '(manual)' : '(alarm)',
-      'raw:', raw.offers.length,
-      'accepted:', acceptedRaw.length,
-      'pairedAt:', pairedAt ? new Date(pairedAt).toISOString() : 'null'
+    const acceptedCount = raw.offers.filter((o) => Number(o.trade_offer_state) === 3).length;
+    dbg(
+      '[skinroi] poll', manual ? '(manual)' : '(alarm)',
+      'raw:', raw.offers.length, 'accepted:', acceptedCount
     );
 
-    // Merge descriptions from three sources into raw.descByKey:
-    //   1. Steam's offer response (usually only a handful)
-    //   2. User's live inventory (ctx 2 + ctx 16)
-    //   3. Persistent cache in chrome.storage.local from prior syncs
-    // Then save the union back to cache so outgoing trades (items that just
-    // left our inventory) still have descs on subsequent syncs.
+    // ── Description cache: merge from offer response + persistent cache + inventory ──
     try {
       const cached = await getDescCache();
       for (const [k, v] of Object.entries(cached)) {
@@ -151,6 +151,31 @@ async function runPoll({ manual = false } = {}) {
     } catch (err) {
       console.debug('[skinroi] inventory desc lookup failed', err?.message || err);
     }
+
+    // ── GetTradeHistory ───────────────────────────────────────────────────────
+    // Paginates up to 50 pages × 500 trades = 25 000 trades. Results are merged
+    // with GetTradeOffers by tradeofferid; GetTradeOffers data takes precedence
+    // because it carries time_updated (actual accepted time), whereas
+    // GetTradeHistory only has time_init (when the trade was created). Trades
+    // only present in history still benefit from new_assetid (the correct
+    // assetid for inspect links on received items). A failure here is non-fatal:
+    // GetTradeOffers already covers the post-pairing window.
+    let historyTrades = [];
+    let historyDescByKey = new Map();
+    try {
+      const histResult = await fetchTradeHistory(token);
+      historyTrades = histResult.trades;
+      historyDescByKey = histResult.descByKey;
+      dbg('[skinroi] history pages fetched, trades:', historyTrades.length);
+    } catch (err) {
+      console.debug('[skinroi] GetTradeHistory failed (non-fatal):', err?.message || err);
+    }
+
+    // Merge history descriptions before normalizing so all items can be named.
+    for (const [k, v] of historyDescByKey) {
+      if (!raw.descByKey.has(k)) raw.descByKey.set(k, v);
+    }
+
     // Persist the union so future syncs can name outgoing items.
     try {
       const flat = {};
@@ -168,109 +193,34 @@ async function runPoll({ manual = false } = {}) {
       console.debug('[skinroi] desc cache save failed', err?.message || err);
     }
 
-    const hasSeeded = await getHasSeededOffers();
+    // ── Normalize + merge ─────────────────────────────────────────────────────
+    const offersNormalized = normalizeAcceptedOffers(raw.offers, raw.descByKey);
+    const historyNormalized = normalizeTradeHistoryOffers(historyTrades, raw.descByKey);
 
-    // First sync after pairing: seed all pre-existing tradeofferids into
-    // processedTradeIds silently, and only surface trades whose `time_updated`
-    // is on-or-after `pairedAt` (with 60s grace) — those are the ones the
-    // user actually completed right around when they paired. Everything
-    // else is historical and gets marked processed so bumped time_updated
-    // on old trades (7-day hold expiries) can't resurface them.
-    if (!hasSeeded) {
-      const pairGraceMs = 60 * 1000;
-      const pairThresholdSec = pairedAt
-        ? Math.floor((pairedAt - pairGraceMs) / 1000)
-        : 0;
-      const recentRawOffers = acceptedRaw.filter(
-        (o) =>
-          !pairThresholdSec || Number(o.time_updated) >= pairThresholdSec
-      );
-      const historicalRawOffers = acceptedRaw.filter(
-        (o) => !recentRawOffers.includes(o)
-      );
-      console.log(
-        '[skinroi] baseline: seeding', historicalRawOffers.length,
-        'historical + surfacing', recentRawOffers.length, 'recent'
-      );
-
-      // Historical: send as baseline (tradeofferids only, no items needed).
-      if (historicalRawOffers.length > 0) {
-        const seeds = collectAllAcceptedTradeIds(historicalRawOffers);
-        try {
-          await pushOffers({ offers: seeds, baseline: true });
-        } catch (err) {
-          await safeLogError(`Baseline seed: ${err.message || err}`);
-          return { skipped: 'baseline_failed' };
-        }
-      }
-
-      // Recent: fully normalize and push as regular trades so they end up
-      // in Handle Items. Same enrichment path as subsequent polls.
-      const recentOffers = normalizeAcceptedOffers(recentRawOffers, raw.descByKey);
-      if (recentOffers.length > 0) {
-        try {
-          const inspectCache = await getInspectCache();
-          await enrichOffersWithInspect({
-            offers: recentOffers,
-            descByKey: raw.descByKey,
-            ownerSteamId: cookieSteamId,
-            cache: inspectCache,
-          });
-          await saveInspectCache(inspectCache);
-        } catch (err) {
-          console.debug('[skinroi] inspect enrichment failed', err?.message || err);
-        }
-        try {
-          const r = await pushOffers({ offers: recentOffers, baseline: false });
-          if ((r.accepted || 0) > 0) {
-            await pushActivity({
-              kind: 'push',
-              accepted: r.accepted,
-              total: recentOffers.length,
-            });
-          }
-        } catch (err) {
-          await safeLogError(`Recent push: ${err.message || err}`);
-          return { skipped: 'push_failed' };
-        }
-      }
-
-      await setHasSeededOffers(true);
-      await pushActivity({
-        kind: 'baseline',
-        message:
-          `Seeded ${historicalRawOffers.length} historical trade${
-            historicalRawOffers.length === 1 ? '' : 's'
-          }` +
-          (recentOffers.length > 0
-            ? ` + surfaced ${recentOffers.length} recent`
-            : ''),
-      });
-      return {
-        baseline: true,
-        seeded: historicalRawOffers.length,
-        recent: recentOffers.length,
-      };
+    // Union by tradeofferid. GetTradeOffers wins when both sources have the same
+    // trade (better acceptedAt = time_updated vs. time_init only in history).
+    const mergedMap = new Map();
+    for (const offer of historyNormalized) {
+      mergedMap.set(offer.tradeofferid, offer);
     }
+    for (const offer of offersNormalized) {
+      mergedMap.set(offer.tradeofferid, offer);
+    }
+    const allOffers = [...mergedMap.values()];
 
-    // Post-baseline: push every accepted offer we can normalize. Backend
-    // dedupes by tradeofferid, so already-seeded offers are skipped and
-    // only truly-new trades produce pending rows.
-    const offers = normalizeAcceptedOffers(raw.offers, raw.descByKey);
-    console.log(
-      '[skinroi] normalized offers:', offers.length,
-      'descs:', raw.descByKey.size
+    dbg(
+      '[skinroi] merged offers:', allOffers.length,
+      '(offers:', offersNormalized.length,
+      'history:', historyNormalized.length,
+      'descs:', raw.descByKey.size, ')'
     );
 
-    // Enrich each item with float, paint seed, stickers, keychains via
-    // CSFloat's inspect API. Cached per-assetid in chrome.storage.local
-    // — a specific asset's inspect data never changes, so a hit skips
-    // the network call entirely.
-    if (offers.length > 0) {
+    // ── CSFloat inspect enrichment ────────────────────────────────────────────
+    if (allOffers.length > 0) {
       try {
         const inspectCache = await getInspectCache();
         await enrichOffersWithInspect({
-          offers,
+          offers: allOffers,
           descByKey: raw.descByKey,
           ownerSteamId: cookieSteamId,
           cache: inspectCache,
@@ -281,9 +231,10 @@ async function runPoll({ manual = false } = {}) {
       }
     }
 
+    // ── Push to backend ───────────────────────────────────────────────────────
     let result;
     try {
-      result = await pushOffers({ offers, baseline: false });
+      result = await pushOffers({ offers: allOffers });
     } catch (err) {
       await safeLogError(`Push: ${err.message || err}`);
       return { skipped: 'push_failed' };
@@ -291,12 +242,11 @@ async function runPoll({ manual = false } = {}) {
 
     const accepted = result.accepted || 0;
     if (accepted > 0) {
-      await pushActivity({ kind: 'push', accepted, total: offers.length });
+      await pushActivity({ kind: 'push', accepted, total: allOffers.length });
     } else if (manual) {
-      // No new trades — but the user manually asked, so surface a confirmation.
       await pushActivity({ kind: 'info', message: 'No new trades detected' });
     }
-    return { pushed: offers.length, ...result };
+    return { pushed: allOffers.length, ...result };
   } catch (err) {
     await safeLogError(`Unexpected: ${err.message || err}`);
     return { skipped: 'unexpected', error: String(err) };
