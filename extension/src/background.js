@@ -204,8 +204,10 @@ async function runPoll({ manual = false } = {}) {
     try {
       const missing = collectMissingClassIds(raw.offers, raw.descByKey);
       if (missing.length > 0) {
+        const beforeSize = raw.descByKey.size;
         dbg('[skinroi] resolving', missing.length, 'missing classid(s) via GetAssetClassInfo');
         await resolveUnknownClassIds(missing, raw.descByKey);
+        dbg('[skinroi] GetAssetClassInfo added', raw.descByKey.size - beforeSize, 'descriptions');
       }
     } catch (err) {
       console.debug('[skinroi] GetAssetClassInfo fallback failed:', err?.message || err);
@@ -233,15 +235,29 @@ async function runPoll({ manual = false } = {}) {
       'descs:', raw.descByKey.size, ')'
     );
     if (acceptedCount > offersNormalized.length) {
-      dbg(
-        '[skinroi] WARN:', acceptedCount - offersNormalized.length,
-        'accepted offer(s) dropped — items had no resolvable description.',
-        'raw offer ids:',
-        raw.offers
-          .filter((o) => Number(o.trade_offer_state) === 3)
-          .map((o) => String(o.tradeofferid))
-          .filter((id) => !offersNormalized.some((n) => n.tradeofferid === id))
+      const droppedOffers = raw.offers.filter(
+        (o) => Number(o.trade_offer_state) === 3 &&
+          !offersNormalized.some((n) => n.tradeofferid === String(o.tradeofferid))
       );
+      // Separate "no CS2 items at all" (correct) from "CS2 items with missing desc" (bug).
+      const noCS2 = droppedOffers.filter((o) => {
+        const items = [...(o.items_to_receive || []), ...(o.items_to_give || [])];
+        return !items.some((it) => it.appid == null || String(it.appid) === '730');
+      });
+      const missingDesc = droppedOffers.length - noCS2.length;
+      dbg(
+        '[skinroi] dropped:', droppedOffers.length,
+        '— non-CS2 offers (correct):', noCS2.length,
+        '— CS2 offers with missing descriptions (bug):', missingDesc
+      );
+      if (missingDesc > 0) {
+        dbg('[skinroi] CS2 offers with missing desc, ids:',
+          droppedOffers.filter((o) => {
+            const items = [...(o.items_to_receive || []), ...(o.items_to_give || [])];
+            return items.some((it) => it.appid == null || String(it.appid) === '730');
+          }).map((o) => String(o.tradeofferid))
+        );
+      }
     }
 
     // ── CSFloat inspect enrichment ────────────────────────────────────────────
@@ -271,6 +287,7 @@ async function runPoll({ manual = false } = {}) {
 
     const accepted = result.accepted || 0;
     const historical = result.historical || 0;
+    dbg('[skinroi] backend: accepted:', accepted, 'historical:', historical);
     if (accepted > 0) {
       await pushActivity({ kind: 'push', accepted, total: allOffers.length, items: result.newItems || [] });
     } else if (historical > 0) {

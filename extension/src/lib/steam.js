@@ -224,7 +224,10 @@ export async function fetchTradeHistory(token, { maxPages = 50 } = {}) {
     } catch {
       break;
     }
-    if (!res.ok) break;
+    if (!res.ok) {
+      console.debug('[skinroi] GetTradeHistory HTTP', res.status, '— stopping pagination');
+      break;
+    }
 
     let json;
     try {
@@ -313,7 +316,9 @@ export function collectMissingClassIds(rawOffers, descByKey) {
     for (const list of [raw.items_to_receive, raw.items_to_give]) {
       if (!Array.isArray(list)) continue;
       for (const it of list) {
-        if (!it || String(it.appid) !== String(CS2_APP_ID)) continue;
+        if (!it) continue;
+        const appidRaw = it.appid;
+        if (appidRaw != null && String(appidRaw) !== String(CS2_APP_ID)) continue;
         const classid = it.classid != null ? String(it.classid) : '';
         if (!classid) continue;
         const instanceid = it.instanceid != null ? String(it.instanceid) : '0';
