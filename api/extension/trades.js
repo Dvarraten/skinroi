@@ -321,6 +321,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       accepted: append.length,
+      historical: newOfferIds.length - append.length,
+      newItems: append.map((i) => ({ type: i.type, marketHashName: i.marketHashName, detectedAt: i.detectedAt })),
       pending: next.pending,
     });
   } catch (err) {

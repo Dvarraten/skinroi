@@ -13,6 +13,7 @@ import {
   STEAM_POINTS_CONFIG,
   STEAM_GET_TRADE_OFFERS,
   STEAM_GET_TRADE_HISTORY,
+  STEAM_GET_ASSET_CLASS_INFO,
   STEAM_OFFER_STATE_ACCEPTED,
   CS2_APP_ID,
 } from './config.js';
@@ -259,6 +260,72 @@ export async function fetchTradeHistory(token, { maxPages = 50 } = {}) {
   }
 
   return { trades, descByKey };
+}
+
+// Fallback description resolver: calls ISteamEconomy/GetAssetClassInfo for
+// classid/instanceid pairs that weren't returned by GetTradeOffers or
+// GetTradeHistory descriptions. This covers items that have left the user's
+// inventory (e.g. sold via YouPin) and whose classid Steam omitted from the
+// offer description list. No auth required — public endpoint.
+export async function resolveUnknownClassIds(missingKeys, descByKey) {
+  if (missingKeys.length === 0) return;
+  // Batch into groups of 100 (Steam limit per call).
+  const BATCH = 100;
+  for (let i = 0; i < missingKeys.length; i += BATCH) {
+    const batch = missingKeys.slice(i, i + BATCH);
+    const params = new URLSearchParams({ appid: String(CS2_APP_ID), language: 'english', class_count: String(batch.length) });
+    batch.forEach(({ classid, instanceid }, idx) => {
+      params.set(`classid${idx}`, classid);
+      params.set(`instanceid${idx}`, instanceid || '0');
+    });
+    let res;
+    try {
+      res = await fetch(`${STEAM_GET_ASSET_CLASS_INFO}?${params}`);
+    } catch {
+      continue;
+    }
+    if (!res.ok) continue;
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      continue;
+    }
+    const result = json?.result ?? {};
+    for (const [, d] of Object.entries(result)) {
+      if (!d || typeof d !== 'object') continue;
+      const classid = d.classid != null ? String(d.classid) : '';
+      if (!classid) continue;
+      const instanceid = d.instanceid != null ? String(d.instanceid) : '0';
+      const key = `${classid}_${instanceid}`;
+      if (!descByKey.has(key)) descByKey.set(key, d);
+    }
+  }
+}
+
+// Collect all classid/instanceid pairs from accepted offers that are missing
+// from descByKey. Returns [{classid, instanceid}] for resolveUnknownClassIds.
+export function collectMissingClassIds(rawOffers, descByKey) {
+  const missing = [];
+  const seen = new Set();
+  for (const raw of rawOffers || []) {
+    if (!raw || Number(raw.trade_offer_state) !== STEAM_OFFER_STATE_ACCEPTED) continue;
+    for (const list of [raw.items_to_receive, raw.items_to_give]) {
+      if (!Array.isArray(list)) continue;
+      for (const it of list) {
+        if (!it || String(it.appid) !== String(CS2_APP_ID)) continue;
+        const classid = it.classid != null ? String(it.classid) : '';
+        if (!classid) continue;
+        const instanceid = it.instanceid != null ? String(it.instanceid) : '0';
+        const key = `${classid}_${instanceid}`;
+        if (!descByKey.has(key) && !seen.has(key)) {
+          seen.add(key);
+          missing.push({ classid, instanceid });
+        }
+      }
+    }
+  }
+  return missing;
 }
 
 // Turn Steam's raw offer objects into the shape we push to the backend:

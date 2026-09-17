@@ -62,7 +62,7 @@ async function renderActivity() {
   }
   for (const entry of list.slice(0, 20)) {
     const li = document.createElement('li');
-    const when = new Date(entry.at).toLocaleTimeString();
+    const when = new Date(entry.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     let text;
     let cls = 'ok';
     if (entry.kind === 'push') {
@@ -80,7 +80,39 @@ async function renderActivity() {
       text = JSON.stringify(entry);
     }
     li.className = cls;
-    li.innerHTML = `<span>${text}</span><span>${when}</span>`;
+
+    const items = entry.kind === 'push' && Array.isArray(entry.items) ? entry.items : [];
+    if (items.length > 0) {
+      li.classList.add('has-items');
+      const row = document.createElement('div');
+      row.className = 'activity-row';
+      row.innerHTML = `<span>${text}</span><span>${when}</span>`;
+      li.appendChild(row);
+
+      const itemsUl = document.createElement('ul');
+      itemsUl.className = 'activity-items';
+      for (const item of items) {
+        const itemLi = document.createElement('li');
+        const isIn = item.type === 'incoming';
+        const arrow = document.createElement('span');
+        arrow.className = isIn ? 'arrow-in' : 'arrow-out';
+        arrow.textContent = isIn ? '↓' : '↑';
+        const name = document.createElement('span');
+        name.className = 'item-name';
+        name.textContent = item.marketHashName || '—';
+        const time = document.createElement('span');
+        time.className = 'item-time';
+        time.textContent = item.detectedAt
+          ? new Date(item.detectedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '';
+        itemLi.append(arrow, name, time);
+        itemsUl.appendChild(itemLi);
+      }
+      li.appendChild(itemsUl);
+    } else {
+      li.innerHTML = `<span>${text}</span><span>${when}</span>`;
+    }
+
     ul.appendChild(li);
   }
 }

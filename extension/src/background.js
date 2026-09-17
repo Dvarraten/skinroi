@@ -27,6 +27,8 @@ import {
   fetchTradeHistory,
   normalizeAcceptedOffers,
   normalizeTradeHistoryOffers,
+  collectMissingClassIds,
+  resolveUnknownClassIds,
 } from './lib/steam.js';
 import { enrichOffersWithInspect } from './lib/inspect.js';
 import { pushOffers } from './lib/skinroi.js';
@@ -166,8 +168,9 @@ async function runPoll({ manual = false } = {}) {
       const histResult = await fetchTradeHistory(token);
       historyTrades = histResult.trades;
       historyDescByKey = histResult.descByKey;
-      dbg('[skinroi] history pages fetched, trades:', historyTrades.length);
+      dbg('[skinroi] history pages fetched, trades:', historyTrades.length, 'descs:', histResult.descByKey.size);
     } catch (err) {
+      dbg('[skinroi] GetTradeHistory FAILED:', err?.message || err);
       console.debug('[skinroi] GetTradeHistory failed (non-fatal):', err?.message || err);
     }
 
@@ -193,6 +196,21 @@ async function runPoll({ manual = false } = {}) {
       console.debug('[skinroi] desc cache save failed', err?.message || err);
     }
 
+    // ── Fallback: GetAssetClassInfo for items with no description ─────────────
+    // Some outgoing items (e.g. sold via YouPin) leave the user's inventory
+    // before the poll runs, and Steam omits their descriptions from the offer
+    // response. GetAssetClassInfo is a public endpoint that returns descriptions
+    // by classid and doesn't require the item to be in any particular inventory.
+    try {
+      const missing = collectMissingClassIds(raw.offers, raw.descByKey);
+      if (missing.length > 0) {
+        dbg('[skinroi] resolving', missing.length, 'missing classid(s) via GetAssetClassInfo');
+        await resolveUnknownClassIds(missing, raw.descByKey);
+      }
+    } catch (err) {
+      console.debug('[skinroi] GetAssetClassInfo fallback failed:', err?.message || err);
+    }
+
     // ── Normalize + merge ─────────────────────────────────────────────────────
     const offersNormalized = normalizeAcceptedOffers(raw.offers, raw.descByKey);
     const historyNormalized = normalizeTradeHistoryOffers(historyTrades, raw.descByKey);
@@ -214,6 +232,17 @@ async function runPoll({ manual = false } = {}) {
       'history:', historyNormalized.length,
       'descs:', raw.descByKey.size, ')'
     );
+    if (acceptedCount > offersNormalized.length) {
+      dbg(
+        '[skinroi] WARN:', acceptedCount - offersNormalized.length,
+        'accepted offer(s) dropped — items had no resolvable description.',
+        'raw offer ids:',
+        raw.offers
+          .filter((o) => Number(o.trade_offer_state) === 3)
+          .map((o) => String(o.tradeofferid))
+          .filter((id) => !offersNormalized.some((n) => n.tradeofferid === id))
+      );
+    }
 
     // ── CSFloat inspect enrichment ────────────────────────────────────────────
     if (allOffers.length > 0) {
@@ -241,8 +270,14 @@ async function runPoll({ manual = false } = {}) {
     }
 
     const accepted = result.accepted || 0;
+    const historical = result.historical || 0;
     if (accepted > 0) {
-      await pushActivity({ kind: 'push', accepted, total: allOffers.length });
+      await pushActivity({ kind: 'push', accepted, total: allOffers.length, items: result.newItems || [] });
+    } else if (historical > 0) {
+      await pushActivity({
+        kind: 'info',
+        message: `Recorded ${historical} historical trade${historical === 1 ? '' : 's'} (before pairing — not added to Handle Items)`,
+      });
     } else if (manual) {
       await pushActivity({ kind: 'info', message: 'No new trades detected' });
     }
