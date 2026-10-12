@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertTriangle, Clock, CheckCircle, Search } from 'lucide-react';
+import { X, ArrowDownCircle, ArrowUpCircle, Clock, CheckCircle, Search, LayoutGrid, List } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import ExtensionPairPanel from '../components/ExtensionPairPanel';
 import PlatformPicker from '../components/PlatformPicker';
 import { TabButton } from '../components/TabsAndSearchbar';
 import RecentSales from '../components/RecentSales';
 import { PLATFORMS } from '../utils/platforms';
 import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
+import { useLocalPriceSync } from '../hooks/useLocalPriceSync';
 
 const SORTS = [
   { label: 'Date', desc: 'date-new', asc: 'date-old' },
@@ -15,6 +15,13 @@ const SORTS = [
 ];
 
 const STEAM_IMG_BASE = 'https://community.akamai.steamstatic.com/economy/image/';
+
+// detectedAt is an ISO string from the backend (the trade's accept time), so
+// it has to be parsed before sorting — subtracting the strings gives NaN.
+const detectedMs = (e) => {
+  const t = e?.detectedAt ? new Date(e.detectedAt).getTime() : 0;
+  return Number.isNaN(t) ? 0 : t;
+};
 
 // ─── Name matching utilities ────────────────────────────────────────────────
 const NAME_STOPWORDS = new Set([
@@ -184,8 +191,53 @@ function CsfloatPriceNote() {
   return <p className="mt-0.5 text-[10px] text-slate-500 leading-tight">CSFloat price</p>;
 }
 
-// ─── Compact incoming row (returns <tr>) ────────────────────────────────────
-function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, currencySymbol, displayCurrency }) {
+// ─── List/card shells ───────────────────────────────────────────────────────
+// Incoming and outgoing entries render as table rows in list view and as cards
+// in grid view. RowShell is the <tr> or the card; Cell is a <td> or a labelled
+// block inside the card (`inline` puts the label and content on one line).
+function RowShell({ grid, theme, children }) {
+  if (!grid) {
+    return <tr className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>{children}</tr>;
+  }
+  return (
+    <div className={`relative flex flex-col gap-2.5 p-3 rounded-xl border ${theme.panel} ${theme.cardBorder} ${theme.cardHover} transition-colors`}>
+      {children}
+    </div>
+  );
+}
+
+function Cell({ grid, className = '', gridClassName = '', label, inline, theme, children, ...rest }) {
+  if (!grid) return <td className={className} {...rest}>{children}</td>;
+  const labelEl = label && (
+    <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext} ${inline ? '' : 'mb-1'}`}>{label}</p>
+  );
+  return (
+    <div className={`${inline ? 'flex items-center justify-between gap-2' : ''} ${gridClassName}`}>
+      {labelEl}
+      {children}
+    </div>
+  );
+}
+
+// Table with a header row in list view, a responsive card grid in grid view.
+function EntryList({ grid, head, children }) {
+  if (grid) {
+    return (
+      <div className="grid gap-3 p-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <table className="w-full">
+      <thead>{head}</thead>
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+
+// ─── Compact incoming row (returns <tr>, or a card in grid view) ───────────
+function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, currencySymbol, displayCurrency, grid = false }) {
   const rep = entries[0];
   const count = entries.length;
   const [usdPrice, setUsdPrice] = useState('');
@@ -195,6 +247,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
   const [onHold, setOnHold] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const fromCsfloat = useCsfloatPrefill(rep.csfloatPrice, exchangeRate, usdPrice, setUsdPrice, setLocalPrice, setPlatform);
+  useLocalPriceSync(usdPrice, exchangeRate, setLocalPrice);
 
   const handleUsdChange = (val) => {
     setUsdPrice(val);
@@ -223,6 +276,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
       entries.map((entry) => ({
         itemName: entry.marketHashName,
         purchasePrice: v,
+        acquiredAt: detectedMs(entry) || null,
         platform,
         pending: onHold,
         expectedDelivery,
@@ -239,12 +293,12 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
   };
 
   return (
-    <tr className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>
-      <td className="px-3 py-2">
+    <RowShell grid={grid} theme={theme}>
+      <Cell grid={grid} theme={theme} className="px-3 py-2" gridClassName="pr-6">
         <div className="flex items-center gap-2 min-w-0">
-          <ItemImage iconUrl={rep.iconUrl} alt={rep.marketHashName} size={36} />
+          <ItemImage iconUrl={rep.iconUrl} alt={rep.marketHashName} size={grid ? 52 : 36} />
           <div className="min-w-0 flex-1">
-            <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>
+            <p title={rep.marketHashName} className={`${grid ? `text-[13px] font-semibold ${theme.text} line-clamp-2` : `text-xs font-medium ${theme.textSecondary} truncate`} leading-tight`}>
               {rep.marketHashName}
             </p>
             <p className="text-[10px] text-slate-600 leading-tight">
@@ -258,9 +312,9 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
             </span>
           )}
         </div>
-      </td>
+      </Cell>
 
-      <td className="px-3 py-2 align-middle">
+      <Cell grid={grid} theme={theme} label="Price" className="px-3 py-2 align-middle">
         <PricePairCompact
           usdValue={usdPrice}
           localValue={localPrice}
@@ -272,25 +326,25 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
           placeholderLocal={displayCurrency}
         />
         {fromCsfloat && <CsfloatPriceNote />}
-      </td>
+      </Cell>
 
-      <td className="px-3 py-2 align-middle">
+      <Cell grid={grid} theme={theme} label="Platform" inline className="px-3 py-2 align-middle">
         <div className="w-32">
           <PlatformPicker value={platform} onChange={setPlatform} theme={theme} platforms={PLATFORMS} compact />
         </div>
-      </td>
+      </Cell>
 
-      <td className="px-3 py-2 align-middle">
+      <Cell grid={grid} theme={theme} className="px-3 py-2 align-middle">
         <input
           type="text"
           value={notes}
           onChange={e => setNotes(e.target.value)}
           placeholder="Notes"
-          className={`h-7 w-28 ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
+          className={`h-7 ${grid ? 'w-full' : 'w-28'} ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
         />
-      </td>
+      </Cell>
 
-      <td className="px-2 py-2 align-middle text-center">
+      <Cell grid={grid} theme={theme} label="Trade hold" inline className="px-2 py-2 align-middle text-center">
         <button
           type="button"
           onClick={() => setOnHold(h => !h)}
@@ -299,22 +353,22 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
         >
           <Clock size={12} />
         </button>
-      </td>
+      </Cell>
 
-      <td className="px-3 py-2 align-middle text-right">
+      <Cell grid={grid} theme={theme} className="px-3 py-2 align-middle text-right" gridClassName="mt-auto">
         <button
           type="button"
           disabled={confirming || !parseFloat(usdPrice)}
           onClick={submit}
-          className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all inline-flex items-center gap-1
+          className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
             ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text}
             disabled:opacity-40 disabled:cursor-not-allowed`}
         >
           {confirming ? <><CheckCircle size={11} /> Added!</> : (count > 1 ? `Add ${count}` : 'Add')}
         </button>
-      </td>
+      </Cell>
 
-      <td className="px-2 py-2 align-middle text-right">
+      <Cell grid={grid} theme={theme} className="px-2 py-2 align-middle text-right" gridClassName="absolute top-2 right-2">
         <button
           type="button"
           onClick={() => onDismissGroup(entries.map(e => e.assetid))}
@@ -323,13 +377,13 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
         >
           <X size={13} />
         </button>
-      </td>
-    </tr>
+      </Cell>
+    </RowShell>
   );
 }
 
-// ─── Compact outgoing row (returns React.Fragment with main + optional expansion row) ──
-function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, theme, exchangeRate, currencySymbol, displayCurrency }) {
+// ─── Compact outgoing row (returns React.Fragment with main + optional expansion row, or a card in grid view) ──
+function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, theme, exchangeRate, currencySymbol, displayCurrency, grid = false }) {
   const [browseAll, setBrowseAll] = useState(candidates.length === 0);
   const [browseQuery, setBrowseQuery] = useState('');
   const [selectedId, setSelectedId] = useState(candidates[0]?.id ? String(candidates[0].id) : '');
@@ -339,6 +393,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
   const [customFee, setCustomFee] = useState('');
   const [confirming, setConfirming] = useState(false);
   const fromCsfloat = useCsfloatPrefill(entry.csfloatPrice, exchangeRate, usdSalePrice, setUsdSalePrice, setLocalSalePrice, setPlatform);
+  useLocalPriceSync(usdSalePrice, exchangeRate, setLocalSalePrice);
 
   const browseResults = useMemo(() => {
     const q = browseQuery.toLowerCase().trim();
@@ -395,14 +450,47 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
     ? (estProfit / selectedCandidate.purchasePrice) * 100
     : null;
 
+  // Browse search / fuzzy warning / custom fee. An extra table row in list
+  // view, the bottom of the card in grid view.
+  const expansion = showExpansion && (
+    <div className={`${grid ? '' : 'ml-12'} flex items-center gap-2 flex-wrap`}>
+      {browseAll && (
+        <input
+          type="text"
+          value={browseQuery}
+          onChange={(e) => setBrowseQuery(e.target.value)}
+          placeholder={`Search active items (${(allActiveItems || []).length} total)…`}
+          className={`flex-1 max-w-md h-7 ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
+        />
+      )}
+      {isFuzzyOnly && !browseAll && (
+        <span className="text-[10px] text-warn">
+          Near-matches only. Toggle Search to confirm the right item.
+        </span>
+      )}
+      {platform === 'other' && (
+        <div className="flex items-center gap-1">
+          <input
+            type="number" min="0" max="100" step="0.1"
+            value={customFee}
+            onChange={(e) => setCustomFee(e.target.value)}
+            placeholder="Fee"
+            className={`w-16 h-7 ${theme.input} rounded-lg px-2 ${theme.text} text-xs font-mono focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+          />
+          <span className={`text-[10px] ${theme.subtext}`}>%</span>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <React.Fragment>
-      <tr className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>
-        <td className="px-3 py-2">
+      <RowShell grid={grid} theme={theme}>
+        <Cell grid={grid} theme={theme} className="px-3 py-2" gridClassName="pr-6">
           <div className="flex items-center gap-2 min-w-0">
-            <ItemImage iconUrl={entry.iconUrl} alt={entry.marketHashName} size={36} />
+            <ItemImage iconUrl={entry.iconUrl} alt={entry.marketHashName} size={grid ? 52 : 36} />
             <div className="min-w-0 flex-1">
-              <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>
+              <p title={entry.marketHashName} className={`${grid ? `text-[13px] font-semibold ${theme.text} line-clamp-2` : `text-xs font-medium ${theme.textSecondary} truncate`} leading-tight`}>
                 {entry.marketHashName}
               </p>
               <p className="text-[10px] text-slate-600 leading-tight">
@@ -411,25 +499,25 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
               <InspectBadges entry={entry} theme={theme} />
             </div>
           </div>
-        </td>
+        </Cell>
 
-        <td className="px-3 py-2 align-middle">
+        <Cell grid={grid} theme={theme} label="Tracked match" className="px-3 py-2 align-middle">
           {visibleCandidates.length > 0 ? (
             <select
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
-              className={`h-7 w-48 ${theme.input} rounded-lg px-2 text-xs ${theme.text} focus:outline-none border`}
+              className={`h-7 ${grid ? 'w-full' : 'w-48'} ${theme.input} rounded-lg px-2 text-xs ${theme.text} focus:outline-none border`}
             >
               {visibleCandidates.map((c) => (
                 <option key={c.id} value={c.id}>{formatCandidateLabel(c)}</option>
               ))}
             </select>
           ) : (
-            <span className="text-[10px] text-warn">No match — toggle Search →</span>
+            <span className="text-[10px] text-warn">No match — toggle Search {grid ? '↓' : '→'}</span>
           )}
-        </td>
+        </Cell>
 
-        <td className="px-3 py-2 align-middle">
+        <Cell grid={grid} theme={theme} label="Sale price" className="px-3 py-2 align-middle">
           <PricePairCompact
             usdValue={usdSalePrice}
             localValue={localSalePrice}
@@ -448,15 +536,15 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
               {estProfitPct !== null && <span className="opacity-60 ml-1">({estProfitPct >= 0 ? '+' : ''}{estProfitPct.toFixed(0)}%)</span>}
             </div>
           )}
-        </td>
+        </Cell>
 
-        <td className="px-3 py-2 align-middle">
+        <Cell grid={grid} theme={theme} label="Platform" inline className="px-3 py-2 align-middle">
           <div className="w-32">
             <PlatformPicker value={platform} onChange={(val) => { setPlatform(val); setCustomFee(val === 'other' ? '0' : ''); }} theme={theme} platforms={PLATFORMS} compact />
           </div>
-        </td>
+        </Cell>
 
-        <td className="px-2 py-2 align-middle text-center">
+        <Cell grid={grid} theme={theme} label="Search all items" inline className="px-2 py-2 align-middle text-center">
           <button
             type="button"
             onClick={() => { setBrowseAll((prev) => !prev); setBrowseQuery(''); }}
@@ -465,23 +553,25 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
           >
             <Search size={11} />
           </button>
-        </td>
+        </Cell>
 
-        <td className="px-3 py-2 align-middle text-right">
+        {grid && expansion}
+
+        <Cell grid={grid} theme={theme} className="px-3 py-2 align-middle text-right" gridClassName="mt-auto">
           <button
             type="button"
             disabled={confirming || !parseFloat(usdSalePrice) || !selectedId || isFuzzyOnly}
             onClick={submit}
             title={isFuzzyOnly ? 'No confident match — toggle Search to pick manually' : undefined}
-            className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all duration-300 active:scale-95 inline-flex items-center gap-1
+            className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
               ${confirming ? 'bg-profit text-white border-transparent scale-95' : `${theme.card} ${theme.cardBorder} ${theme.text}`}
               disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {confirming ? <><CheckCircle size={11} /> Sold!</> : 'Mark sold'}
           </button>
-        </td>
+        </Cell>
 
-        <td className="px-2 py-2 align-middle text-right">
+        <Cell grid={grid} theme={theme} className="px-2 py-2 align-middle text-right" gridClassName="absolute top-2 right-2">
           <button
             type="button"
             onClick={() => onDismiss(entry.assetid, 'outgoing')}
@@ -490,41 +580,14 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
           >
             <X size={13} />
           </button>
-        </td>
-      </tr>
+        </Cell>
+      </RowShell>
 
       {/* Expansion row (browse search / fuzzy warning / custom fee) */}
-      {showExpansion && (
+      {!grid && showExpansion && (
         <tr className={`border-b ${theme.cardBorder}`}>
           <td colSpan={7} className="px-3 pb-2.5 pt-0">
-            <div className="ml-12 flex items-center gap-2 flex-wrap">
-              {browseAll && (
-                <input
-                  type="text"
-                  value={browseQuery}
-                  onChange={(e) => setBrowseQuery(e.target.value)}
-                  placeholder={`Search active items (${(allActiveItems || []).length} total)…`}
-                  className={`flex-1 max-w-md h-7 ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
-                />
-              )}
-              {isFuzzyOnly && !browseAll && (
-                <span className="text-[10px] text-warn">
-                  Near-matches only. Toggle Search to confirm the right item.
-                </span>
-              )}
-              {platform === 'other' && (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number" min="0" max="100" step="0.1"
-                    value={customFee}
-                    onChange={(e) => setCustomFee(e.target.value)}
-                    placeholder="Fee"
-                    className={`w-16 h-7 ${theme.input} rounded-lg px-2 ${theme.text} text-xs font-mono focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  />
-                  <span className={`text-[10px] ${theme.subtext}`}>%</span>
-                </div>
-              )}
-            </div>
+            {expansion}
           </td>
         </tr>
       )}
@@ -621,10 +684,6 @@ export default function HandleItemsPage({
   theme,
   incoming = [],
   outgoing = [],
-  lastSync,
-  lastSyncOk,
-  lastError,
-  reachable,
   onDismiss,
   items = [],
   addItemDirect,
@@ -632,17 +691,17 @@ export default function HandleItemsPage({
   exchangeRate,
   currencySymbol = '¥',
   displayCurrency = 'CNY',
-  extension = null,
-  refreshState,
 }) {
-  const [refreshing, setRefreshing] = useState(false);
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try { await refreshState?.(); } finally { setRefreshing(false); }
-  };
   const [tab, setTab] = useState('incoming');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date-new');
+  // Table or card view for incoming/outgoing, remembered per browser.
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('skinroi-handle-view') === 'grid' ? 'grid' : 'list'; } catch { return 'list'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('skinroi-handle-view', viewMode); } catch {}
+  }, [viewMode]);
 
   const switchTab = (newTab) => {
     setTab(newTab);
@@ -736,11 +795,11 @@ export default function HandleItemsPage({
     return groups.sort((a, b) => {
       const x = a[0], y = b[0];
       switch (sortBy) {
-        case 'date-old': return (x.detectedAt || 0) - (y.detectedAt || 0);
+        case 'date-old': return detectedMs(x) - detectedMs(y);
         case 'name-az':  return (x.marketHashName || '').localeCompare(y.marketHashName || '');
         case 'name-za':  return (y.marketHashName || '').localeCompare(x.marketHashName || '');
         case 'date-new':
-        default:         return (y.detectedAt || 0) - (x.detectedAt || 0);
+        default:         return detectedMs(y) - detectedMs(x);
       }
     });
   }, [incoming, searchTerm, sortBy]);
@@ -752,60 +811,21 @@ export default function HandleItemsPage({
       : outgoing;
     const arr = [...filtered];
     switch (sortBy) {
-      case 'date-old': return arr.sort((x, y) => (x.detectedAt || 0) - (y.detectedAt || 0));
-      case 'name-az':  return arr.sort((x, y) => (x.marketHashName || '').localeCompare(y.marketHashName || '') || (x.detectedAt || 0) - (y.detectedAt || 0));
-      case 'name-za':  return arr.sort((x, y) => (y.marketHashName || '').localeCompare(x.marketHashName || '') || (x.detectedAt || 0) - (y.detectedAt || 0));
+      case 'date-old': return arr.sort((x, y) => detectedMs(x) - detectedMs(y));
+      case 'name-az':  return arr.sort((x, y) => (x.marketHashName || '').localeCompare(y.marketHashName || '') || detectedMs(x) - detectedMs(y));
+      case 'name-za':  return arr.sort((x, y) => (y.marketHashName || '').localeCompare(x.marketHashName || '') || detectedMs(x) - detectedMs(y));
       case 'date-new':
-      default:         return arr.sort((x, y) => (y.detectedAt || 0) - (x.detectedAt || 0));
+      default:         return arr.sort((x, y) => detectedMs(y) - detectedMs(x));
     }
   }, [outgoing, searchTerm, sortBy]);
 
   const tableHeaderCls = `text-[10px] uppercase tracking-wide font-semibold ${theme.subtext}`;
+  const grid = viewMode === 'grid';
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
       <div className="flex gap-6 items-start">
         <div className="flex-1 min-w-[600px] space-y-4">
-
-        {/* Status header */}
-        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-3 flex items-center justify-between`}>
-          <div className="flex items-center gap-3">
-            <h2 className={`font-semibold ${theme.text}`}>Handle Items</h2>
-            <span className={`text-[11px] ${theme.subtext}`}>
-              {lastSync
-                ? `Last push: ${new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                : 'Waiting for extension…'}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className={`flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium border transition-all
-              ${theme.card} ${theme.cardBorder} ${refreshing ? theme.text : `${theme.subtext} ${theme.textHover}`}
-              disabled:opacity-50`}
-          >
-            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-
-        {/* Error banner */}
-        {(reachable === false || lastSyncOk === false) && (
-          <div className={`px-4 py-2 rounded-xl border text-[11px] flex items-center gap-1.5 flex-wrap ${reachable === false ? 'border-amber-500/30 bg-amber-500/5 text-amber-300' : 'border-red-500/30 bg-red-500/5 text-red-300'}`}>
-            <AlertTriangle size={12} />
-            {reachable === false ? (
-              <>Backend unreachable — check your connection or try again.</>
-            ) : (
-              <>Last push failed: {lastError}</>
-            )}
-          </div>
-        )}
-
-        {/* Extension pairing / status */}
-        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-4`}>
-          <ExtensionPairPanel theme={theme} extension={extension} onChange={refreshState} />
-        </div>
 
         {/* Analytics */}
         <HandleStats items={items} incomingCount={incomingCount} outgoingCount={outgoingCount} theme={theme} />
@@ -869,6 +889,28 @@ export default function HandleItemsPage({
               </button>
             ))}
           </div>
+
+          {/* View toggle — same as on Home */}
+          <div className={`flex items-center rounded-lg border ${theme.cardBorder} overflow-hidden`}>
+            <button
+              onClick={() => setViewMode('grid')}
+              title="Grid view"
+              className={`px-2 py-[7px] transition-colors ${
+                grid ? `${theme.card} ${theme.textSecondary}` : `text-slate-600 hover:text-slate-300 ${theme.itemHoverBg}`
+              }`}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              title="List view"
+              className={`px-2 py-[7px] border-l ${theme.cardBorder} transition-colors ${
+                !grid ? `${theme.card} ${theme.textSecondary}` : `text-slate-600 hover:text-slate-300 ${theme.itemHoverBg}`
+              }`}
+            >
+              <List size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Table */}
@@ -879,8 +921,7 @@ export default function HandleItemsPage({
             ) : visibleIncomingGroups.length === 0 ? (
               <EmptyState theme={theme} text={`No incoming items match "${searchTerm}".`} />
             ) : (
-              <table className="w-full">
-                <thead>
+              <EntryList grid={grid} head={<>
                   <tr className={`border-b ${theme.cardBorder}`}>
                     <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Item</th>
                     <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Price</th>
@@ -890,8 +931,7 @@ export default function HandleItemsPage({
                     <th className={`text-right px-3 py-2 ${tableHeaderCls}`}>Action</th>
                     <th className="w-8"></th>
                   </tr>
-                </thead>
-                <tbody>
+                </>}>
                   {visibleIncomingGroups.map((group, i) => (
                     <IncomingRow
                       key={`in-${group[0].assetid}`}
@@ -908,10 +948,10 @@ export default function HandleItemsPage({
                         onDismiss(group.map((e) => e.assetid), 'incoming');
                       }}
                       onDismissGroup={(ids) => onDismiss(ids, 'incoming')}
+                      grid={grid}
                     />
                   ))}
-                </tbody>
-              </table>
+              </EntryList>
             )
           )}
 
@@ -921,8 +961,7 @@ export default function HandleItemsPage({
             ) : visibleOutgoing.length === 0 ? (
               <EmptyState theme={theme} text={`No outgoing items match "${searchTerm}".`} />
             ) : (
-              <table className="w-full">
-                <thead>
+              <EntryList grid={grid} head={<>
                   <tr className={`border-b ${theme.cardBorder}`}>
                     <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Item</th>
                     <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Tracked match</th>
@@ -932,8 +971,7 @@ export default function HandleItemsPage({
                     <th className={`text-right px-3 py-2 ${tableHeaderCls}`}>Action</th>
                     <th className="w-8"></th>
                   </tr>
-                </thead>
-                <tbody>
+                </>}>
                   {visibleOutgoing.map((entry) => (
                     <OutgoingRow
                       key={`out-${entry.assetid}`}
@@ -949,10 +987,10 @@ export default function HandleItemsPage({
                         if (ok) onDismiss(assetid, 'outgoing');
                       }}
                       onDismiss={onDismiss}
+                      grid={grid}
                     />
                   ))}
-                </tbody>
-              </table>
+              </EntryList>
             )
           )}
         </div>

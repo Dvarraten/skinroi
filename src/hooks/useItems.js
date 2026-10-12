@@ -156,6 +156,9 @@ export const useItems = (steamId) => {
     // the extension resolved them so old rows and manual adds stay clean.
     floatValue = null, paintSeed = null, paintIndex = null, defIndex = null,
     stickers = null, keychains = null,
+    // When the extension saw the trade (epoch ms). Drives the Date sort and
+    // datePurchased, so items show when they were traded, not when added.
+    acquiredAt = null,
   }) => {
     if (!itemName || !purchasePrice) return null;
     const newItem = {
@@ -163,7 +166,7 @@ export const useItems = (steamId) => {
       itemName,
       purchasePrice: parseFloat(purchasePrice),
       notes,
-      datePurchased: new Date().toISOString().split('T')[0],
+      datePurchased: new Date(acquiredAt || Date.now()).toISOString().split('T')[0],
       sold: false,
       salePrice: null,
       platform,
@@ -190,6 +193,9 @@ export const useItems = (steamId) => {
     }
     if (Array.isArray(keychains) && keychains.length > 0) {
       newItem.keychains = keychains;
+    }
+    if (typeof acquiredAt === 'number' && Number.isFinite(acquiredAt)) {
+      newItem.acquiredAt = acquiredAt;
     }
     setItems(prev => [newItem, ...prev]);
     return newItem.id;

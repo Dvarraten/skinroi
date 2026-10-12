@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { themes } from './themes/themes';
 import './index.css';
 
@@ -8,6 +9,7 @@ import { useItems } from './hooks/useItems';
 import { useExchangeRate } from './hooks/useExchangeRate';
 import { useChartData } from './hooks/useChartData';
 import { useSteamSync } from './hooks/useSteamSync';
+import { usePortfolioView } from './hooks/usePortfolioView';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
 
@@ -35,7 +37,7 @@ export default function CS2TradingTracker() {
   const {
     items, setItems, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
-    addItemDirect, sellItemDirect, promotePendingItem, handleBulkDelete, handleAddTransaction,
+    addItemDirect, sellItemDirect, promotePendingItem, handleAddTransaction,
   } = useItems(user?.steamId);
 
   const handleImportCSV = (file) => {
@@ -50,8 +52,6 @@ export default function CS2TradingTracker() {
   };
 
   const steamSync = useSteamSync();
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const {
     usdAmount, rmbAmount,
@@ -60,9 +60,9 @@ export default function CS2TradingTracker() {
     displayCurrency, setDisplayCurrency, currencySymbol,
   } = useExchangeRate();
 
-  const [activeTab, setActiveTab] = useState('active');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
+  // Home shows active items only. Trades are handled in Handle Items; manual
+  // sell / mark received / delete sit in the ⋯ menu on each Home card.
+  const { searchTerm, setSearchTerm, sortBy, setSortBy, sortedItems } = usePortfolioView(items, 'active');
   const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'snipes' | 'analytics' | 'about'
   const [chartPeriod, setChartPeriod] = useState('30d');
   const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'bloomberg'); return themes[r] ? r : 'bloomberg'; });
@@ -98,16 +98,6 @@ export default function CS2TradingTracker() {
   }, [isHandleItemsPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (
-      activeTab === 'active' &&
-      (sortBy === 'profit-high' || sortBy === 'profit-low' ||
-        sortBy === 'profit-dollar-high' || sortBy === 'profit-dollar-low')
-    ) {
-      setSortBy('newest');
-    }
-  }, [activeTab, sortBy]);
-
-  useEffect(() => {
     const now = Date.now();
     items
       .filter(i => i.pending && !i.sold && i.expectedDelivery)
@@ -127,50 +117,6 @@ export default function CS2TradingTracker() {
     totalSoldCount:   items.filter(i => i.sold).length,
     totalProfit:      items.filter(i => i.sold).reduce((sum, i) => sum + i.profit, 0),
     totalInvested:    items.reduce((sum, i) => sum + i.purchasePrice, 0),
-  };
-
-  const filteredItems = items.filter(item => {
-    const matchesTab =
-      activeTab === 'active'  ? !item.sold
-      : activeTab === 'pending' ? (!item.sold && !!item.pending)
-      : item.sold;
-    const matchesSearch =
-      item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesTab && matchesSearch;
-  });
-
-  const soldTime = (it) =>
-    it.soldAt ?? (it.dateSold ? new Date(it.dateSold).getTime() : 0);
-
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    if (sortBy === 'newest')             return activeTab === 'sold' ? soldTime(b) - soldTime(a) || (b.id - a.id) : b.id - a.id;
-    if (sortBy === 'oldest')             return activeTab === 'sold' ? soldTime(a) - soldTime(b) || (a.id - b.id) : a.id - b.id;
-    if (sortBy === 'price-high')         return b.purchasePrice - a.purchasePrice;
-    if (sortBy === 'price-low')          return a.purchasePrice - b.purchasePrice;
-    if (sortBy === 'profit-high')        return (b.profitPercent ?? -Infinity) - (a.profitPercent ?? -Infinity);
-    if (sortBy === 'profit-low')         return (a.profitPercent ?? Infinity)  - (b.profitPercent ?? Infinity);
-    if (sortBy === 'profit-dollar-high') return (b.profit ?? -Infinity) - (a.profit ?? -Infinity);
-    if (sortBy === 'profit-dollar-low')  return (a.profit ?? Infinity)  - (b.profit ?? Infinity);
-    if (sortBy === 'delivery-soon')      return (a.expectedDelivery ?? Infinity)  - (b.expectedDelivery ?? Infinity);
-    if (sortBy === 'delivery-late')      return (b.expectedDelivery ?? -Infinity) - (a.expectedDelivery ?? -Infinity);
-    return 0;
-  });
-
-  const toggleSelect = (id) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-  const clearSelection  = () => setSelectedIds(new Set());
-  const exitSelectMode  = () => { setSelectMode(false); clearSelection(); };
-  const confirmBulkDelete = () => {
-    if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
-    handleBulkDelete([...selectedIds]);
-    exitSelectMode();
   };
 
   return (
@@ -208,7 +154,13 @@ export default function CS2TradingTracker() {
         onLogout={logout}
         onExportCSV={() => exportToCSV(items)}
         onImportCSV={handleImportCSV}
-        extensionConnected={!!steamSync.extension?.connected}
+        extension={steamSync.extension}
+        syncError={
+          steamSync.reachable === false ? 'Backend unreachable. Check your connection or try again.'
+          : steamSync.lastSyncOk === false ? `Last push failed: ${steamSync.lastError || 'unknown error'}`
+          : null
+        }
+        onExtensionChange={steamSync.refreshState}
         usdAmount={usdAmount}
         rmbAmount={rmbAmount}
         sidebarRate={sidebarRate}
@@ -272,35 +224,45 @@ export default function CS2TradingTracker() {
         {/* Row 2+3 — tabs + grid (left) and recent sales (right) */}
         <div className="flex-1 min-h-0 flex gap-6 overflow-hidden">
           <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden px-10">
-            <div className="shrink-0">
+            <div className="shrink-0 space-y-2">
+              <div className="flex items-baseline gap-2">
+                <h2 className={`text-xs font-semibold uppercase tracking-widest ${themeStyles.text}`}>Active items</h2>
+                <span className={`text-[11px] font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
+                {stats.totalPending > 0 && (
+                  <span className="text-[11px] text-warn">· {stats.totalPending} on trade hold</span>
+                )}
+              </div>
               <TabsAndSearchbar
                 theme={themeStyles}
-                setActiveTab={setActiveTab} activeTab={activeTab}
-                stats={stats}
+                activeTab="active"
+                showTabs={false}
+                allowSelect={false}
+                actions={
+                  <button
+                    onClick={() => openPage('handleItems')}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-[7px] rounded-lg border ${themeStyles.cardBorder} ${themeStyles.subtext} ${themeStyles.textHover} transition-colors`}
+                  >
+                    Manage items
+                    <ChevronRight size={12} />
+                  </button>
+                }
                 searchTerm={searchTerm} setSearchTerm={setSearchTerm}
                 sortBy={sortBy} setSortBy={setSortBy}
-                selectMode={selectMode}
-                selectedIds={selectedIds}
-                onEnterSelectMode={() => setSelectMode(true)}
-                onCancelSelectMode={exitSelectMode}
-                onConfirmBulkDelete={confirmBulkDelete}
                 viewMode={viewMode} setViewMode={setViewMode}
               />
             </div>
             <div className="flex-1 overflow-y-auto pb-2">
               <ItemGrid
+                menuActions
                 sellPlatform={sellPlatform} setSellData={setSellData}
                 sellData={sellData} setSellPlatform={setSellPlatform}
                 handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
                 promotePendingItem={promotePendingItem}
-                theme={themeStyles} items={items} sortedItems={sortedItems}
-                searchTerm={searchTerm} activeTab={activeTab}
-                selectMode={selectMode}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
                 exchangeRate={exchangeRate}
                 currencySymbol={currencySymbol}
                 displayCurrency={displayCurrency}
+                theme={themeStyles} sortedItems={sortedItems}
+                searchTerm={searchTerm} activeTab="active"
                 viewMode={viewMode}
               />
             </div>
