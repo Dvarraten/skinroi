@@ -644,7 +644,12 @@ export default function HandleItemsPage({
 }) {
   const [tab, setTab] = useState('incoming');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('date-new');
+  const [sortBy, setSortBy] = useState(() => {
+    try { return localStorage.getItem('skinroi-handle-sort') || 'date-new'; } catch { return 'date-new'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('skinroi-handle-sort', sortBy); } catch {}
+  }, [sortBy]);
   // Table or card view for incoming/outgoing, remembered per browser.
   const [viewMode, setViewMode] = useState(() => {
     try { return localStorage.getItem('skinroi-handle-view') === 'grid' ? 'grid' : 'list'; } catch { return 'list'; }
