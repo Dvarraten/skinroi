@@ -62,6 +62,7 @@ function CurrencySelect({ value, onChange, theme }) {
       {open && createPortal(
         <div
           ref={menuRef}
+          data-currency-menu
           style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
           className={`w-20 max-h-52 overflow-y-auto rounded-lg border ${theme.panelBorder} ${theme.panel} shadow-xl`}
         >

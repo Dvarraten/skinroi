@@ -94,6 +94,9 @@ export default function Header({
   useEffect(() => {
     if (!currencyOpen) return;
     const handler = (e) => {
+      // The currency picker's list is portaled to <body>, so it sits outside
+      // currencyRef; closing on it would unmount the list before the click lands.
+      if (e.target.closest?.('[data-currency-menu]')) return;
       if (currencyRef.current && !currencyRef.current.contains(e.target)) {
         setCurrencyOpen(false);
       }

@@ -7,6 +7,7 @@ import RecentSales from '../components/RecentSales';
 import { PLATFORMS } from '../utils/platforms';
 import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
+import { useLocalPriceSync } from '../hooks/useLocalPriceSync';
 
 const SORTS = [
   { label: 'Date', desc: 'date-new', asc: 'date-old' },
@@ -246,6 +247,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
   const [onHold, setOnHold] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const fromCsfloat = useCsfloatPrefill(rep.csfloatPrice, exchangeRate, usdPrice, setUsdPrice, setLocalPrice, setPlatform);
+  useLocalPriceSync(usdPrice, exchangeRate, setLocalPrice);
 
   const handleUsdChange = (val) => {
     setUsdPrice(val);
@@ -391,6 +393,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
   const [customFee, setCustomFee] = useState('');
   const [confirming, setConfirming] = useState(false);
   const fromCsfloat = useCsfloatPrefill(entry.csfloatPrice, exchangeRate, usdSalePrice, setUsdSalePrice, setLocalSalePrice, setPlatform);
+  useLocalPriceSync(usdSalePrice, exchangeRate, setLocalSalePrice);
 
   const browseResults = useMemo(() => {
     const q = browseQuery.toLowerCase().trim();

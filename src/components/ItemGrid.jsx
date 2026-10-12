@@ -8,6 +8,7 @@ import { getPlatformFee } from "../utils/platformFees";
 import { PlatformBadge } from "./PlatformBadge";
 import { PROFIT_COLOR, LOSS_COLOR, WARN_COLOR } from "../themes/themes";
 import { useItemImage } from "../utils/itemImages";
+import { useLocalPriceSync } from "../hooks/useLocalPriceSync";
 import buff163Icon  from "../assets/platforms/buff163.webp";
 import csfloatIcon  from "../assets/platforms/csfloat.webp";
 import csmoneyIcon  from "../assets/platforms/csmoney.webp";
@@ -407,6 +408,7 @@ function ItemCard({
 }) {
   const [barColor, setBarColor] = useState(accentHex);
   const [localSellAmount, setLocalSellAmount] = useState('');
+  useLocalPriceSync(sellData[item.id], exchangeRate, setLocalSellAmount);
   const [customFee, setCustomFee] = useState('');
   const [exiting, setExiting] = useState(false);
   const [soldFeedback, setSoldFeedback] = useState(false);
@@ -779,6 +781,7 @@ function ListRow({
 
   const isStack = row.type === 'stack';
   const item = isStack ? row.items[0] : row.item;
+  useLocalPriceSync(sellData[item.id], exchangeRate, setLocalSellAmount);
   const count = isStack ? row.items.length : null;
 
   const countdown = item.pending ? formatDeliveryCountdown(item.expectedDelivery) : null;
