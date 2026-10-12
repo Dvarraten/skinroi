@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, ArrowDownCircle, ArrowUpCircle, Clock, CheckCircle, Search, LayoutGrid, List } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
 import PlatformPicker from '../components/PlatformPicker';
@@ -160,6 +160,29 @@ function PricePairCompact({ usdValue, localValue, onUsdChange, onLocalChange, th
   );
 }
 
+// Prefills a price pair from the CSFloat trade price the backend attached to a
+// pending item (`csfloatPrice`, USD). Only fills while the field is empty or
+// still holds the value we filled ourselves, so it never overwrites typing.
+// Returns true while the shown USD value is the CSFloat one.
+function useCsfloatPrefill(csfloatPrice, exchangeRate, usdValue, setUsd, setLocal, setPlatform) {
+  const autoRef = useRef(null);
+  useEffect(() => {
+    if (csfloatPrice == null) return;
+    if (usdValue !== '' && usdValue !== autoRef.current) return;
+    const usd = csfloatPrice.toFixed(2);
+    const firstFill = autoRef.current === null;
+    autoRef.current = usd;
+    if (usdValue !== usd) setUsd(usd);
+    setLocal(exchangeRate ? (csfloatPrice * exchangeRate).toFixed(2) : '');
+    if (firstFill) setPlatform('csfloat');
+  }, [csfloatPrice, exchangeRate, usdValue, setUsd, setLocal, setPlatform]);
+  return csfloatPrice != null && usdValue !== '' && usdValue === autoRef.current;
+}
+
+function CsfloatPriceNote() {
+  return <p className="mt-0.5 text-[10px] text-slate-500 leading-tight">CSFloat price</p>;
+}
+
 // ─── List/card shells ───────────────────────────────────────────────────────
 // Incoming and outgoing entries render as table rows in list view and as cards
 // in grid view. RowShell is the <tr> or the card; Cell is a <td> or a labelled
@@ -215,6 +238,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
   const [notes, setNotes] = useState('');
   const [onHold, setOnHold] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const fromCsfloat = useCsfloatPrefill(rep.csfloatPrice, exchangeRate, usdPrice, setUsdPrice, setLocalPrice, setPlatform);
 
   const handleUsdChange = (val) => {
     setUsdPrice(val);
@@ -291,6 +315,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
           currencySymbol={currencySymbol}
           placeholderLocal={displayCurrency}
         />
+        {fromCsfloat && <CsfloatPriceNote />}
       </Cell>
 
       <Cell grid={grid} theme={theme} label="Platform" inline className="px-3 py-2 align-middle">
@@ -357,6 +382,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
   const [platform, setPlatform] = useState('csfloat');
   const [customFee, setCustomFee] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const fromCsfloat = useCsfloatPrefill(entry.csfloatPrice, exchangeRate, usdSalePrice, setUsdSalePrice, setLocalSalePrice, setPlatform);
 
   const browseResults = useMemo(() => {
     const q = browseQuery.toLowerCase().trim();
@@ -492,6 +518,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
             placeholderUsd="Sold"
             placeholderLocal={displayCurrency}
           />
+          {fromCsfloat && <CsfloatPriceNote />}
           {estProfit !== null && (
             <div className={`mt-1 rounded-md py-0.5 px-1.5 text-[10px] font-mono font-semibold text-center ${estProfit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
               {estProfit >= 0 ? '+' : ''}${estProfit.toFixed(2)}
@@ -741,7 +768,9 @@ export default function HandleItemsPage({
       const keychains = Array.isArray(e.keychains) && e.keychains.length
         ? 'k' + e.keychains.map((s) => s.stickerId).sort((a, b) => a - b).join(',')
         : '';
-      return `${seed}|${stickers}|${keychains}`;
+      // Different CSFloat prices must not collapse into one row with one price.
+      const price = e.csfloatPrice != null ? `c${e.csfloatPrice}` : '';
+      return `${seed}|${stickers}|${keychains}|${price}`;
     };
 
     const groups = [];
