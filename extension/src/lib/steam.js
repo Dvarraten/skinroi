@@ -14,6 +14,7 @@ import {
   STEAM_GET_TRADE_OFFERS,
   STEAM_GET_TRADE_HISTORY,
   STEAM_GET_ASSET_CLASS_INFO,
+  STEAM_GET_TRADE_STATUS,
   STEAM_OFFER_STATE_ACCEPTED,
   CS2_APP_ID,
 } from './config.js';
@@ -333,6 +334,69 @@ export function collectMissingClassIds(rawOffers, descByKey) {
   return missing;
 }
 
+// For accepted offers that have a `tradeid` but whose CS2 items are still
+// missing from descByKey, return the list of tradeids. GetTradeStatus can
+// then be called to retrieve descriptions for those specific trades.
+export function collectTradeIdsMissingDescriptions(rawOffers, descByKey) {
+  const tradeids = [];
+  for (const raw of rawOffers || []) {
+    if (!raw || Number(raw.trade_offer_state) !== STEAM_OFFER_STATE_ACCEPTED) continue;
+    const tradeid = raw.tradeid != null ? String(raw.tradeid) : '';
+    if (!tradeid) continue;
+    const allItems = [...(raw.items_to_receive || []), ...(raw.items_to_give || [])];
+    const hasCS2 = allItems.some(
+      (it) => it && (it.appid == null || String(it.appid) === String(CS2_APP_ID))
+    );
+    if (!hasCS2) continue;
+    const missingAny = allItems.some((it) => {
+      if (!it) return false;
+      if (it.appid != null && String(it.appid) !== String(CS2_APP_ID)) return false;
+      const classid = it.classid != null ? String(it.classid) : '';
+      if (!classid) return false;
+      const instanceid = it.instanceid != null ? String(it.instanceid) : '0';
+      return !descByKey.has(`${classid}_${instanceid}`);
+    });
+    if (missingAny) tradeids.push(tradeid);
+  }
+  return tradeids;
+}
+
+// Call IEconService/GetTradeStatus for each tradeid (up to `max` per poll)
+// and populate descByKey with any descriptions returned. Returns the count of
+// new entries added. Silent on per-trade errors — a failure on one tradeid
+// must not abort the rest.
+export async function resolveDescriptionsViaTradeStatus(token, tradeids, descByKey, { max = 40 } = {}) {
+  let added = 0;
+  const limit = Math.min(tradeids.length, max);
+  for (let i = 0; i < limit; i++) {
+    const tradeid = tradeids[i];
+    try {
+      const params = new URLSearchParams({
+        access_token: token,
+        tradeid,
+        get_descriptions: 'true',
+        language: 'english',
+      });
+      const res = await fetchWithRetry(`${STEAM_GET_TRADE_STATUS}?${params}`);
+      if (!res.ok) continue;
+      const json = await res.json();
+      for (const d of json?.response?.descriptions || []) {
+        const classid = d.classid != null ? String(d.classid) : '';
+        if (!classid) continue;
+        const instanceid = d.instanceid != null ? String(d.instanceid) : '0';
+        const key = `${classid}_${instanceid}`;
+        if (!descByKey.has(key)) {
+          descByKey.set(key, d);
+          added++;
+        }
+      }
+    } catch {
+      // skip this tradeid silently
+    }
+  }
+  return added;
+}
+
 // Turn Steam's raw offer objects into the shape we push to the backend:
 //   { tradeofferid, acceptedAt, items: [{ type, assetid, marketHashName, iconUrl }] }
 //
@@ -358,12 +422,13 @@ export function normalizeAcceptedOffers(rawOffers, descByKey) {
     const acceptedAt =
       updatedSec > 0 ? new Date(updatedSec * 1000).toISOString() : new Date().toISOString();
 
+    const tradeid = raw.tradeid != null ? String(raw.tradeid) : '';
     const items = [];
     collectItems(raw.items_to_receive, 'incoming', descByKey, items);
     collectItems(raw.items_to_give, 'outgoing', descByKey, items);
 
     if (items.length === 0) continue;
-    out.push({ tradeofferid, acceptedAt, items });
+    out.push({ tradeofferid, tradeid, acceptedAt, items });
   }
 
   return out;
@@ -372,8 +437,9 @@ export function normalizeAcceptedOffers(rawOffers, descByKey) {
 // Turn Steam's raw GetTradeHistory trade objects into the same
 // { tradeofferid, acceptedAt, items[] } shape as normalizeAcceptedOffers.
 //
-// GetTradeHistory uses `tradeid` (== tradeofferid) and `time_init` (when
-// initiated). For incoming items we use `new_assetid` — the assetid the
+// GetTradeHistory uses `tradeid` (the unique trade identifier — corresponds to
+// the `tradeid` field on an accepted offer, not the `tradeofferid`) and
+// `time_init` (when initiated). For incoming items we use `new_assetid` — the assetid the
 // item has in our inventory after the trade, which is what inspect links
 // and the backend need. For outgoing items we use the original `assetid`
 // (which was in our inventory before the trade).
@@ -398,7 +464,7 @@ export function normalizeTradeHistoryOffers(rawTrades, descByKey) {
     collectTradeHistoryItems(t.assets_given, 'outgoing', descByKey, items);
 
     if (items.length === 0) continue;
-    out.push({ tradeofferid, acceptedAt, items });
+    out.push({ tradeofferid, tradeid: tradeofferid, acceptedAt, items });
   }
 
   return out;

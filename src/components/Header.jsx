@@ -16,6 +16,7 @@ import {
   ArrowDownUp,
   Home,
   PanelLeft,
+  Crosshair,
 } from "lucide-react";
 import steamLogo from "../assets/platforms/steam.png";
 import logoSrc from "../utils/skinroi-logo.svg";
@@ -30,6 +31,7 @@ export default function Header({
   theme,
   activePage = null,
   onAnalyticsClick,
+  onSnipesClick,
   onAddItemClick,
   onHandleItemsClick,
   onTransactionClick,
@@ -118,6 +120,7 @@ export default function Header({
                 { key: 'addItem',      label: 'Add Item',     icon: PackagePlus, onClick: onAddItemClick,     badge: 0 },
                 { key: 'handleItems',  label: 'Handle Items', icon: Inbox,       onClick: onHandleItemsClick, badge: pendingCount },
                 { key: 'transactions', label: 'Transactions', icon: ArrowDownUp, onClick: onTransactionClick, badge: 0 },
+                { key: 'snipes',       label: 'Snipes',       icon: Crosshair,   onClick: onSnipesClick,      badge: 0 },
                 { key: 'analytics',    label: 'Analytics',    icon: BarChart3,   onClick: onAnalyticsClick,   badge: 0 },
                 { key: 'about',        label: 'About',        icon: Info,        onClick: onAboutClick,       badge: 0 },
               ];

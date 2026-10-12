@@ -20,6 +20,7 @@ export const STEAM_POINTS_CONFIG =
 export const STEAM_GET_TRADE_OFFERS = 'https://api.steampowered.com/IEconService/GetTradeOffers/v1/';
 export const STEAM_GET_TRADE_HISTORY = 'https://api.steampowered.com/IEconService/GetTradeHistory/v1/';
 export const STEAM_GET_ASSET_CLASS_INFO = 'https://api.steampowered.com/ISteamEconomy/GetAssetClassInfo/v1/';
+export const STEAM_GET_TRADE_STATUS = 'https://api.steampowered.com/IEconService/GetTradeStatus/v1/';
 
 // CSFloat's public inspect endpoint — takes a Steam inspect_link, returns
 // float value, paint seed / index, stickers, keychains. Same API their own

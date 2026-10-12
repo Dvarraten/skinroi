@@ -15,7 +15,9 @@ skinroi/
 │   │   ├── profile.js          Steam display name + avatar (Redis-cached 24h)
 │   │   ├── redis.js            Shared Upstash Redis client factory
 │   │   ├── state.js            Read/write per-user pending list + tombstones
-│   │   └── extension-store.js  Pairing codes + long-lived extension secrets
+│   │   ├── extension-store.js  Pairing codes + long-lived extension secrets
+│   │   └── snipes/             Snipes scanner: csfloat.js, dmarket.js (listings),
+│   │                           reference.js (YouPin/Buff163 prices), scan.js
 │   ├── auth/             Steam OpenID login + session
 │   │   ├── steam.js       Initiates OpenID redirect
 │   │   ├── callback.js    Validates OpenID response, sets session cookie
@@ -29,8 +31,10 @@ skinroi/
 │   │   ├── state.js       GET — returns pending list + extension status
 │   │   ├── dismiss.js     POST — removes a pending item + tombstones its assetid
 │   │   └── reset.js       POST — wipes pending state
-│   └── items/
-│       └── index.js       GET/POST — load and save the tracked item portfolio
+│   ├── items/
+│   │   └── index.js       GET/POST — load and save the tracked item portfolio
+│   └── snipes/
+│       └── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~45s)
 ├── extension/            Chrome extension (Manifest V3, load unpacked)
 │   ├── manifest.json
 │   └── src/
@@ -86,6 +90,17 @@ skinroi/
   `POST /api/extension/trades` authenticated by `Authorization: Bearer {secret}`
 - Backend dedupes by `tradeofferid` in `processedTradeIds`; respects
   `dismissedAssetIds` tombstones for user-dismissed items
+
+**Snipes**: `GET /api/snipes` (logged-in only) rescans when the last scan is
+older than 45s, guarded by a Redis lock. A scan pulls the newest CSFloat and
+DMarket listings, prices them against YouPin (fallback Buff163) and stores
+every listing at least 2% under reference for 30 min. Fees, ROI and liquidity
+filters run in the browser (`src/utils/snipes.js`). Env vars:
+`CSFLOAT_API_KEY` (required for CSFloat), `CSPRICEAPI_KEY` (YouPin + Buff163
+with listing counts; without it the free csgotrader.app Buff163 dump is used),
+optional `DMARKET_PUBLIC_KEY`/`DMARKET_SECRET_KEY` (signed requests) and
+`SNIPES_MIN_PRICE_CENTS` (default 200). Dopplers without a known phase are
+skipped so phases never get mixed.
 
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
 Guest users → `localStorage` key `cs2-trading-items`.
@@ -149,6 +164,10 @@ npm run items:update
 | `skinroi:ext-pair:{code}`        | Short-lived pairing code (10 min TTL)             |
 | `skinroi:ext-secret:{secret}`    | Reverse lookup: Bearer secret → steamId           |
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
+| `skinroi:snipes:deals`           | Current snipe candidates (30 min window)          |
+| `skinroi:snipes:meta`            | Last scan time + per-source status                |
+| `skinroi:snipes:lock`            | Scan lock (25s TTL)                               |
+| `skinroi:snipes:ref:{name}`      | Cached CSPriceAPI row per item (5 min TTL)        |
 
 ## Hard Project Rules
 
