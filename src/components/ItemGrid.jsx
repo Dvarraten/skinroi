@@ -979,27 +979,6 @@ function ListRow({
   );
 }
 
-// --- MonthHeader ---
-// Sticky divider between months in the grid, with item count and the
-// month's total cost (Active) or total profit (Sold).
-function MonthHeader({ sectionKey, stat, sold, theme }) {
-  const [year, month] = sectionKey.split('-').map(Number);
-  const label = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  return (
-    <div className={`col-span-full sticky top-0 z-40 -mb-1 pt-2 pb-1.5 flex items-baseline gap-3 border-b ${theme.cardBorder} ${theme.bg}`}>
-      <h4 className={`text-xs font-semibold uppercase tracking-wider ${theme.textSecondary}`}>{label}</h4>
-      <span className={`text-[11px] ${theme.subtext}`}>
-        {stat.count} {sold ? (stat.count === 1 ? 'sale' : 'sales') : (stat.count === 1 ? 'item' : 'items')}
-      </span>
-      <span className={`ml-auto text-[11px] font-mono font-semibold ${
-        sold ? (stat.sum >= 0 ? 'text-profit' : 'text-loss') : theme.textSecondary
-      }`}>
-        {sold ? `${stat.sum >= 0 ? '+' : '−'}$${Math.abs(stat.sum).toFixed(2)}` : `$${stat.sum.toFixed(2)}`}
-      </span>
-    </div>
-  );
-}
-
 // --- ItemGrid ---
 
 const INITIAL_VISIBLE = 60;
@@ -1061,34 +1040,6 @@ export default function ItemGrid({
 
   const visibleRows = flatRows.slice(0, visibleCount);
   const hasMore = visibleCount < flatRows.length;
-
-  // Month sections for the grid (purchase month on Active, sale month on Sold).
-  // Only shown when every month forms one unbroken run, i.e. the list is
-  // sorted by date — a price sort would otherwise repeat the same month.
-  const sections = useMemo(() => {
-    if (activeTab === 'pending' || flatRows.length === 0) return null;
-    const keyOf = (row) => {
-      const it = row.type === 'stack' ? row.items[0] : row.item;
-      const d = new Date(activeTab === 'sold' ? it.dateSold : it.datePurchased);
-      return isNaN(d) ? null : `${d.getFullYear()}-${d.getMonth()}`;
-    };
-    const stats = new Map();
-    let prev = null;
-    for (const row of flatRows) {
-      const key = keyOf(row);
-      if (key === null) return null;
-      if (key !== prev && stats.has(key)) return null;
-      prev = key;
-      const rowItems = row.type === 'stack' ? row.items : [row.item];
-      const s = stats.get(key) || { count: 0, sum: 0 };
-      for (const it of rowItems) {
-        s.count += 1;
-        s.sum += activeTab === 'sold' ? (it.profit || 0) : it.purchasePrice;
-      }
-      stats.set(key, s);
-    }
-    return { keyOf, stats };
-  }, [flatRows, activeTab]);
 
   const emptyText =
     searchTerm ? 'No items match your search.'
@@ -1169,12 +1120,7 @@ export default function ItemGrid({
           }
         `}</style>
 
-        {visibleRows.map((row, index) => {
-          const sectionKey = sections ? sections.keyOf(row) : null;
-          const header = sectionKey && (index === 0 || sections.keyOf(visibleRows[index - 1]) !== sectionKey) ? (
-            <MonthHeader key={`h:${sectionKey}`} sectionKey={sectionKey} stat={sections.stats.get(sectionKey)} sold={activeTab === 'sold'} theme={theme} />
-          ) : null;
-          const card = row.type === 'stack' ? (
+        {visibleRows.map((row, index) => row.type === 'stack' ? (
           <StackedCard
             key={row.key}
             items={row.items}
@@ -1192,9 +1138,7 @@ export default function ItemGrid({
             {...commonProps}
             accentHex={accentHex}
           />
-        );
-          return header ? [header, card] : card;
-        })}
+        ))}
 
         {flatRows.length === 0 && (
           <div className="col-span-full text-center py-12 text-slate-400">
