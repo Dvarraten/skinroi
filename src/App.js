@@ -154,7 +154,13 @@ export default function CS2TradingTracker() {
         onLogout={logout}
         onExportCSV={() => exportToCSV(items)}
         onImportCSV={handleImportCSV}
-        extensionConnected={!!steamSync.extension?.connected}
+        extension={steamSync.extension}
+        syncError={
+          steamSync.reachable === false ? 'Backend unreachable. Check your connection or try again.'
+          : steamSync.lastSyncOk === false ? `Last push failed: ${steamSync.lastError || 'unknown error'}`
+          : null
+        }
+        onExtensionChange={steamSync.refreshState}
         usdAmount={usdAmount}
         rmbAmount={rmbAmount}
         sidebarRate={sidebarRate}

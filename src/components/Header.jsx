@@ -11,7 +11,7 @@ import {
   PackagePlus,
   Inbox,
   Info,
-  CheckCircle,
+  AlertTriangle,
   ArrowLeftRight,
   ArrowDownUp,
   Home,
@@ -22,6 +22,8 @@ import steamLogo from "../assets/platforms/steam.png";
 import logoSrc from "../utils/skinroi-logo.svg";
 import logoLightSrc from "../utils/skinroi-logo-light.svg";
 import CurrencyConverter from "./CurrencyConverter";
+import ExtensionPairPanel from "./ExtensionPairPanel";
+import { PROFIT_COLOR, WARN_COLOR, LOSS_COLOR } from "../themes/themes";
 
 function SteamIcon({ className }) {
   return <img src={steamLogo} alt="" className={className} />;
@@ -43,7 +45,11 @@ export default function Header({
   onLogout,
   onExportCSV,
   onImportCSV,
-  extensionConnected = false,
+  // Extension status, shown as the colour of the ring around the avatar:
+  // green = connected, orange = not paired yet, red = sync/backend error.
+  extension = null,
+  syncError = null,
+  onExtensionChange,
   // Currency converter props (for popover)
   usdAmount,
   rmbAmount,
@@ -62,6 +68,13 @@ export default function Header({
   children,
 }) {
   const importInputRef = useRef(null);
+  const extStatus = syncError ? 'error' : extension?.connected ? 'connected' : 'disconnected';
+  const ringColor = { connected: PROFIT_COLOR, disconnected: WARN_COLOR, error: LOSS_COLOR }[extStatus];
+  const ringTitle = {
+    connected: 'Extension connected',
+    disconnected: 'Extension not connected',
+    error: `Extension sync problem: ${syncError}`,
+  }[extStatus];
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -208,23 +221,28 @@ export default function Header({
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen((o) => !o)}
+                title={ringTitle}
                 className="rounded-full p-0.5 transition-all"
               >
                 {user.avatarUrl ? (
                   <img
                     src={user.avatarUrl}
                     alt={user.personaName || ""}
-                    className={`w-10 h-10 rounded-full ring-2 transition-all ${dropdownOpen ? "ring-white/70" : "ring-white/20 hover:ring-white/55"}`}
+                    className={`w-10 h-10 rounded-full transition-all ${dropdownOpen ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
+                    style={{ boxShadow: `0 0 0 2px ${ringColor}` }}
                   />
                 ) : (
-                  <div className={`w-10 h-10 rounded-full ring-2 transition-all flex items-center justify-center ${theme?.card || 'bg-white/10'} ${dropdownOpen ? "ring-white/70" : "ring-white/20 hover:ring-white/55"}`}>
+                  <div
+                    className={`w-10 h-10 rounded-full transition-all flex items-center justify-center ${theme?.card || 'bg-white/10'}`}
+                    style={{ boxShadow: `0 0 0 2px ${ringColor}` }}
+                  >
                     <User size={18} className="text-slate-400" />
                   </div>
                 )}
               </button>
 
               {dropdownOpen && (
-                <div className={`absolute right-0 top-12 w-52 rounded-xl border ${theme?.panelBorder || 'border-white/10'} ${theme?.panel || 'bg-[#151f35]'} shadow-xl overflow-hidden z-50`}>
+                <div className={`absolute right-0 top-12 w-80 rounded-xl border ${theme?.panelBorder || 'border-white/10'} ${theme?.panel || 'bg-[#151f35]'} shadow-xl overflow-hidden z-50`}>
                   {user.personaName && (
                     <div className={`px-4 py-3 border-b ${theme?.panelBorder || 'border-white/10'}`}>
                       <p className={`${theme?.text || 'text-white'} text-sm font-medium truncate`}>
@@ -232,6 +250,16 @@ export default function Header({
                       </p>
                     </div>
                   )}
+                  {/* Extension status + pairing (moved here from Handle Items) */}
+                  <div className={`p-3 border-b ${theme?.panelBorder || 'border-white/10'} space-y-2`}>
+                    {syncError && (
+                      <div className="px-3 py-2 rounded-lg border border-red-500/30 bg-red-500/5 text-[11px] text-red-300 flex items-start gap-1.5">
+                        <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                        <span>{syncError}</span>
+                      </div>
+                    )}
+                    <ExtensionPairPanel theme={theme} extension={extension} onChange={onExtensionChange} />
+                  </div>
                   <div className="py-1">
                     <a
                       href={`https://steamcommunity.com/profiles/${user.steamId}`}
@@ -292,12 +320,6 @@ export default function Header({
                       Analytics
                     </button>
                     <div className={`border-t ${theme?.panelBorder || 'border-white/10'} mt-1 pt-1`}>
-                      {extensionConnected && (
-                        <div className="flex items-center gap-3 px-4 py-2.5 text-sm text-emerald-400">
-                          <CheckCircle size={15} />
-                          Extension connected
-                        </div>
-                      )}
                       <button
                         onClick={() => { onLogout(); setDropdownOpen(false); }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 ${theme?.itemHoverBg || 'hover:bg-white/8'} transition-all`}

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertTriangle, Clock, CheckCircle, Search, LayoutGrid, List } from 'lucide-react';
+import { X, ArrowDownCircle, ArrowUpCircle, Clock, CheckCircle, Search, LayoutGrid, List } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import ExtensionPairPanel from '../components/ExtensionPairPanel';
 import PlatformPicker from '../components/PlatformPicker';
 import { TabButton } from '../components/TabsAndSearchbar';
 import RecentSales from '../components/RecentSales';
@@ -647,10 +646,6 @@ export default function HandleItemsPage({
   theme,
   incoming = [],
   outgoing = [],
-  lastSync,
-  lastSyncOk,
-  lastError,
-  reachable,
   onDismiss,
   items = [],
   addItemDirect,
@@ -658,14 +653,7 @@ export default function HandleItemsPage({
   exchangeRate,
   currencySymbol = '¥',
   displayCurrency = 'CNY',
-  extension = null,
-  refreshState,
 }) {
-  const [refreshing, setRefreshing] = useState(false);
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try { await refreshState?.(); } finally { setRefreshing(false); }
-  };
   const [tab, setTab] = useState('incoming');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date-new');
@@ -798,46 +786,6 @@ export default function HandleItemsPage({
     <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
       <div className="flex gap-6 items-start">
         <div className="flex-1 min-w-[600px] space-y-4">
-
-        {/* Status header */}
-        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-3 flex items-center justify-between`}>
-          <div className="flex items-center gap-3">
-            <h2 className={`font-semibold ${theme.text}`}>Handle Items</h2>
-            <span className={`text-[11px] ${theme.subtext}`}>
-              {lastSync
-                ? `Last push: ${new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                : 'Waiting for extension…'}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className={`flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium border transition-all
-              ${theme.card} ${theme.cardBorder} ${refreshing ? theme.text : `${theme.subtext} ${theme.textHover}`}
-              disabled:opacity-50`}
-          >
-            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-
-        {/* Error banner */}
-        {(reachable === false || lastSyncOk === false) && (
-          <div className={`px-4 py-2 rounded-xl border text-[11px] flex items-center gap-1.5 flex-wrap ${reachable === false ? 'border-amber-500/30 bg-amber-500/5 text-amber-300' : 'border-red-500/30 bg-red-500/5 text-red-300'}`}>
-            <AlertTriangle size={12} />
-            {reachable === false ? (
-              <>Backend unreachable — check your connection or try again.</>
-            ) : (
-              <>Last push failed: {lastError}</>
-            )}
-          </div>
-        )}
-
-        {/* Extension pairing / status */}
-        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg px-5 py-4`}>
-          <ExtensionPairPanel theme={theme} extension={extension} onChange={refreshState} />
-        </div>
 
         {/* Analytics */}
         <HandleStats items={items} incomingCount={incomingCount} outgoingCount={outgoingCount} theme={theme} />
