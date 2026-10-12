@@ -29,8 +29,18 @@ function parseItemName(name) {
   return { baseName: name, wear: null };
 }
 
+// Short wear labels for the chip on the card image.
+const WEAR_SHORT = {
+  'Factory New': 'FN', 'Minimal Wear': 'MW', 'Field-Tested': 'FT', 'Well-Worn': 'WW', 'Battle-Scarred': 'BS',
+};
+
+function formatShortDate(value) {
+  return value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+}
+
 function ItemThumbnail({ item }) {
   const url = useItemImage({ directIconUrl: item.iconUrl, name: item.itemName });
+  const [failed, setFailed] = useState(false);
   if (item.isTransaction) {
     return (
       <div className="h-20 w-full flex items-center justify-center">
@@ -38,9 +48,90 @@ function ItemThumbnail({ item }) {
       </div>
     );
   }
-  if (!url) return <div className="w-14 h-14 rounded-lg bg-white/5" />;
+  if (!url || failed) return <div className="w-14 h-14 rounded-lg bg-white/5" />;
   return (
-    <img src={url} alt="" loading="lazy" className="h-20 w-full object-contain" />
+    <img src={url} alt="" loading="lazy" onError={() => setFailed(true)} className="h-24 w-full object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]" />
+  );
+}
+
+// Trade-hold chip shown on the card image for pending items.
+function HoldChip({ countdown }) {
+  return (
+    <span
+      title={countdown.overdue ? 'Trade hold is over' : `Trade-locked, tradeable in ${countdown.label}`}
+      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border backdrop-blur-sm inline-flex items-center gap-1 ${
+        countdown.overdue
+          ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+          : 'bg-black/60 text-warn border-warn/30'
+      }`}
+    >
+      {countdown.overdue ? <Unlock size={10} /> : <Lock size={10} />}
+      {countdown.overdue ? 'Tradeable' : `Hold ${countdown.label}`}
+    </span>
+  );
+}
+
+// Image area shared by ItemCard and StackedCard: wear chip top-left,
+// stack count top-right, trade-hold chip bottom-left.
+function CardMedia({ item, wear, countdown, count, hideWear, theme }) {
+  const wearShort = wear ? WEAR_SHORT[wear] : null;
+  return (
+    <div className="relative h-28 px-4 flex justify-center items-center bg-gradient-to-b from-white/[0.06] to-black/25">
+      <ItemThumbnail item={item} />
+      {wearShort && !hideWear && (
+        <span title={wear} className="absolute top-2 left-2 text-[10px] font-semibold tracking-wide px-1.5 py-0.5 rounded-md bg-black/50 text-slate-200">
+          {wearShort}
+        </span>
+      )}
+      {count > 1 && (
+        <span className={`absolute top-2 right-2 text-[11px] font-bold px-1.5 py-0.5 rounded-md ${theme.accentBg} text-white leading-tight`}>
+          ×{count}
+        </span>
+      )}
+      {countdown && (
+        <div className="absolute bottom-2 left-2 pointer-events-none">
+          <HoldChip countdown={countdown} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Name (up to two lines), wear + float, and notes.
+function CardTitle({ item, baseName, wear, theme }) {
+  const sub = [wear, typeof item.floatValue === 'number' ? `Float ${item.floatValue.toFixed(4)}` : null]
+    .filter(Boolean).join(' · ');
+  return (
+    <div className="min-w-0">
+      {/* Fixed height for name + wear so cost rows line up across a grid row */}
+      <div className="min-h-[3.25rem]">
+        <h3 title={item.itemName} className={`text-[13px] font-semibold ${theme.text} leading-snug line-clamp-2`}>
+          {baseName}
+        </h3>
+        <p className={`text-[11px] ${theme.subtext} truncate leading-tight mt-0.5`}>{sub || '\u00a0'}</p>
+      </div>
+      {item.notes && (
+        <p title={item.notes} className="mt-1.5 text-[10px] font-medium text-warn bg-warn/10 px-1.5 py-0.5 rounded-md truncate w-fit max-w-full">
+          {item.notes}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// "Cost" block for active / pending cards: big price left, platform + date right.
+function CostRow({ item, theme }) {
+  return (
+    <div className="flex items-end justify-between gap-2">
+      <div className="min-w-0">
+        <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`}>Cost</p>
+        <p className={`font-mono text-base font-semibold ${theme.text} leading-tight`}>${item.purchasePrice.toFixed(2)}</p>
+      </div>
+      <div className={`flex flex-col items-end gap-0.5 text-[11px] ${theme.textSecondary} min-w-0`}>
+        {item.platform && <PlatformBadge platform={item.platform} size="xs" />}
+        <span className={`${theme.subtext} pr-1.5`}>{formatShortDate(item.datePurchased)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -265,6 +356,7 @@ function ItemCard({
   selectMode, isSelected, onToggleSelect,
   exchangeRate, currencySymbol, displayCurrency,
   initialSellOpen = false,
+  readOnly = false,
 }) {
   const [barColor, setBarColor] = useState(accentHex);
   const [localSellAmount, setLocalSellAmount] = useState('');
@@ -334,8 +426,8 @@ function ItemCard({
   return (
     <div
       className={`relative group flex flex-col h-full ${theme.panel} backdrop-blur-sm rounded-xl border ${
-        selectMode && isSelected ? 'border-red-500 ring-2 ring-red-500/40' : theme.cardBorder
-      } transition-all duration-300 overflow-hidden
+        selectMode && isSelected ? 'border-red-500 ring-2 ring-red-500/40' : `${theme.cardBorder} ${theme.cardHover}`
+      } transition-all duration-300 overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30
         ${exiting ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}
         ${soldFeedback && !item.sold ? 'ring-2 ring-profit/60' : ''}
         ${selectMode ? 'cursor-pointer' : ''}
@@ -351,116 +443,70 @@ function ItemCard({
         />
       )}
 
-      <div className="flex-1 p-3 pb-4 min-w-0 flex flex-col">
-
-        {/* Notes chip — top-left, absolute */}
-        {item.notes && !selectMode && (
-          <div className="absolute top-1.5 left-1.5 z-10 max-w-[calc(100%-2.5rem)]">
-            <span className="text-[9px] font-medium text-warn bg-warn/15 px-1.5 py-0.5 rounded-full truncate block leading-tight">
-              {item.notes}
-            </span>
-          </div>
-        )}
-
-        {/* Top-right action: X cancel-sell when sell open, trash in select mode */}
-        {sellOpen ? (
-          <div className="absolute top-1.5 right-1.5 z-30">
-            <button
-              type="button"
-              onClick={() => setSellOpen(false)}
-              className="p-1.5 rounded-lg transition-all text-red-400/50 hover:text-red-400 hover:bg-red-500/10 active:text-red-500 active:bg-red-500/20"
-            >
-              <X size={13} />
-            </button>
-          </div>
-        ) : selectMode ? (
-          <div className="absolute top-1.5 right-1.5 z-30" onClick={(e) => e.stopPropagation()}>
-            <DeleteButton onDelete={onDelete} />
-          </div>
-        ) : null}
-
-        {/* Select checkbox */}
-        {selectMode && !item.sold && (
-          <div className="absolute top-2 left-3 z-10">
-            <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-              isSelected ? 'bg-red-500 border-red-500' : 'border-white/30 bg-white/5'
-            }`}>
-              {isSelected && <CheckCircle size={10} className="text-white" />}
-            </div>
-          </div>
-        )}
-
-        {/* Image area — flush to card edges, no bottom margin (bar sits directly below) */}
-        <div className="-mx-3 -mt-3 mb-0 h-24 relative flex justify-center items-center bg-gradient-to-b from-white/[0.06] to-black/25">
-          <ItemThumbnail item={item} />
-          {item.pending && countdown && (
-            <div className="absolute bottom-1.5 left-0 right-0 flex justify-center pointer-events-none">
-              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border backdrop-blur-sm inline-flex items-center gap-1 ${
-                countdown.overdue
-                  ? 'bg-blue-500/20 text-blue-400 border-blue-500/20'
-                  : 'bg-black/50 text-warn border-warn/25'
-              }`}>
-                {countdown.overdue ? <Unlock size={9} /> : <Lock size={9} />}{countdown.label}
-              </span>
-            </div>
-          )}
+      {/* Top-right action: X cancel-sell when sell open, trash in select mode */}
+      {sellOpen ? (
+        <div className="absolute top-1.5 right-1.5 z-30">
+          <button
+            type="button"
+            onClick={() => setSellOpen(false)}
+            title="Cancel sell"
+            className="p-1.5 rounded-lg transition-all bg-black/40 text-red-300/70 hover:text-red-400 hover:bg-red-500/20 active:text-red-500"
+          >
+            <X size={13} />
+          </button>
         </div>
-
-        {/* Accent bar — only for sold items; pending uses the image overlay instead */}
-        <div
-          className={`h-[3px] mb-3 ${
-            item.sold ? 'mx-4 rounded-full' : 'mx-4 opacity-0'
-          }`}
-          style={{ backgroundColor: currentBarColor, transition: 'background-color 0.1s' }}
-        />
-
-        {/* Name + wear — wear always occupies a line to keep meta row at fixed position */}
-        <div className="mb-1.5">
-          <h3 className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>
-            {baseName}
-          </h3>
-          <span className={`text-xs ${theme.subtext} font-normal block leading-tight mt-1`}>
-            {wear || ' '}
-          </span>
+      ) : selectMode ? (
+        <div className="absolute top-1.5 right-1.5 z-30" onClick={(e) => e.stopPropagation()}>
+          <DeleteButton onDelete={onDelete} />
         </div>
+      ) : null}
 
-        {/* Meta row — active/pending only, hidden when sell is open */}
-        {!item.sold && !sellOpen && (
-          <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] mb-3">
-            <span className={`font-mono ${theme.text} font-semibold`}>${item.purchasePrice.toFixed(2)}</span>
-            <span className="text-slate-600">·</span>
-            <span className="text-slate-500">
-              {item.datePurchased
-                ? new Date(item.datePurchased).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : ''}
-            </span>
-            {item.platform && (
-              <>
-                <span className="text-slate-600">·</span>
-                <PlatformBadge platform={item.platform} size="xs" />
-              </>
-            )}
+      {/* Select checkbox */}
+      {selectMode && !item.sold && (
+        <div className="absolute top-2 left-2 z-10">
+          <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+            isSelected ? 'bg-red-500 border-red-500' : 'border-white/30 bg-white/5'
+          }`}>
+            {isSelected && <CheckCircle size={10} className="text-white" />}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Action zone */}
-        <div className={!item.sold && !item.pending && sellOpen ? "mt-2" : "mt-auto"}>
+      <CardMedia item={item} wear={wear} countdown={countdown} hideWear={selectMode} theme={theme} />
+
+      {/* Accent bar — profit/loss colour once sold (also shows the sell animation) */}
+      <div
+        className={`h-[3px] ${item.sold || soldFeedback ? '' : 'opacity-0'}`}
+        style={{ backgroundColor: currentBarColor, transition: 'background-color 0.1s' }}
+      />
+
+      <div className="flex-1 p-3 min-w-0 flex flex-col gap-3">
+        <CardTitle item={item} baseName={baseName} wear={wear} theme={theme} />
+
+        {/* Cost row — active/pending only, hidden when sell is open */}
+        {!item.sold && !sellOpen && <CostRow item={item} theme={theme} />}
+
+        {/* Action zone — hidden on the read-only Home grid */}
+        {!readOnly && (
+        <div className={!item.sold && !item.pending && sellOpen ? "" : "mt-auto"}>
           {item.pending && !item.sold ? (
             <div className="flex gap-1.5">
               <button
                 type="button"
                 onClick={() => promotePendingItem && promotePendingItem(item.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium ${theme.card} border ${theme.cardBorder} ${theme.textSecondary} ${theme.textHover} hover:border-white/20 transition-colors`}
+                title="Mark as received"
+                className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 h-8 rounded-lg text-xs font-medium whitespace-nowrap ${theme.card} border ${theme.cardBorder} ${theme.textSecondary} ${theme.textHover} hover:border-white/20 transition-colors`}
               >
-                <PackageCheck size={13} />
-                Mark received
+                <PackageCheck size={13} className="shrink-0" />
+                Received
               </button>
               <button
                 type="button"
                 onClick={() => {
                   if (window.confirm('Cancel this pending purchase? It will be removed entirely.')) handleDeleteItem(item.id);
                 }}
-                className={`px-3 h-9 rounded-lg text-xs ${theme.card} border ${theme.cardBorder} text-slate-600 hover:text-slate-300 transition-colors`}
+                title="Cancel pending purchase"
+                className={`px-2.5 h-8 rounded-lg text-xs whitespace-nowrap ${theme.card} border ${theme.cardBorder} text-slate-500 hover:text-red-400 hover:border-red-500/30 transition-colors`}
               >
                 Cancel
               </button>
@@ -564,29 +610,20 @@ function ItemCard({
               </div>
             </div>
           ) : (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1 text-[11px] font-mono">
-                <span className="text-slate-400">${item.purchasePrice.toFixed(2)}</span>
-                <span className="text-slate-600">→</span>
-                <span className={`${theme.text} font-semibold`}>${(item.purchasePrice + item.profit).toFixed(2)}</span>
-              </div>
-              <div className="flex items-center gap-1 text-[11px]">
-                <span className="text-slate-600">
-                  {item.datePurchased ? new Date(item.datePurchased).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
-                </span>
-                <span className="text-slate-700">→</span>
-                <span className="text-slate-500">
-                  {item.dateSold ? new Date(item.dateSold).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-[11px]">
-                {item.platform ? <PlatformBadge platform={item.platform} size="xs" /> : <span className="text-slate-700">—</span>}
-                <span className="text-slate-700">→</span>
-                {item.soldPlatform ? <PlatformBadge platform={item.soldPlatform} size="xs" /> : <span className="text-slate-700">—</span>}
+            <div className="space-y-2">
+              <div className={`grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] ${theme.textSecondary}`}>
+                <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`}>Bought</p>
+                <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`} title="Sale price after platform fee">Sold · net</p>
+                <p className="font-mono text-slate-400">${item.purchasePrice.toFixed(2)}</p>
+                <p className={`font-mono font-semibold ${theme.text}`}>${(item.purchasePrice + item.profit).toFixed(2)}</p>
+                <div className="-ml-1.5 min-w-0">{item.platform ? <PlatformBadge platform={item.platform} size="xs" /> : <span className="pl-1.5 text-slate-600">—</span>}</div>
+                <div className="-ml-1.5 min-w-0">{item.soldPlatform ? <PlatformBadge platform={item.soldPlatform} size="xs" /> : <span className="pl-1.5 text-slate-600">—</span>}</div>
+                <p className={theme.subtext}>{formatShortDate(item.datePurchased)}</p>
+                <p className={theme.subtext}>{formatShortDate(item.dateSold)}</p>
               </div>
               <div className={`rounded-md py-1.5 px-2 flex items-center justify-between ${item.profit >= 0 ? 'bg-profit/10' : 'bg-loss/10'}`}>
-                <span className={`text-xs font-mono font-semibold ${item.profit >= 0 ? 'text-profit' : 'text-loss'}`}>
-                  {item.profit >= 0 ? '+' : ''}${item.profit.toFixed(2)}
+                <span className={`text-sm font-mono font-semibold ${item.profit >= 0 ? 'text-profit' : 'text-loss'}`}>
+                  {item.profit >= 0 ? '+' : '−'}${Math.abs(item.profit).toFixed(2)}
                 </span>
                 <span className={`text-xs font-mono ${item.profit >= 0 ? 'text-profit/70' : 'text-loss/70'}`}>
                   {item.profit >= 0 ? '+' : ''}{item.profitPercent.toFixed(1)}%
@@ -595,6 +632,7 @@ function ItemCard({
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );
@@ -603,61 +641,45 @@ function ItemCard({
 
 // --- StackedCard ---
 // Representative card with xN badge. Clicking Sell expands the group to individual cards.
-function StackedCard({ items, theme, accentHex, onExpand }) {
+// Read-only (Home) stacks have no button.
+function StackedCard({ items, theme, onExpand, readOnly = false }) {
   const rep = items[0];
   const countdown = rep.pending ? formatDeliveryCountdown(rep.expectedDelivery) : null;
-  const isOnHold = rep.pending && countdown && !countdown.overdue;
-  const barColor = isOnHold ? WARN_COLOR : accentHex;
   const { baseName, wear } = parseItemName(rep.itemName);
+  const total = rep.purchasePrice * items.length;
 
   return (
     <div
-      className={`relative group flex flex-col h-full ${theme.panel} backdrop-blur-sm rounded-xl border ${theme.cardBorder} overflow-hidden`}
+      className={`relative group flex flex-col h-full ${theme.panel} backdrop-blur-sm rounded-xl border ${theme.cardBorder} ${theme.cardHover} overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30`}
       style={{ animation: 'fadeSlideIn 0.3s ease both' }}
     >
-      {/* xN badge */}
-      <div className="absolute top-1.5 left-1.5 z-10">
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white leading-tight block`}>
-          x{items.length}
-        </span>
-      </div>
-      <div className="flex-1 p-3 pb-4 flex flex-col">
-        <div className="-mx-3 -mt-3 mb-0 h-24 relative flex justify-center items-center bg-gradient-to-b from-white/[0.06] to-black/25">
-          <ItemThumbnail item={rep} />
-          {countdown && (
-            <div className="absolute bottom-1.5 left-0 right-0 flex justify-center pointer-events-none">
-              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border backdrop-blur-sm inline-flex items-center gap-1 ${
-                countdown.overdue
-                  ? 'bg-blue-500/20 text-blue-400 border-blue-500/20'
-                  : 'bg-black/50 text-warn border-warn/25'
-              }`}>
-                {countdown.overdue ? <Unlock size={9} /> : <Lock size={9} />}{countdown.label}
-              </span>
-            </div>
-          )}
+      <CardMedia item={rep} wear={wear} countdown={countdown} count={items.length} theme={theme} />
+      {/* Spacer matching ItemCard's accent bar so rows line up */}
+      <div className="h-[3px]" />
+      <div className="flex-1 p-3 flex flex-col gap-3">
+        <CardTitle item={rep} baseName={baseName} wear={wear} theme={theme} />
+        <div className="flex items-end justify-between gap-2">
+          <div className="min-w-0">
+            <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`}>Cost each</p>
+            <p className={`font-mono text-base font-semibold ${theme.text} leading-tight`}>${rep.purchasePrice.toFixed(2)}</p>
+          </div>
+          <div className={`flex flex-col items-end gap-0.5 text-[11px] ${theme.textSecondary} min-w-0`}>
+            <span className={`font-mono ${theme.subtext}`} title="Total cost of the stack">Σ ${total.toFixed(2)}</span>
+            <span className={theme.subtext}>{formatShortDate(rep.datePurchased)}</span>
+          </div>
         </div>
-        <div className="mx-4 h-[3px] mb-3 opacity-0" style={{ backgroundColor: barColor }} />
-        <div className="mb-1.5">
-          <h3 className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>{baseName}</h3>
-          <span className={`text-xs ${theme.subtext} font-normal block leading-tight mt-1`}>{wear || ' '}</span>
-        </div>
-        <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] mb-3">
-          <span className={`font-mono ${theme.text} font-semibold`}>${rep.purchasePrice.toFixed(2)}</span>
-          <span className="text-slate-600">·</span>
-          <span className="text-slate-500">
-            {rep.datePurchased ? new Date(rep.datePurchased).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
-          </span>
-        </div>
+        {!readOnly && (
         <div className="mt-auto">
           <button
             type="button"
             onClick={onExpand}
             className={`w-full flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-medium border transition-colors ${theme.card} ${theme.cardBorder} ${theme.textSecondary} ${theme.textHover} hover:border-white/20`}
           >
-            {rep.pending ? `${items.length} on hold` : `Sell ${items.length} items`}
+            {rep.pending ? `Show ${items.length} on hold` : `Sell ${items.length} items`}
             <ChevronRight size={12} className="opacity-50" />
           </button>
         </div>
+        )}
       </div>
     </div>
   );
@@ -674,6 +696,7 @@ function ListRow({
   selectMode, selectedIds, onToggleSelect,
   exchangeRate, currencySymbol, displayCurrency,
   onExpandGroup,
+  readOnly = false,
 }) {
   const [sellOpen, setSellOpen] = useState(false);
   const [localSellAmount, setLocalSellAmount] = useState('');
@@ -823,6 +846,7 @@ function ListRow({
         </td>
 
         {/* Action */}
+        {!readOnly && (
         <td className="px-3 py-2">
           <div className="flex items-center gap-1.5 justify-end">
             {item.sold ? (
@@ -885,6 +909,7 @@ function ListRow({
             )}
           </div>
         </td>
+        )}
       </tr>
 
       {/* Inline sell form row */}
@@ -954,18 +979,40 @@ function ListRow({
   );
 }
 
+// --- MonthHeader ---
+// Sticky divider between months in the grid, with item count and the
+// month's total cost (Active) or total profit (Sold).
+function MonthHeader({ sectionKey, stat, sold, theme }) {
+  const [year, month] = sectionKey.split('-').map(Number);
+  const label = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return (
+    <div className={`col-span-full sticky top-0 z-40 -mb-1 pt-2 pb-1.5 flex items-baseline gap-3 border-b ${theme.cardBorder} ${theme.bg}`}>
+      <h4 className={`text-xs font-semibold uppercase tracking-wider ${theme.textSecondary}`}>{label}</h4>
+      <span className={`text-[11px] ${theme.subtext}`}>
+        {stat.count} {sold ? (stat.count === 1 ? 'sale' : 'sales') : (stat.count === 1 ? 'item' : 'items')}
+      </span>
+      <span className={`ml-auto text-[11px] font-mono font-semibold ${
+        sold ? (stat.sum >= 0 ? 'text-profit' : 'text-loss') : theme.textSecondary
+      }`}>
+        {sold ? `${stat.sum >= 0 ? '+' : '−'}$${Math.abs(stat.sum).toFixed(2)}` : `$${stat.sum.toFixed(2)}`}
+      </span>
+    </div>
+  );
+}
+
 // --- ItemGrid ---
 
 const INITIAL_VISIBLE = 60;
 const VISIBLE_STEP = 30;
 
 export default function ItemGrid({
-  sellPlatform, setSellData, sellData, setSellPlatform,
+  sellPlatform = {}, setSellData, sellData = {}, setSellPlatform,
   handleSellItem, handleDeleteItem, promotePendingItem,
   theme, sortedItems, searchTerm, activeTab,
   selectMode, selectedIds, onToggleSelect,
   exchangeRate, currencySymbol, displayCurrency,
   viewMode = 'grid',
+  readOnly = false,
 }) {
   const accentHex = theme.dotColor;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -1015,6 +1062,34 @@ export default function ItemGrid({
   const visibleRows = flatRows.slice(0, visibleCount);
   const hasMore = visibleCount < flatRows.length;
 
+  // Month sections for the grid (purchase month on Active, sale month on Sold).
+  // Only shown when every month forms one unbroken run, i.e. the list is
+  // sorted by date — a price sort would otherwise repeat the same month.
+  const sections = useMemo(() => {
+    if (activeTab === 'pending' || flatRows.length === 0) return null;
+    const keyOf = (row) => {
+      const it = row.type === 'stack' ? row.items[0] : row.item;
+      const d = new Date(activeTab === 'sold' ? it.dateSold : it.datePurchased);
+      return isNaN(d) ? null : `${d.getFullYear()}-${d.getMonth()}`;
+    };
+    const stats = new Map();
+    let prev = null;
+    for (const row of flatRows) {
+      const key = keyOf(row);
+      if (key === null) return null;
+      if (key !== prev && stats.has(key)) return null;
+      prev = key;
+      const rowItems = row.type === 'stack' ? row.items : [row.item];
+      const s = stats.get(key) || { count: 0, sum: 0 };
+      for (const it of rowItems) {
+        s.count += 1;
+        s.sum += activeTab === 'sold' ? (it.profit || 0) : it.purchasePrice;
+      }
+      stats.set(key, s);
+    }
+    return { keyOf, stats };
+  }, [flatRows, activeTab]);
+
   const emptyText =
     searchTerm ? 'No items match your search.'
     : activeTab === 'active' ? 'No active items. Add your first purchase!'
@@ -1026,6 +1101,7 @@ export default function ItemGrid({
     handleSellItem, handleDeleteItem, promotePendingItem,
     selectMode, selectedIds, onToggleSelect,
     exchangeRate, currencySymbol, displayCurrency,
+    readOnly,
   };
 
   const loadMore = hasMore ? (
@@ -1052,9 +1128,11 @@ export default function ItemGrid({
               </th>
               <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Platform</th>
               <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Status</th>
-              <th className={`text-right px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
-                {activeTab === 'sold' ? 'P&L' : 'Action'}
-              </th>
+              {!readOnly && (
+                <th className={`text-right px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
+                  {activeTab === 'sold' ? 'P&L' : 'Action'}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -1083,7 +1161,7 @@ export default function ItemGrid({
   // --- Grid view (default) ---
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(172px, 1fr))' }}>
         <style>{`
           @keyframes fadeSlideIn {
             from { opacity: 0; transform: translateY(8px); }
@@ -1091,12 +1169,17 @@ export default function ItemGrid({
           }
         `}</style>
 
-        {visibleRows.map((row, index) => row.type === 'stack' ? (
+        {visibleRows.map((row, index) => {
+          const sectionKey = sections ? sections.keyOf(row) : null;
+          const header = sectionKey && (index === 0 || sections.keyOf(visibleRows[index - 1]) !== sectionKey) ? (
+            <MonthHeader key={`h:${sectionKey}`} sectionKey={sectionKey} stat={sections.stats.get(sectionKey)} sold={activeTab === 'sold'} theme={theme} />
+          ) : null;
+          const card = row.type === 'stack' ? (
           <StackedCard
             key={row.key}
             items={row.items}
             theme={theme}
-            accentHex={accentHex}
+            readOnly={readOnly}
             onExpand={() => setExpandedGroups(prev => new Set([...prev, row.key]))}
           />
         ) : (
@@ -1109,7 +1192,9 @@ export default function ItemGrid({
             {...commonProps}
             accentHex={accentHex}
           />
-        ))}
+        );
+          return header ? [header, card] : card;
+        })}
 
         {flatRows.length === 0 && (
           <div className="col-span-full text-center py-12 text-slate-400">

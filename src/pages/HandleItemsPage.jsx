@@ -5,6 +5,7 @@ import ExtensionPairPanel from '../components/ExtensionPairPanel';
 import PlatformPicker from '../components/PlatformPicker';
 import { TabButton } from '../components/TabsAndSearchbar';
 import RecentSales from '../components/RecentSales';
+import PortfolioManager from '../components/PortfolioManager';
 import { PLATFORMS } from '../utils/platforms';
 import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
@@ -607,6 +608,12 @@ export default function HandleItemsPage({
   displayCurrency = 'CNY',
   extension = null,
   refreshState,
+  // Portfolio management (moved here from Home)
+  promotePendingItem,
+  sellData, setSellData, sellPlatform, setSellPlatform,
+  handleSellItem, handleDeleteItem, handleBulkDelete,
+  viewMode, setViewMode,
+  onAddItem,
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => {
@@ -616,6 +623,13 @@ export default function HandleItemsPage({
   const [tab, setTab] = useState('incoming');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date-new');
+
+  const isPortfolioTab = tab === 'active' || tab === 'pending' || tab === 'sold';
+  const portfolioCounts = useMemo(() => ({
+    active:  items.filter((it) => !it.sold).length,
+    pending: items.filter((it) => !it.sold && it.pending).length,
+    sold:    items.filter((it) => it.sold).length,
+  }), [items]);
 
   const switchTab = (newTab) => {
     setTab(newTab);
@@ -809,7 +823,59 @@ export default function HandleItemsPage({
                 : tab === 'outgoing' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
             }
           />
+
+          {/* Portfolio tabs — sell, mark received, cancel and delete live here */}
+          <div className="h-5 w-px bg-slate-600/40 mx-1" />
+          {[
+            { key: 'active',  label: 'Active' },
+            { key: 'pending', label: 'Pending' },
+            { key: 'sold',    label: 'Sold' },
+          ].map(({ key, label }) => (
+            <TabButton
+              key={key}
+              label={label}
+              count={portfolioCounts[key]}
+              isActive={tab === key}
+              onClick={() => switchTab(key)}
+              theme={theme}
+              accentColor={theme.accentColor}
+              badgeClass={
+                key === 'pending' && portfolioCounts.pending > 0
+                  ? 'bg-warn/20 text-warn'
+                  : tab === key ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
+              }
+            />
+          ))}
+          {onAddItem && (
+            <button
+              type="button"
+              onClick={onAddItem}
+              className={`ml-auto flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium border transition-colors ${theme.card} ${theme.cardBorder} ${theme.textSecondary} ${theme.textHover}`}
+            >
+              + Add item
+            </button>
+          )}
         </div>
+
+        {isPortfolioTab && (
+          <PortfolioManager
+            theme={theme}
+            items={items}
+            activeTab={tab}
+            sellData={sellData} setSellData={setSellData}
+            sellPlatform={sellPlatform} setSellPlatform={setSellPlatform}
+            handleSellItem={handleSellItem}
+            handleDeleteItem={handleDeleteItem}
+            handleBulkDelete={handleBulkDelete}
+            promotePendingItem={promotePendingItem}
+            exchangeRate={exchangeRate}
+            currencySymbol={currencySymbol}
+            displayCurrency={displayCurrency}
+            viewMode={viewMode} setViewMode={setViewMode}
+          />
+        )}
+
+        {!isPortfolioTab && (<>
 
         {/* Search + sort */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -842,7 +908,7 @@ export default function HandleItemsPage({
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table — incoming / outgoing trades */}
         <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-x-auto`}>
           {tab === 'incoming' && (
             incoming.length === 0 ? (
@@ -927,6 +993,7 @@ export default function HandleItemsPage({
             )
           )}
         </div>
+        </>)}
         </div>
         <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 sticky top-0">
           <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext} mb-2 px-1`}>Recent Sales</p>

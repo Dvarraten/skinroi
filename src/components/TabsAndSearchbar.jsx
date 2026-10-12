@@ -1,5 +1,7 @@
 // Tab bar (Active / Pending / Sold) with item counts, free-text search,
 // segmented sort control, stacked-view toggle, and bulk-delete select mode.
+// Home hides the tabs and select mode (showTabs / allowSelect = false) and
+// passes its own right-hand `actions` instead.
 import React from "react";
 import { Search, MousePointer2, LayoutGrid, List } from "lucide-react";
 
@@ -48,6 +50,7 @@ export default function TabsAndSearchbar({
   theme, setActiveTab, activeTab, stats, searchTerm, setSearchTerm, sortBy, setSortBy,
   selectMode, selectedIds, onEnterSelectMode, onCancelSelectMode, onConfirmBulkDelete,
   viewMode, setViewMode,
+  showTabs = true, allowSelect = true, actions = null,
 }) {
   const sorts = SORTS[activeTab] ?? SORTS.active;
 
@@ -72,6 +75,7 @@ export default function TabsAndSearchbar({
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
+        {showTabs && (<>
         <TabButton
           label="Active" count={stats.totalActiveCount}
           isActive={activeTab === 'active'} onClick={() => switchTab('active')}
@@ -96,6 +100,7 @@ export default function TabsAndSearchbar({
         />
 
         <div className="h-5 w-px bg-slate-600/40 mx-1" />
+        </>)}
 
         {/* Search + segmented sort + view toggle + select */}
 
@@ -160,7 +165,7 @@ export default function TabsAndSearchbar({
 
         {/* Divider + Select — pushed to far right */}
         <div className="h-5 w-px bg-slate-600/40 ml-auto" />
-        {!selectMode ? (
+        {!allowSelect ? actions : !selectMode ? (
           <button
             onClick={onEnterSelectMode}
             className={`flex items-center gap-1.5 text-xs px-3 py-[7px] rounded-lg border ${theme.cardBorder} ${theme.subtext} ${theme.textHover} transition-colors`}
