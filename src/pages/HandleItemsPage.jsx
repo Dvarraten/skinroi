@@ -288,6 +288,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
         defIndex: entry.defIndex,
         stickers: entry.stickers,
         keychains: entry.keychains,
+        assetid: entry.assetid,
       }))
     );
   };

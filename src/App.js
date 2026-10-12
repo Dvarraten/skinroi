@@ -9,6 +9,7 @@ import { useItems } from './hooks/useItems';
 import { useExchangeRate } from './hooks/useExchangeRate';
 import { useChartData } from './hooks/useChartData';
 import { useSteamSync } from './hooks/useSteamSync';
+import { useCsfloatAutoSync } from './hooks/useCsfloatAutoSync';
 import { usePortfolioView } from './hooks/usePortfolioView';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
@@ -35,7 +36,7 @@ export default function CS2TradingTracker() {
   const showWelcome = !authLoading && !user && !authDismissed;
 
   const {
-    items, setItems, formData, setFormData, sellData, setSellData,
+    items, setItems, portfolioReady, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
     addItemDirect, sellItemDirect, promotePendingItem, handleAddTransaction,
   } = useItems(user?.steamId);
@@ -52,6 +53,14 @@ export default function CS2TradingTracker() {
   };
 
   const steamSync = useSteamSync();
+  useCsfloatAutoSync({
+    enabled: portfolioReady,
+    pending: steamSync.pending,
+    items,
+    addItemDirect,
+    sellItemDirect,
+    dismiss: steamSync.dismiss,
+  });
 
   const {
     usdAmount, rmbAmount,
