@@ -91,6 +91,12 @@ skinroi/
 - Backend dedupes by `tradeofferid` in `processedTradeIds`; respects
   `dismissedAssetIds` tombstones for user-dismissed items
 
+**CSFloat prices (server → CSFloat)**: `GET /api/inventory/state` fetches the
+user's CSFloat trades (undocumented `GET csfloat.com/api/v1/me/trades`, auth with
+`CSFLOAT_API_KEY`, cached 2 min in Redis) and adds `csfloatPrice` (USD) to pending
+items whose `tradeid` equals the trade's `steam_offer.id`. Handle Items prefills
+the buy/sell price from it; the user still confirms. See `api/_lib/csfloat-trades.js`.
+
 **Snipes**: `GET /api/snipes` (logged-in only) rescans when the last scan is
 older than 45s, guarded by a Redis lock. A scan pulls the newest CSFloat and
 DMarket listings, prices them against YouPin (fallback Buff163) and stores
@@ -164,6 +170,7 @@ npm run items:update
 | `skinroi:ext-pair:{code}`        | Short-lived pairing code (10 min TTL)             |
 | `skinroi:ext-secret:{secret}`    | Reverse lookup: Bearer secret → steamId           |
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
+| `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (2 min TTL) |
 | `skinroi:snipes:deals`           | Current snipe candidates (30 min window)          |
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |
 | `skinroi:snipes:lock`            | Scan lock (25s TTL)                               |
