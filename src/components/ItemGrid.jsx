@@ -3,7 +3,7 @@
 // Trash icon revealed on card hover. Wear on second line. Notes chip top-left.
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Trash2, CheckCircle, ChevronDown, PackageCheck, ChevronRight, X, Lock, Unlock, ArrowDownUp } from "lucide-react";
+import { Trash2, CheckCircle, ChevronDown, PackageCheck, ChevronRight, X, Lock, Unlock, ArrowDownUp, MoreHorizontal, Layers } from "lucide-react";
 import { getPlatformFee } from "../utils/platformFees";
 import { PlatformBadge } from "./PlatformBadge";
 import { PROFIT_COLOR, LOSS_COLOR, WARN_COLOR } from "../themes/themes";
@@ -72,7 +72,8 @@ function HoldChip({ countdown }) {
 }
 
 // Image area shared by ItemCard and StackedCard: wear chip top-left,
-// stack count top-right, trade-hold chip bottom-left.
+// trade-hold chip bottom-left, stack count bottom-right (top-right is kept
+// free for the action menu / close buttons).
 function CardMedia({ item, wear, countdown, count, hideWear, theme }) {
   const wearShort = wear ? WEAR_SHORT[wear] : null;
   return (
@@ -84,7 +85,7 @@ function CardMedia({ item, wear, countdown, count, hideWear, theme }) {
         </span>
       )}
       {count > 1 && (
-        <span className={`absolute top-2 right-2 text-[11px] font-bold px-1.5 py-0.5 rounded-md ${theme.accentBg} text-white leading-tight`}>
+        <span className={`absolute bottom-2 right-2 text-[11px] font-bold px-1.5 py-0.5 rounded-md ${theme.accentBg} text-white leading-tight`}>
           ×{count}
         </span>
       )}
@@ -347,6 +348,52 @@ function SellPlatformPicker({ value, onChange, theme }) {
   );
 }
 
+// --- ActionMenu ---
+// "⋯" button with a small dropdown. Used on the Home grid, where cards stay
+// clean and sell / mark received / delete live behind this menu.
+// actions: [{ label, icon, onClick, danger }]
+function ActionMenu({ actions, theme, className = '' }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  return (
+    <div ref={ref} className={`relative ${className}`} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="Actions"
+        className={`p-1 rounded-md transition-colors ${open ? `bg-black/60 ${theme.text}` : 'bg-black/40 text-slate-300 hover:text-white hover:bg-black/60'}`}
+      >
+        <MoreHorizontal size={14} />
+      </button>
+      {open && (
+        <div className={`absolute right-0 top-full mt-1 z-40 min-w-[150px] py-1 rounded-lg border shadow-xl ${theme.card} ${theme.cardBorder}`}>
+          {actions.map((a) => (
+            <button
+              key={a.label}
+              type="button"
+              onClick={() => { setOpen(false); a.onClick(); }}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors hover:bg-white/10 ${
+                a.danger ? 'text-red-400' : theme.textSecondary
+              }`}
+            >
+              {a.icon}
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- ItemCard ---
 
 function ItemCard({
@@ -356,7 +403,7 @@ function ItemCard({
   selectMode, isSelected, onToggleSelect,
   exchangeRate, currencySymbol, displayCurrency,
   initialSellOpen = false,
-  readOnly = false,
+  menuActions = false,
 }) {
   const [barColor, setBarColor] = useState(accentHex);
   const [localSellAmount, setLocalSellAmount] = useState('');
@@ -423,6 +470,20 @@ function ItemCard({
 
   const { baseName, wear } = parseItemName(item.itemName);
 
+  const menuItems = item.sold ? [] : [
+    ...(item.pending
+      ? [{ label: 'Mark received', icon: <PackageCheck size={12} />, onClick: () => promotePendingItem && promotePendingItem(item.id) }]
+      : [{ label: 'Sell', icon: <ChevronRight size={12} />, onClick: () => setSellOpen(true) }]),
+    {
+      label: item.pending ? 'Cancel purchase' : 'Delete',
+      icon: <Trash2 size={12} />,
+      danger: true,
+      onClick: () => {
+        if (window.confirm(item.pending ? 'Cancel this pending purchase? It will be removed entirely.' : 'Delete this item? This cannot be undone.')) onDelete();
+      },
+    },
+  ];
+
   return (
     <div
       className={`relative group flex flex-col h-full ${theme.panel} backdrop-blur-sm rounded-xl border ${
@@ -459,6 +520,12 @@ function ItemCard({
         <div className="absolute top-1.5 right-1.5 z-30" onClick={(e) => e.stopPropagation()}>
           <DeleteButton onDelete={onDelete} />
         </div>
+      ) : menuActions && menuItems.length > 0 ? (
+        <ActionMenu
+          actions={menuItems}
+          theme={theme}
+          className="!absolute top-1.5 right-1.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+        />
       ) : null}
 
       {/* Select checkbox */}
@@ -486,8 +553,8 @@ function ItemCard({
         {/* Cost row — active/pending only, hidden when sell is open */}
         {!item.sold && !sellOpen && <CostRow item={item} theme={theme} />}
 
-        {/* Action zone — hidden on the read-only Home grid */}
-        {!readOnly && (
+        {/* Action zone — on Home it only appears once Sell is picked from the menu */}
+        {(!menuActions || sellOpen) && (
         <div className={!item.sold && !item.pending && sellOpen ? "" : "mt-auto"}>
           {item.pending && !item.sold ? (
             <div className="flex gap-1.5">
@@ -642,7 +709,7 @@ function ItemCard({
 // --- StackedCard ---
 // Representative card with xN badge. Clicking Sell expands the group to individual cards.
 // Read-only (Home) stacks have no button.
-function StackedCard({ items, theme, onExpand, readOnly = false }) {
+function StackedCard({ items, theme, onExpand, menuActions = false }) {
   const rep = items[0];
   const countdown = rep.pending ? formatDeliveryCountdown(rep.expectedDelivery) : null;
   const { baseName, wear } = parseItemName(rep.itemName);
@@ -653,6 +720,13 @@ function StackedCard({ items, theme, onExpand, readOnly = false }) {
       className={`relative group flex flex-col h-full ${theme.panel} backdrop-blur-sm rounded-xl border ${theme.cardBorder} ${theme.cardHover} overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30`}
       style={{ animation: 'fadeSlideIn 0.3s ease both' }}
     >
+      {menuActions && (
+        <ActionMenu
+          actions={[{ label: `Show ${items.length} items`, icon: <Layers size={12} />, onClick: onExpand }]}
+          theme={theme}
+          className="!absolute top-1.5 right-1.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+        />
+      )}
       <CardMedia item={rep} wear={wear} countdown={countdown} count={items.length} theme={theme} />
       {/* Spacer matching ItemCard's accent bar so rows line up */}
       <div className="h-[3px]" />
@@ -668,7 +742,7 @@ function StackedCard({ items, theme, onExpand, readOnly = false }) {
             <span className={theme.subtext}>{formatShortDate(rep.datePurchased)}</span>
           </div>
         </div>
-        {!readOnly && (
+        {!menuActions && (
         <div className="mt-auto">
           <button
             type="button"
@@ -696,7 +770,7 @@ function ListRow({
   selectMode, selectedIds, onToggleSelect,
   exchangeRate, currencySymbol, displayCurrency,
   onExpandGroup,
-  readOnly = false,
+  menuActions = false,
 }) {
   const [sellOpen, setSellOpen] = useState(false);
   const [localSellAmount, setLocalSellAmount] = useState('');
@@ -845,8 +919,33 @@ function ListRow({
           )}
         </td>
 
-        {/* Action */}
-        {!readOnly && (
+        {/* Action — a ⋯ menu on Home, buttons elsewhere */}
+        {menuActions && !sellOpen ? (
+          <td className="px-3 py-2">
+            {!item.sold && (
+              <div className="flex justify-end">
+                <ActionMenu
+                  theme={theme}
+                  actions={isStack ? [
+                    { label: `Show ${count} items`, icon: <Layers size={12} />, onClick: onExpandGroup },
+                  ] : [
+                    ...(item.pending
+                      ? [{ label: 'Mark received', icon: <PackageCheck size={12} />, onClick: () => promotePendingItem && promotePendingItem(item.id) }]
+                      : [{ label: 'Sell', icon: <ChevronRight size={12} />, onClick: () => setSellOpen(true) }]),
+                    {
+                      label: item.pending ? 'Cancel purchase' : 'Delete',
+                      icon: <Trash2 size={12} />,
+                      danger: true,
+                      onClick: () => {
+                        if (window.confirm(item.pending ? 'Cancel this pending purchase?' : 'Delete this item? This cannot be undone.')) handleDeleteItem(item.id);
+                      },
+                    },
+                  ]}
+                />
+              </div>
+            )}
+          </td>
+        ) : (
         <td className="px-3 py-2">
           <div className="flex items-center gap-1.5 justify-end">
             {item.sold ? (
@@ -991,7 +1090,7 @@ export default function ItemGrid({
   selectMode, selectedIds, onToggleSelect,
   exchangeRate, currencySymbol, displayCurrency,
   viewMode = 'grid',
-  readOnly = false,
+  menuActions = false,
 }) {
   const accentHex = theme.dotColor;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -1052,7 +1151,7 @@ export default function ItemGrid({
     handleSellItem, handleDeleteItem, promotePendingItem,
     selectMode, selectedIds, onToggleSelect,
     exchangeRate, currencySymbol, displayCurrency,
-    readOnly,
+    menuActions,
   };
 
   const loadMore = hasMore ? (
@@ -1079,11 +1178,9 @@ export default function ItemGrid({
               </th>
               <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Platform</th>
               <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Status</th>
-              {!readOnly && (
-                <th className={`text-right px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
-                  {activeTab === 'sold' ? 'P&L' : 'Action'}
-                </th>
-              )}
+              <th className={`text-right px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
+                {menuActions ? '' : activeTab === 'sold' ? 'P&L' : 'Action'}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1125,7 +1222,7 @@ export default function ItemGrid({
             key={row.key}
             items={row.items}
             theme={theme}
-            readOnly={readOnly}
+            menuActions={menuActions}
             onExpand={() => setExpandedGroups(prev => new Set([...prev, row.key]))}
           />
         ) : (

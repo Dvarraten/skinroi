@@ -37,7 +37,7 @@ export default function CS2TradingTracker() {
   const {
     items, setItems, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
-    addItemDirect, sellItemDirect, promotePendingItem, handleBulkDelete, handleAddTransaction,
+    addItemDirect, sellItemDirect, promotePendingItem, handleAddTransaction,
   } = useItems(user?.steamId);
 
   const handleImportCSV = (file) => {
@@ -60,7 +60,8 @@ export default function CS2TradingTracker() {
     displayCurrency, setDisplayCurrency, currencySymbol,
   } = useExchangeRate();
 
-  // Home shows active items only; selling and managing happens in Handle Items.
+  // Home shows active items only. Trades are handled in Handle Items; manual
+  // sell / mark received / delete sit in the ⋯ menu on each Home card.
   const { searchTerm, setSearchTerm, sortBy, setSortBy, sortedItems } = usePortfolioView(items, 'active');
   const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'snipes' | 'analytics' | 'about'
   const [chartPeriod, setChartPeriod] = useState('30d');
@@ -246,7 +247,14 @@ export default function CS2TradingTracker() {
             </div>
             <div className="flex-1 overflow-y-auto pb-2">
               <ItemGrid
-                readOnly
+                menuActions
+                sellPlatform={sellPlatform} setSellData={setSellData}
+                sellData={sellData} setSellPlatform={setSellPlatform}
+                handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
+                promotePendingItem={promotePendingItem}
+                exchangeRate={exchangeRate}
+                currencySymbol={currencySymbol}
+                displayCurrency={displayCurrency}
                 theme={themeStyles} sortedItems={sortedItems}
                 searchTerm={searchTerm} activeTab="active"
                 viewMode={viewMode}
@@ -317,13 +325,6 @@ export default function CS2TradingTracker() {
           addItemDirect={addItemDirect}
           sellItemDirect={sellItemDirect}
           promotePendingItem={promotePendingItem}
-          sellData={sellData} setSellData={setSellData}
-          sellPlatform={sellPlatform} setSellPlatform={setSellPlatform}
-          handleSellItem={handleSellItem}
-          handleDeleteItem={handleDeleteItem}
-          handleBulkDelete={handleBulkDelete}
-          viewMode={viewMode} setViewMode={setViewMode}
-          onAddItem={() => openPage('addItem')}
           exchangeRate={exchangeRate}
           currencySymbol={currencySymbol}
           displayCurrency={displayCurrency}
