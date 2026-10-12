@@ -87,6 +87,12 @@ skinroi/
 - Backend dedupes by `tradeofferid` in `processedTradeIds`; respects
   `dismissedAssetIds` tombstones for user-dismissed items
 
+**CSFloat prices (server → CSFloat)**: `GET /api/inventory/state` fetches the
+user's CSFloat trades (undocumented `GET csfloat.com/api/v1/me/trades`, auth with
+`CSFLOAT_API_KEY`, cached 2 min in Redis) and adds `csfloatPrice` (USD) to pending
+items whose `tradeid` equals the trade's `steam_offer.id`. Handle Items prefills
+the buy/sell price from it; the user still confirms. See `api/_lib/csfloat-trades.js`.
+
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
 Guest users → `localStorage` key `cs2-trading-items`.
 
@@ -149,6 +155,7 @@ npm run items:update
 | `skinroi:ext-pair:{code}`        | Short-lived pairing code (10 min TTL)             |
 | `skinroi:ext-secret:{secret}`    | Reverse lookup: Bearer secret → steamId           |
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
+| `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (2 min TTL) |
 
 ## Hard Project Rules
 
