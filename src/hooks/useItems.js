@@ -7,6 +7,10 @@ import { getPlatformFee } from '../utils/platformFees';
 export const useItems = (steamId) => {
   const [items, setItems] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  // steamId whose portfolio was loaded successfully from the API. Unlike
+  // isLoaded it is never set after a failed load, and is cleared the moment
+  // steamId changes, so automation can't act on a stale or guest list.
+  const [loadedFor, setLoadedFor] = useState(null);
   const saveTimerRef = useRef(null);
   const [formData, setFormData] = useState({
     itemName: '',
@@ -25,6 +29,7 @@ export const useItems = (steamId) => {
   // Load items — from API when logged in, localStorage otherwise
   useEffect(() => {
     setIsLoaded(false);
+    setLoadedFor(null);
     if (steamId) {
       fetch('/api/items')
         .then(r => r.json())
@@ -43,6 +48,7 @@ export const useItems = (steamId) => {
             setItems(Array.isArray(items) ? items : []);
           }
           setIsLoaded(true);
+          setLoadedFor(steamId);
         })
         .catch(() => setIsLoaded(true));
     } else {
@@ -159,6 +165,10 @@ export const useItems = (steamId) => {
     // When the extension saw the trade (epoch ms). Drives the Date sort and
     // datePurchased, so items show when they were traded, not when added.
     acquiredAt = null,
+    // Steam assetid the item landed with. It stays the same while the item
+    // sits in this inventory, so a later sale can be matched to exactly this
+    // copy (see useCsfloatAutoSync).
+    assetid = null,
   }) => {
     if (!itemName || !purchasePrice) return null;
     const newItem = {
@@ -196,6 +206,9 @@ export const useItems = (steamId) => {
     }
     if (typeof acquiredAt === 'number' && Number.isFinite(acquiredAt)) {
       newItem.acquiredAt = acquiredAt;
+    }
+    if (assetid != null && assetid !== '') {
+      newItem.assetid = String(assetid);
     }
     setItems(prev => [newItem, ...prev]);
     return newItem.id;
@@ -285,6 +298,8 @@ export const useItems = (steamId) => {
   return {
     items,
     setItems,
+    // True once the logged-in user's portfolio has loaded from the API.
+    portfolioReady: !!steamId && loadedFor === steamId,
     formData,
     setFormData,
     sellData,

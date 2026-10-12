@@ -95,7 +95,13 @@ skinroi/
 user's CSFloat trades (undocumented `GET csfloat.com/api/v1/me/trades`, auth with
 `CSFLOAT_API_KEY`, cached 2 min in Redis) and adds `csfloatPrice` (USD) to pending
 items whose `tradeid` equals the trade's `steam_offer.id`. Handle Items prefills
-the buy/sell price from it; the user still confirms. See `api/_lib/csfloat-trades.js`.
+the buy/sell price from it. See `api/_lib/csfloat-trades.js`.
+`useCsfloatAutoSync` (wired in `App.js`, runs once the portfolio has loaded from
+the API) then resolves those entries on its own: incoming ones are added at the
+CSFloat price, outgoing ones mark an item sold only when exactly one unsold item
+is the same copy (same `assetid`, or for items without one: same name, exact
+float and paint seed). Everything else stays in Handle Items for the user.
+Items added via Handle Items store the Steam `assetid` for this matching.
 
 **Snipes**: `GET /api/snipes` (logged-in only) rescans when the last scan is
 older than 45s, guarded by a Redis lock. A scan pulls the newest CSFloat and
