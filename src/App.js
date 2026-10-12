@@ -23,6 +23,7 @@ import AboutPage from './pages/AboutPage';
 import TransactionPage from './pages/TransactionPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import AddItemPage from './pages/AddItemPage';
+import SnipesPage from './pages/SnipesPage';
 
 export default function CS2TradingTracker() {
   const { user, loading: authLoading, login, logout } = useAuth();
@@ -62,7 +63,7 @@ export default function CS2TradingTracker() {
   const [activeTab, setActiveTab] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('newest');
-  const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'analytics' | 'about'
+  const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'snipes' | 'analytics' | 'about'
   const [chartPeriod, setChartPeriod] = useState('30d');
   const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'bloomberg'); return themes[r] ? r : 'bloomberg'; });
   const [showThemePicker, setShowThemePicker] = useState(false);
@@ -78,6 +79,7 @@ export default function CS2TradingTracker() {
   const isHandleItemsPage  = activePage === 'handleItems';
   const isTransactionsPage = activePage === 'transactions';
   const isAboutPage        = activePage === 'about';
+  const isSnipesPage       = activePage === 'snipes';
   const openPage  = (name) => setActivePage(prev => prev === name ? null : name);
   const closePage = () => setActivePage(null);
 
@@ -194,6 +196,7 @@ export default function CS2TradingTracker() {
         theme={themeStyles}
         activePage={activePage}
         onAnalyticsClick={() => openPage('analytics')}
+        onSnipesClick={() => openPage('snipes')}
         onAddItemClick={() => openPage('addItem')}
         onHandleItemsClick={() => openPage('handleItems')}
         onTransactionClick={() => openPage('transactions')}
@@ -334,6 +337,15 @@ export default function CS2TradingTracker() {
           onAdd={(tx) => { handleAddTransaction(tx); }}
           theme={themeStyles}
           items={items}
+        />
+      )}
+
+      {/* ── Snipes page ──────────────────────────────────────────────────── */}
+      {isSnipesPage && (
+        <SnipesPage
+          theme={themeStyles}
+          exchangeRate={exchangeRate}
+          currencySymbol={currencySymbol}
         />
       )}
 

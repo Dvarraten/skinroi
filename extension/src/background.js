@@ -29,6 +29,8 @@ import {
   normalizeTradeHistoryOffers,
   collectMissingClassIds,
   resolveUnknownClassIds,
+  collectTradeIdsMissingDescriptions,
+  resolveDescriptionsViaTradeStatus,
 } from './lib/steam.js';
 import { enrichOffersWithInspect } from './lib/inspect.js';
 import { pushOffers } from './lib/skinroi.js';
@@ -179,6 +181,21 @@ async function runPoll({ manual = false } = {}) {
       if (!raw.descByKey.has(k)) raw.descByKey.set(k, v);
     }
 
+    // ── GetTradeStatus: descriptions for buy-order / settlement-delayed trades ─
+    // Offers with `delay_settlement: true` (e.g. CSFloat auto-accept) carry
+    // `missing: true` on items and no descriptions. GetTradeStatus with the
+    // offer's `tradeid` returns descriptions including market_hash_name, so we
+    // resolve them here before persisting and normalizing.
+    try {
+      const missingTradeids = collectTradeIdsMissingDescriptions(raw.offers, raw.descByKey);
+      if (missingTradeids.length > 0) {
+        const added = await resolveDescriptionsViaTradeStatus(token, missingTradeids, raw.descByKey);
+        dbg('[skinroi] GetTradeStatus added', added, 'descriptions for', missingTradeids.length, 'trade(s)');
+      }
+    } catch (err) {
+      console.debug('[skinroi] GetTradeStatus fallback failed:', err?.message || err);
+    }
+
     // Persist the union so future syncs can name outgoing items.
     try {
       const flat = {};
@@ -217,16 +234,20 @@ async function runPoll({ manual = false } = {}) {
     const offersNormalized = normalizeAcceptedOffers(raw.offers, raw.descByKey);
     const historyNormalized = normalizeTradeHistoryOffers(historyTrades, raw.descByKey);
 
-    // Union by tradeofferid. GetTradeOffers wins when both sources have the same
-    // trade (better acceptedAt = time_updated vs. time_init only in history).
-    const mergedMap = new Map();
-    for (const offer of historyNormalized) {
-      mergedMap.set(offer.tradeofferid, offer);
-    }
-    for (const offer of offersNormalized) {
-      mergedMap.set(offer.tradeofferid, offer);
-    }
-    const allOffers = [...mergedMap.values()];
+    // GetTradeHistory's tradeid is NOT the same as an offer's tradeofferid — it
+    // corresponds to the `tradeid` field on the offer. Dedup by that field so the
+    // same trade doesn't appear twice (once from GetTradeOffers and once from
+    // GetTradeHistory). GetTradeOffers data takes precedence (carries time_updated
+    // as acceptedAt; history only has time_init).
+    const offerTradeIds = new Set(
+      raw.offers
+        .map((o) => (o.tradeid != null ? String(o.tradeid) : ''))
+        .filter(Boolean)
+    );
+    const allOffers = [
+      ...offersNormalized,
+      ...historyNormalized.filter((h) => !offerTradeIds.has(h.tradeid)),
+    ];
 
     dbg(
       '[skinroi] merged offers:', allOffers.length,
