@@ -15,6 +15,13 @@ const SORTS = [
 
 const STEAM_IMG_BASE = 'https://community.akamai.steamstatic.com/economy/image/';
 
+// detectedAt is an ISO string from the backend (the trade's accept time), so
+// it has to be parsed before sorting — subtracting the strings gives NaN.
+const detectedMs = (e) => {
+  const t = e?.detectedAt ? new Date(e.detectedAt).getTime() : 0;
+  return Number.isNaN(t) ? 0 : t;
+};
+
 // ─── Name matching utilities ────────────────────────────────────────────────
 const NAME_STOPWORDS = new Set([
   'stattrak', 'souvenir', 'the',
@@ -267,6 +274,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
       entries.map((entry) => ({
         itemName: entry.marketHashName,
         purchasePrice: v,
+        acquiredAt: detectedMs(entry) || null,
         platform,
         pending: onHold,
         expectedDelivery,
@@ -784,11 +792,11 @@ export default function HandleItemsPage({
     return groups.sort((a, b) => {
       const x = a[0], y = b[0];
       switch (sortBy) {
-        case 'date-old': return (x.detectedAt || 0) - (y.detectedAt || 0);
+        case 'date-old': return detectedMs(x) - detectedMs(y);
         case 'name-az':  return (x.marketHashName || '').localeCompare(y.marketHashName || '');
         case 'name-za':  return (y.marketHashName || '').localeCompare(x.marketHashName || '');
         case 'date-new':
-        default:         return (y.detectedAt || 0) - (x.detectedAt || 0);
+        default:         return detectedMs(y) - detectedMs(x);
       }
     });
   }, [incoming, searchTerm, sortBy]);
@@ -800,11 +808,11 @@ export default function HandleItemsPage({
       : outgoing;
     const arr = [...filtered];
     switch (sortBy) {
-      case 'date-old': return arr.sort((x, y) => (x.detectedAt || 0) - (y.detectedAt || 0));
-      case 'name-az':  return arr.sort((x, y) => (x.marketHashName || '').localeCompare(y.marketHashName || '') || (x.detectedAt || 0) - (y.detectedAt || 0));
-      case 'name-za':  return arr.sort((x, y) => (y.marketHashName || '').localeCompare(x.marketHashName || '') || (x.detectedAt || 0) - (y.detectedAt || 0));
+      case 'date-old': return arr.sort((x, y) => detectedMs(x) - detectedMs(y));
+      case 'name-az':  return arr.sort((x, y) => (x.marketHashName || '').localeCompare(y.marketHashName || '') || detectedMs(x) - detectedMs(y));
+      case 'name-za':  return arr.sort((x, y) => (y.marketHashName || '').localeCompare(x.marketHashName || '') || detectedMs(x) - detectedMs(y));
       case 'date-new':
-      default:         return arr.sort((x, y) => (y.detectedAt || 0) - (x.detectedAt || 0));
+      default:         return arr.sort((x, y) => detectedMs(y) - detectedMs(x));
     }
   }, [outgoing, searchTerm, sortBy]);
 
