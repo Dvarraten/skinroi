@@ -8,6 +8,7 @@ import { PLATFORMS } from '../utils/platforms';
 import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
 import { useLocalPriceSync } from '../hooks/useLocalPriceSync';
+import { nameMatchScore } from '../utils/nameMatch';
 
 const SORTS = [
   { label: 'Date', desc: 'date-new', asc: 'date-old' },
@@ -24,57 +25,6 @@ const detectedMs = (e) => {
 };
 
 // ─── Name matching utilities ────────────────────────────────────────────────
-const NAME_STOPWORDS = new Set([
-  'stattrak', 'souvenir', 'the',
-  'factory', 'new', 'minimal', 'wear', 'field', 'tested', 'well', 'worn',
-  'battle', 'scarred',
-]);
-
-function tokenizeName(name) {
-  return (name || '')
-    .toLowerCase()
-    .replace(/★/g, ' ')
-    .replace(/™/g, ' ')
-    .replace(/\([^)]*\)/g, ' ')
-    .replace(/[|/\-.,:'"]/g, ' ')
-    .split(/\s+/)
-    .filter((t) => t.length >= 2 && !NAME_STOPWORDS.has(t));
-}
-
-function getSkinPart(name) {
-  if (!name) return null;
-  const stripped = name.replace(/\s*\([^)]*\)\s*$/, '').trim();
-  const pipeIdx = stripped.indexOf('|');
-  if (pipeIdx === -1) return null;
-  return stripped.slice(pipeIdx + 1).trim();
-}
-
-const WEAR_LEVELS = ['Factory New', 'Minimal Wear', 'Field-Tested', 'Well-Worn', 'Battle-Scarred'];
-function getWearLevel(name) {
-  return WEAR_LEVELS.find(w => (name || '').includes(w)) ?? null;
-}
-
-function nameMatchScore(steamName, trackerName) {
-  const sw = getWearLevel(steamName);
-  const tw = getWearLevel(trackerName);
-  if (sw && tw && sw !== tw) return 0;
-  const steamSkin = getSkinPart(steamName);
-  if (steamSkin) {
-    const steamSkinTokens = tokenizeName(steamSkin);
-    if (steamSkinTokens.length === 0) return 0;
-    const trackerCmp = getSkinPart(trackerName) ?? trackerName;
-    const trackerTokens = new Set(tokenizeName(trackerCmp));
-    if (trackerTokens.size === 0) return 0;
-    const matched = steamSkinTokens.filter((t) => trackerTokens.has(t)).length;
-    return matched / steamSkinTokens.length;
-  }
-  const steamTokens = new Set(tokenizeName(steamName));
-  const trackerTokens = tokenizeName(trackerName);
-  if (trackerTokens.length === 0 || steamTokens.size === 0) return 0;
-  const matched = trackerTokens.filter((t) => steamTokens.has(t)).length;
-  return matched / trackerTokens.length;
-}
-
 function formatCandidateLabel(c) {
   const base = `${c.itemName} · $${c.purchasePrice.toFixed(2)}`;
   if (c.matchType === 'fuzzy' && typeof c.matchScore === 'number') {
