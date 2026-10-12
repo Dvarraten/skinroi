@@ -1,6 +1,7 @@
 // Search + sort state for the Home grid of portfolio items on one tab
-// ('active' | 'pending' | 'sold'). Switching tab resets the sort to newest.
-import { useEffect, useMemo, useState } from 'react';
+// ('active' | 'pending' | 'sold'). The sort is saved per tab in localStorage
+// so it survives page switches and reloads.
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const soldTime = (it) =>
   it.soldAt ?? (it.dateSold ? new Date(it.dateSold).getTime() : 0);
@@ -9,11 +10,20 @@ const soldTime = (it) =>
 // else the id (a Date.now() timestamp from when it was added).
 const acquiredTime = (it) => it.acquiredAt ?? it.id;
 
+const sortKey = (tab) => `skinroi-sort-${tab}`;
+const loadSort = (tab) => {
+  try { return localStorage.getItem(sortKey(tab)) || 'newest'; } catch { return 'newest'; }
+};
+
 export function usePortfolioView(items, activeTab) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
+  const [sortBy, setSortByState] = useState(() => loadSort(activeTab));
 
-  useEffect(() => { setSortBy('newest'); }, [activeTab]);
+  useEffect(() => { setSortByState(loadSort(activeTab)); }, [activeTab]);
+  const setSortBy = useCallback((value) => {
+    setSortByState(value);
+    try { localStorage.setItem(sortKey(activeTab), value); } catch {}
+  }, [activeTab]);
 
   const sortedItems = useMemo(() => {
     const q = searchTerm.toLowerCase();
