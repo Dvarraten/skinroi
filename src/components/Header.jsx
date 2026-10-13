@@ -76,6 +76,10 @@ export default function Header({
     error: `Extension sync problem: ${syncError}`,
   }[extStatus];
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // A broken Steam avatar URL falls back to the placeholder icon instead of
+  // leaving an empty circle.
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => { setAvatarFailed(false); }, [user?.avatarUrl]);
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const dropdownRef = useRef(null);
   const currencyRef = useRef(null);
@@ -227,10 +231,12 @@ export default function Header({
                 title={ringTitle}
                 className="rounded-full p-0.5 transition-all"
               >
-                {user.avatarUrl ? (
+                {user.avatarUrl && !avatarFailed ? (
                   <img
                     src={user.avatarUrl}
                     alt={user.personaName || ""}
+                    referrerPolicy="no-referrer"
+                    onError={() => setAvatarFailed(true)}
                     className={`w-10 h-10 rounded-full transition-all ${dropdownOpen ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
                     style={{ boxShadow: `0 0 0 2px ${ringColor}` }}
                   />
