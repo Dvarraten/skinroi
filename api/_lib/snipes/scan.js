@@ -22,10 +22,13 @@ const MAX_DEALS = 400;
 // liquidity are filtered in the browser so the user can tune them live.
 const MIN_DISCOUNT = 0.02;
 
+// minIntervalMs keeps us under each market's rate limit; after a 429 the
+// source pauses for RATE_LIMIT_PAUSE_MS so we don't keep making it worse.
 const SOURCES = {
-  csfloat: fetchCsfloatListings,
-  dmarket: fetchDmarketListings,
+  csfloat: { fetch: fetchCsfloatListings, minIntervalMs: 2 * 60 * 1000 },
+  dmarket: { fetch: fetchDmarketListings, minIntervalMs: 0 },
 };
+const RATE_LIMIT_PAUSE_MS = 15 * 60 * 1000;
 
 export async function loadSnipes() {
   const redis = getRedis();
@@ -48,19 +51,35 @@ export async function ensureFresh() {
 
 async function scan(redis) {
   const minPriceCents = parseInt(process.env.SNIPES_MIN_PRICE_CENTS || '200', 10);
-  const names = Object.keys(SOURCES);
-  const results = await Promise.allSettled(names.map((n) => SOURCES[n]({ minPriceCents })));
+  const now = Date.now();
+  const prevMeta = (await redis.get(META_KEY)) || {};
+  const prevSources = prevMeta.sources || {};
 
   const sources = {};
+  const due = [];
+  for (const [name, src] of Object.entries(SOURCES)) {
+    const prev = prevSources[name] || {};
+    if (prev.pausedUntil && now < prev.pausedUntil) {
+      sources[name] = prev;
+    } else if (prev.lastRun && now - prev.lastRun < src.minIntervalMs) {
+      sources[name] = { ...prev, skipped: true };
+    } else {
+      due.push(name);
+    }
+  }
+
+  const results = await Promise.allSettled(due.map((n) => SOURCES[n].fetch({ minPriceCents })));
   const listings = [];
   results.forEach((r, i) => {
-    const name = names[i];
+    const name = due[i];
     if (r.status === 'fulfilled') {
-      sources[name] = { ok: true, count: r.value.length };
+      sources[name] = { ok: true, count: r.value.length, lastRun: now };
       listings.push(...r.value);
     } else {
-      sources[name] = { ok: false, error: r.reason?.message || String(r.reason) };
-      console.warn(`[snipes] ${name} failed:`, sources[name].error);
+      const error = r.reason?.message || String(r.reason);
+      const pausedUntil = r.reason?.status === 429 ? now + RATE_LIMIT_PAUSE_MS : null;
+      sources[name] = { ok: false, error, lastRun: now, pausedUntil };
+      console.warn(`[snipes] ${name} failed:`, error);
     }
   });
 
@@ -77,7 +96,6 @@ async function scan(redis) {
     console.warn('[snipes] reference prices failed:', e.message);
   }
 
-  const now = Date.now();
   const fresh = [];
   for (const l of priceable) {
     const ref = refs.get(itemKey(l.name, l.phase));

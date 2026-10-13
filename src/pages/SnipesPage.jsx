@@ -111,9 +111,14 @@ function ScanStatus({ meta, now, theme }) {
         <span
           key={name}
           title={s.ok ? `${s.count} listings checked` : s.error}
-          className={s.ok ? "" : "text-loss"}
+          className={`max-w-xs truncate ${s.ok ? "" : "text-loss"}`}
         >
-          {MARKET_LABELS[name] || name} {s.ok ? `· ${s.count}` : "· failed"}
+          {MARKET_LABELS[name] || name}{" "}
+          {s.ok
+            ? `· ${s.count}`
+            : s.pausedUntil && s.pausedUntil > now
+              ? `· rate limited, retrying in ${Math.ceil((s.pausedUntil - now) / 60000)}m`
+              : `· failed: ${s.error}`}
         </span>
       ))}
       {meta.refError && (
