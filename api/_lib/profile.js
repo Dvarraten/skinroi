@@ -11,17 +11,40 @@ function getRedis() {
   return new Redis({ url, token });
 }
 
+// Pulls the avatar + name out of either the ?xml=1 response or the normal
+// profile HTML. Steam sometimes drops the CDATA wrapper or serves the HTML
+// page instead of XML, so both shapes are accepted.
+export function parseProfile(text) {
+  const tag = (name) =>
+    text.match(new RegExp(`<${name}>\\s*(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?\\s*</${name}>`))?.[1]?.trim() || null;
+  const avatarUrl =
+    tag('avatarFull') ||
+    tag('avatarMedium') ||
+    text.match(/<link rel="image_src" href="([^"]+)"/)?.[1] ||
+    text.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ||
+    null;
+  const personaName =
+    tag('steamID') ||
+    text.match(/<span class="actual_persona_name">([^<]+)<\/span>/)?.[1] ||
+    null;
+  return { avatarUrl, personaName };
+}
+
+async function fetchText(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  return res.ok ? res.text() : '';
+}
+
 async function fetchFromSteam(steamId) {
+  const base = `https://steamcommunity.com/profiles/${steamId}`;
   try {
-    const res = await fetch(`https://steamcommunity.com/profiles/${steamId}/?xml=1`, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
-    const xml = await res.text();
-    const avatarMatch = xml.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/);
-    const nameMatch = xml.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/);
+    const profile = parseProfile(await fetchText(`${base}/?xml=1`));
+    if (profile.avatarUrl) return profile;
+    // XML gave nothing usable: try the regular profile page.
+    const fromHtml = parseProfile(await fetchText(`${base}/`));
     return {
-      avatarUrl: avatarMatch?.[1] || null,
-      personaName: nameMatch?.[1] || null,
+      avatarUrl: fromHtml.avatarUrl,
+      personaName: profile.personaName || fromHtml.personaName,
     };
   } catch {
     return { avatarUrl: null, personaName: null };
