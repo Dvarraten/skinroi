@@ -1,27 +1,18 @@
-// CSFloat — newest buy-now listings. Needs CSFLOAT_API_KEY (profile →
-// Developer tab on csfloat.com). Prices are USD cents.
-// Docs: https://docs.csfloat.com/
+// CSFloat — newest buy-now listings, normalized for the scanner. Prices are
+// USD cents. The listings are fetched by the SkinROI browser extension and
+// pushed to /api/snipes/ingest: CSFloat answers 429 ("too many requests from
+// too many IPs") when the server fetches them, because Vercel functions call
+// out from many different IPs. The extension runs on the user's one IP.
 
-import { fetchJson, normalizePhase, toMillis } from './normalize.js';
+import { normalizePhase, toMillis } from './normalize.js';
 
 const STEAM_IMG = 'https://community.cloudflare.steamstatic.com/economy/image/';
 
-export async function fetchCsfloatListings({ minPriceCents }) {
-  const key = process.env.CSFLOAT_API_KEY;
-  if (!key) throw new Error('CSFLOAT_API_KEY is not set');
-
-  const params = new URLSearchParams({
-    sort_by: 'most_recent',
-    type: 'buy_now',
-    limit: '50',
-    min_price: String(minPriceCents),
-  });
-  const json = await fetchJson(`https://csfloat.com/api/v1/listings?${params}`, {
-    headers: { Authorization: key },
-  });
-  // The endpoint has returned both a bare array and { data, cursor } over time.
-  const rows = Array.isArray(json) ? json : json?.data || [];
-  return rows.filter((l) => l?.item?.market_hash_name && l.price > 0).map(toListing);
+// rows: raw listing objects from GET csfloat.com/api/v1/listings.
+export function normalizeCsfloatListings(rows, { minPriceCents = 0 } = {}) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((l) => l?.id && l?.item?.market_hash_name && l.price >= Math.max(minPriceCents, 1))
+    .map(toListing);
 }
 
 function toListing(l) {

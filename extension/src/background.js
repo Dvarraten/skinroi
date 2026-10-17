@@ -9,7 +9,7 @@
 // Trades accepted on or after pairing go straight to pending. No baseline seed
 // or first-sync special-casing is needed on the extension side.
 
-import { POLL_INTERVAL_MIN } from './lib/config.js';
+import { POLL_INTERVAL_MIN, CSFLOAT_LISTINGS_URL } from './lib/config.js';
 import {
   getPairing,
   pushActivity,
@@ -33,7 +33,7 @@ import {
   resolveDescriptionsViaTradeStatus,
 } from './lib/steam.js';
 import { enrichOffersWithInspect } from './lib/inspect.js';
-import { pushOffers } from './lib/skinroi.js';
+import { pushOffers, pushSnipeListings } from './lib/skinroi.js';
 
 const ALARM_NAME = 'skinroi-poll';
 
@@ -58,6 +58,7 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
     runPoll({ manual: false }).catch((err) => console.error('[skinroi] poll failed', err));
+    runSnipes().catch((err) => console.error('[skinroi] snipes failed', err));
   }
 });
 
@@ -65,6 +66,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // popup can re-render its activity list even if we log nothing.
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === 'runPollNow') {
+    runSnipes().catch((err) => console.error('[skinroi] snipes failed', err));
     runPoll({ manual: true }).then(
       (result) => sendResponse({ ok: true, result }),
       (err) => sendResponse({ ok: false, error: String(err) })
@@ -86,6 +88,37 @@ async function safeLogError(msg) {
     // pushActivity itself failing IS a real bug — chrome.storage.local
     // being broken means the extension can't do its job.
     console.error('[skinroi] pushActivity failed', e);
+  }
+}
+
+// ── Snipes: forward the newest CSFloat listings to the backend ──────────────
+// Independent of the Steam poll: it only needs a pairing, not a Steam login.
+// No API key is sent; CSFloat serves listings to the browser session as-is.
+let snipesInFlight = false;
+
+async function runSnipes() {
+  if (snipesInFlight) return;
+  snipesInFlight = true;
+  try {
+    const { secret } = await getPairing();
+    if (!secret) return;
+    let rows;
+    try {
+      const res = await fetch(CSFLOAT_LISTINGS_URL, { credentials: 'include' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      rows = Array.isArray(json) ? json : json?.data || [];
+    } catch (err) {
+      await safeLogError(`CSFloat listings: ${err.message || err}`);
+      return;
+    }
+    try {
+      await pushSnipeListings(rows);
+    } catch (err) {
+      await safeLogError(`Snipes push: ${err.message || err}`);
+    }
+  } finally {
+    snipesInFlight = false;
   }
 }
 

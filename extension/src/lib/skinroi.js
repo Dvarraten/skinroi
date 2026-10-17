@@ -48,3 +48,13 @@ export async function pushOffers({ offers }) {
     body: { offers: payload, extVersion: EXT_VERSION },
   });
 }
+
+// Push raw CSFloat listings for the Snipes tab. The backend normalizes and
+// prices them; the extension only forwards what CSFloat returned.
+export async function pushSnipeListings(listings) {
+  return request('/api/snipes/ingest', {
+    method: 'POST',
+    auth: true,
+    body: { market: 'csfloat', listings, extVersion: EXT_VERSION },
+  });
+}
