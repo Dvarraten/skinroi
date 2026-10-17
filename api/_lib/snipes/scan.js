@@ -5,7 +5,7 @@
 // - Server-fetched sources (DMarket): GET /api/snipes calls ensureFresh(),
 //   which rescans when the last scan is older than SCAN_INTERVAL_MS.
 // - Pushed sources (CSFloat): the browser extension fetches listings from
-//   the user's own IP and POSTs them to /api/snipes/ingest → ingestListings().
+//   the user's own IP and POSTs them to POST /api/snipes → ingestListings().
 // Both paths share one Redis lock so they never overwrite each other's deals.
 
 import { getRedis } from '../redis.js';

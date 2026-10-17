@@ -34,8 +34,8 @@ skinroi/
 │   ├── items/
 │   │   └── index.js       GET/POST — load and save the tracked item portfolio
 │   └── snipes/
-│       ├── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~45s)
-│       └── ingest.js      POST — extension pushes raw CSFloat listings (Bearer secret)
+│       └── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~45s);
+│                          POST — extension pushes raw CSFloat listings (Bearer secret)
 ├── extension/            Chrome extension (Manifest V3, load unpacked)
 │   ├── manifest.json
 │   └── src/
@@ -108,7 +108,7 @@ Items added via Handle Items store the Steam `assetid` for this matching.
 (DMarket) when the last scan is older than 45s, guarded by a Redis lock.
 CSFloat listings come from the extension instead: every poll (2 min) it fetches
 `csfloat.com/api/v1/listings?sort_by=most_recent` with the browser session (no
-API key) and POSTs the raw rows to `/api/snipes/ingest`. CSFloat answers 429
+API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
 "too many IPs" when Vercel fetches them, because functions call out from many
 IPs. Both paths price listings against YouPin (fallback Buff163) and store every
 listing at least 2% under reference for 30 min. Fees, ROI and liquidity filters
@@ -253,6 +253,10 @@ Every theme in `src/themes/themes.js` has two representations of its accent colo
 When adding a new theme, always set both fields.
 
 ### 4. Deployment
+The Vercel Hobby plan allows at most 12 serverless functions (every file under
+`api/` outside `_lib/`). A 13th fails the deploy, so add new routes as methods
+on an existing function instead of new files.
+
 Pushing to `main` triggers an automatic Vercel production deploy — no manual
 step required. To deploy manually:
 

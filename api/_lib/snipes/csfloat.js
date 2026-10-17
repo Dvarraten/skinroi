@@ -1,6 +1,6 @@
 // CSFloat — newest buy-now listings, normalized for the scanner. Prices are
 // USD cents. The listings are fetched by the SkinROI browser extension and
-// pushed to /api/snipes/ingest: CSFloat answers 429 ("too many requests from
+// pushed to POST /api/snipes: CSFloat answers 429 ("too many requests from
 // too many IPs") when the server fetches them, because Vercel functions call
 // out from many different IPs. The extension runs on the user's one IP.
 
