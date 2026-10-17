@@ -112,7 +112,10 @@ filters run in the browser (`src/utils/snipes.js`). Env vars:
 with listing counts; without it the free csgotrader.app Buff163 dump is used),
 optional `DMARKET_PUBLIC_KEY`/`DMARKET_SECRET_KEY` (signed requests) and
 `SNIPES_MIN_PRICE_CENTS` (default 200). Dopplers without a known phase are
-skipped so phases never get mixed.
+skipped so phases never get mixed. DMarket is read from
+`/marketplace-api/v2/offers` (the old `/exchange/v1/market/items` returns 410).
+CSFloat is polled at most every 2 min and pauses 15 min after a 429; CSFloat
+rate-limits an API key that is used from many IPs, which Vercel functions do.
 
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
 Guest users → `localStorage` key `cs2-trading-items`.
