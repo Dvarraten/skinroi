@@ -105,18 +105,21 @@ function CardTitle({ item, baseName, wear, theme }) {
     .filter(Boolean).join(' · ');
   return (
     <div className="min-w-0">
-      {/* Fixed height for name + wear so cost rows line up across a grid row */}
-      <div className="min-h-[3.25rem]">
+      {/* Fixed height for name + wear + one notes line so cost rows line up across a grid row */}
+      <div className="min-h-[4.625rem]">
         <h3 title={item.itemName} className={`text-[13px] font-semibold ${theme.text} leading-snug line-clamp-2`}>
           {baseName}
         </h3>
         <p className={`text-[11px] ${theme.subtext} truncate leading-tight mt-0.5`}>{sub || '\u00a0'}</p>
+        {/* Notes get exactly one line, reserved even when empty; long notes are cut with … (full text on hover) */}
+        <div className="h-[18px] mt-1 flex items-center">
+          {item.notes && (
+            <p title={item.notes} className="text-[10px] leading-[14px] font-medium text-warn bg-warn/10 px-1.5 py-0.5 rounded-md truncate w-fit max-w-full">
+              {item.notes}
+            </p>
+          )}
+        </div>
       </div>
-      {item.notes && (
-        <p title={item.notes} className="mt-1.5 text-[10px] font-medium text-warn bg-warn/10 px-1.5 py-0.5 rounded-md truncate w-fit max-w-full">
-          {item.notes}
-        </p>
-      )}
     </div>
   );
 }
@@ -842,7 +845,7 @@ function ListRow({
             <div className="min-w-0">
               <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>{baseName}</p>
               {wear && <p className={`text-[10px] ${theme.subtext} truncate leading-tight`}>{wear}</p>}
-              {item.notes && <p className="text-[9px] font-medium text-warn truncate leading-tight mt-0.5">{item.notes}</p>}
+              {item.notes && <p title={item.notes} className="text-[9px] font-medium text-warn truncate leading-tight mt-0.5">{item.notes}</p>}
             </div>
             {count && count > 1 && (
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white leading-tight flex-shrink-0`}>
