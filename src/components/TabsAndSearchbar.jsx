@@ -25,13 +25,14 @@ const SORTS = {
 };
 
 export function TabButton({ label, count, isActive, onClick, theme, accentColor, badgeClass }) {
+  // Text tab marked by a 2px accent line, like the nav and Analytics periods.
+  // Put tabs in a row with a bottom border; the line sits on that border.
   return (
     <button
       onClick={onClick}
-      className={`relative px-4 py-2 text-[13px] font-medium transition-colors border flex items-center gap-2 group overflow-hidden rounded-lg ${
-        isActive
-          ? `${theme.card} ${theme.cardBorder} ${theme.text}`
-          : `bg-transparent ${theme.cardBorder} ${theme.subtext} ${theme.textHover} hover:bg-white/5`
+      aria-pressed={isActive}
+      className={`relative py-2 text-[13px] font-medium transition-colors flex items-center gap-2 group ${
+        isActive ? theme.text : `${theme.subtext} ${theme.textHover}`
       }`}
     >
       <span>{label}</span>
@@ -39,7 +40,7 @@ export function TabButton({ label, count, isActive, onClick, theme, accentColor,
         {count}
       </span>
       <span
-        className={`absolute bottom-0 left-0 h-[2px] w-full origin-left transition-transform duration-200 ${isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`}
+        className={`absolute -bottom-px left-0 h-[2px] w-full rounded-full origin-left transition-transform duration-200 ${isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`}
         style={{ backgroundColor: accentColor }}
       />
     </button>
@@ -105,14 +106,14 @@ export default function TabsAndSearchbar({
         {/* Search + segmented sort + view toggle + select */}
 
         {/* Search */}
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+        <div className="relative flex-1 sm:flex-none sm:w-72 min-w-[180px]">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search items…"
-            className={`w-full pl-8 pr-3 py-2 ${theme.card} border ${theme.cardBorder} rounded-lg text-sm ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors`}
+            className={`w-full pl-8 pr-3 py-[6px] ${theme.card} border ${theme.cardBorder} rounded-lg text-xs ${theme.textSecondary} placeholder-slate-500 focus:outline-none transition-colors`}
           />
         </div>
 

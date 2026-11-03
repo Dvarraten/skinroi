@@ -809,7 +809,7 @@ export default function HandleItemsPage({
         <HandleStats items={items} incomingCount={incomingCount} outgoingCount={outgoingCount} theme={theme} />
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className={`flex items-center gap-6 border-b ${theme.cardBorder}`}>
           <TabButton
             label="Incoming"
             count={incomingCount}
@@ -840,14 +840,14 @@ export default function HandleItemsPage({
 
         {/* Search + sort */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+          <div className="relative flex-1 sm:flex-none sm:w-72 min-w-[180px]">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={tab === 'incoming' ? `Search ${incomingCount} incoming items…` : `Search ${outgoingCount} outgoing items…`}
-              className={`w-full pl-8 pr-3 py-2 ${theme.card} border ${theme.cardBorder} rounded-lg text-sm ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors`}
+              className={`w-full pl-8 pr-3 py-[6px] ${theme.card} border ${theme.cardBorder} rounded-lg text-xs ${theme.textSecondary} placeholder-slate-500 focus:outline-none transition-colors`}
             />
           </div>
           <div className={`flex items-center rounded-lg border ${theme.cardBorder} overflow-hidden`}>

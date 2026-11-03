@@ -155,7 +155,7 @@ export default function Header({
 
   return (
     <header className={`w-full sticky top-0 z-50 px-4 pt-3 pb-1 ${theme?.bg || 'bg-[#0c1120]'}`}>
-      <div className={`px-4 md:px-5 h-14 flex items-center justify-between rounded-2xl ${theme?.header || "bg-[#0f1929] border border-slate-700/40"}`}>
+      <div className={`px-4 md:px-5 h-14 flex items-center justify-between rounded-2xl shadow-lg ${theme?.header || "bg-gradient-to-b from-[#0e1a32] to-[#070c16]"}`}>
         {/* LEFT: Logo + Nav */}
         <div className="flex items-center gap-8">
           <button

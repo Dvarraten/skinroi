@@ -49,12 +49,18 @@ export default function PortfolioHero({ stats, profitChartData, theme }) {
         {cumulativeData.length > 1 ? (
           <ResponsiveContainer width="100%" height={80} style={{ pointerEvents: 'none' }}>
             <AreaChart data={cumulativeData} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={chartColor} stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <Area
                 type="monotone"
                 dataKey="cumulative"
                 stroke={chartColor}
                 strokeWidth={1.5}
-                fill="none"
+                fill="url(#heroGrad)"
                 dot={false}
                 isAnimationActive={false}
               />

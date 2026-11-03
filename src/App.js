@@ -241,7 +241,7 @@ export default function CS2TradingTracker() {
         {/* Row 2+3 — tabs + grid (left) and recent sales (right) */}
         <div className="flex-1 min-h-0 flex gap-6 overflow-hidden">
           <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden lg:px-10">
-            <div className="shrink-0 space-y-2">
+            <div className="shrink-0 space-y-2 pr-3 md:pr-[18px]">
               <div className="flex items-baseline gap-2">
                 <h2 className={`text-sm font-semibold ${themeStyles.text}`}>Active items</h2>
                 <span className={`text-xs font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
@@ -269,7 +269,7 @@ export default function CS2TradingTracker() {
                 viewMode={viewMode} setViewMode={setViewMode}
               />
             </div>
-            <div className="flex-1 overflow-y-auto pb-2">
+            <div className="flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable]">
               <ItemGrid
                 menuActions
                 sellPlatform={sellPlatform} setSellData={setSellData}
