@@ -19,7 +19,7 @@ import { extractBearer, resolveSecret } from './extension-store.js';
 import { getCnyPerUsd } from './snipes/fx.js';
 
 export const MARKETS = ['buff163', 'csfloat'];
-const MAX_RESULTS = 100;
+const MAX_RESULTS = 1000; // Buff163 prices every owned item in one push
 
 const key = (steamId) => `skinroi:sellprices:${steamId}`;
 const itemsKey = (steamId) => `skinroi:items:${steamId}`;
