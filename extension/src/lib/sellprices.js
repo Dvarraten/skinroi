@@ -1,31 +1,18 @@
-// Sell prices for Home: the lowest Buff163 and CSFloat listing for every item
-// the user currently owns, so they can compare where to sell.
+// Sell prices for Home: the lowest CSFloat listing for every item the user
+// currently owns. (YouPin prices come from SteamDT on the server.)
 //
-// Fetched here, from the user's own browser, because the server can't:
-// CSFloat rate-limits Vercel's many IPs, and Buff163 only answers a logged-in
-// browser session (the user must be signed in on buff.163.com in Chrome).
-//
-// Each poll asks the backend which names it owns and how old each price is,
-// refreshes what is due, and pushes the results. The site hides anything
-// older than an hour.
-// - CSFloat: one request per item, the stalest few per poll, gently spaced.
-// - Buff163: one request per 15 min (4 an hour, the user's limit). It reads
-//   Buff's view of the user's Steam inventory, which carries the lowest Buff
-//   listing for every item in it, so all owned items are priced at once.
-//   Items not in the Steam inventory (e.g. still on trade hold elsewhere)
-//   get no Buff price.
+// Fetched here, from the user's own browser, because CSFloat rate-limits
+// Vercel's many IPs. Each poll asks the backend which names it owns and how
+// old each price is, refreshes the stalest few (gently spaced), and pushes
+// the results. The site hides anything older than an hour.
 
 import {
-  BUFF_INVENTORY_URL,
-  BUFF_INVENTORY_INTERVAL_MS,
   CSFLOAT_LISTINGS_API,
-  STORAGE_KEYS,
   SELL_PRICES_PER_RUN,
   SELL_PRICES_REFRESH_AFTER_MS,
   SELL_PRICES_RETRY_ERROR_MS,
 } from './config.js';
 import { getSellPriceState, pushSellPrices } from './skinroi.js';
-import { get, set } from './storage.js';
 
 // Markets priced one item per request.
 const PER_ITEM_MARKETS = {
@@ -54,7 +41,8 @@ export function dueNames(names, prices, market, now) {
 
 export async function runSellPrices() {
   const state = await getSellPriceState();
-  const names = Array.isArray(state?.names) ? state.names : [];
+  const targets = new Map((Array.isArray(state?.targets) ? state.targets : []).map((t) => [t.key, t]));
+  const names = [...targets.keys()];
   if (!names.length) return { skipped: 'no_items' };
 
   const now = Date.now();
@@ -62,7 +50,6 @@ export async function runSellPrices() {
   const status = {};
 
   await Promise.all([
-    runBuff(names, results, status, now),
     ...Object.entries(PER_ITEM_MARKETS).map(async ([market, { fetch: fetchPrice, gapMs }]) => {
       const due = dueNames(names, state.prices, market, now);
       if (!due.length) return;
@@ -70,7 +57,7 @@ export async function runSellPrices() {
       for (let i = 0; i < due.length; i++) {
         if (i > 0) await sleep(gapMs);
         try {
-          results.push({ name: due[i], market, ...(await fetchPrice(due[i])) });
+          results.push({ name: due[i], market, ...(await fetchPrice(targets.get(due[i]))) });
           ok++;
         } catch (err) {
           if (err instanceof MarketError) {
@@ -89,63 +76,44 @@ export async function runSellPrices() {
   return { pushed: results.length, status };
 }
 
-// ── Buff163 ────────────────────────────────────────────────────────────────
-// At most one request per BUFF_INVENTORY_INTERVAL_MS, counted from the last
-// attempt (failed ones too), so Buff never sees more than ~4 calls an hour.
-async function runBuff(names, results, status, now) {
-  const last = (await get([STORAGE_KEYS.BUFF_LAST_FETCH]))[STORAGE_KEYS.BUFF_LAST_FETCH] || 0;
-  if (now - last < BUFF_INVENTORY_INTERVAL_MS) return;
-  await set({ [STORAGE_KEYS.BUFF_LAST_FETCH]: now });
-  try {
-    const byName = await fetchBuffInventoryPrices();
-    for (const name of names) {
-      const hit = byName.get(name);
-      results.push(hit
-        ? { name, market: 'buff163', ...hit }
-        : { name, market: 'buff163', error: 'not in your Steam inventory on Buff163' });
-    }
-    status.buff163 = null;
-  } catch (err) {
-    status.buff163 = err.message || String(err);
-  }
-}
-
-// Buff's sell page data: the user's Steam inventory plus goods_infos, one
-// entry per item type with sell_min_price (CNY, lowest listing) and sell_num.
-// Returns Map(market_hash_name → { priceCny, count }).
-async function fetchBuffInventoryPrices() {
-  const res = await fetch(BUFF_INVENTORY_URL, { credentials: 'include' });
-  if (res.status === 429) throw new Error('Buff163 rate limited, retrying in 15 min');
-  if (!res.ok) throw new Error(`Buff163 HTTP ${res.status}`);
-  const json = await res.json().catch(() => null);
-  if (json?.code === 'Login Required') throw new Error('Not signed in to buff.163.com in this browser');
-  if (json?.code !== 'OK') throw new Error(`Buff163: ${json?.msg || json?.error || json?.code || 'unexpected answer'}`);
-  const infos = json.data?.goods_infos;
-  if (!infos || typeof infos !== 'object') {
-    throw new Error(`Buff163: no goods_infos (got ${Object.keys(json.data || {}).slice(0, 8).join(', ')})`);
-  }
-  const out = new Map();
-  for (const g of Object.values(infos)) {
-    if (!g?.market_hash_name) continue;
-    const count = Number(g.sell_num);
-    const price = Number(g.sell_min_price);
-    out.set(g.market_hash_name, {
-      priceCny: price > 0 && count !== 0 ? price : null,
-      count: Number.isFinite(count) ? count : null,
-    });
-  }
-  return out;
-}
-
 // ── CSFloat ────────────────────────────────────────────────────────────────
 // Cheapest buy-now listing for the exact name. Price is USD cents.
-async function fetchCsfloatPrice(name) {
+// Dopplers are looked up per phase through CSFloat's paint_index filter: the
+// item's own paint index when known, else each index that phase can have
+// (older vs newer knives, Glock Gamma Doppler) until one has listings.
+const PHASE_PAINT_INDEXES = {
+  Doppler: {
+    'Phase 1': [418, 852], 'Phase 2': [419, 853], 'Phase 3': [420, 854], 'Phase 4': [421, 855],
+    Ruby: [415], Sapphire: [416], 'Black Pearl': [417],
+  },
+  'Gamma Doppler': {
+    'Phase 1': [569, 1120], 'Phase 2': [570, 1121], 'Phase 3': [571, 1122], 'Phase 4': [572, 1123],
+    Emerald: [568, 1119],
+  },
+};
+
+async function fetchCsfloatPrice(target) {
+  const { name, phase, paintIndex } = target;
+  const isDoppler = /\bDoppler\b/.test(name);
+  if (!isDoppler) return cheapestCsfloat(name, null);
+  if (!phase) throw new Error('Doppler phase unknown (add the phase to the item name)');
+  const finish = /\bGamma Doppler\b/.test(name) ? 'Gamma Doppler' : 'Doppler';
+  const indexes = paintIndex != null ? [paintIndex] : PHASE_PAINT_INDEXES[finish][phase] || [];
+  for (const idx of indexes) {
+    const hit = await cheapestCsfloat(name, idx);
+    if (hit.priceUsd != null) return hit;
+  }
+  return { priceUsd: null, count: 0 };
+}
+
+async function cheapestCsfloat(name, paintIndex) {
   const params = new URLSearchParams({
     market_hash_name: name,
     sort_by: 'lowest_price',
     type: 'buy_now',
     limit: '1',
   });
+  if (paintIndex != null) params.set('paint_index', String(paintIndex));
   const res = await fetch(`${CSFLOAT_LISTINGS_API}?${params}`, { credentials: 'include' });
   if (res.status === 429) throw new MarketError('CSFloat rate limited, retrying later');
   if (res.status === 401 || res.status === 403) {
@@ -154,6 +122,8 @@ async function fetchCsfloatPrice(name) {
   if (!res.ok) throw new Error(`CSFloat HTTP ${res.status}`);
   const json = await res.json();
   const rows = Array.isArray(json) ? json : json?.data || [];
-  const cheapest = rows.find((l) => l?.item?.market_hash_name === name && l.price > 0);
+  const cheapest = rows.find((l) =>
+    l?.item?.market_hash_name === name && l.price > 0 &&
+    (paintIndex == null || l.item.paint_index == null || l.item.paint_index === paintIndex));
   return cheapest ? { priceUsd: cheapest.price / 100 } : { priceUsd: null, count: 0 };
 }

@@ -11,6 +11,11 @@ export const useItems = (steamId) => {
   // isLoaded it is never set after a failed load, and is cleared the moment
   // steamId changes, so automation can't act on a stale or guest list.
   const [loadedFor, setLoadedFor] = useState(null);
+  // Which source (steamId or 'guest') the current list came from, set when a
+  // load finishes (also after a failed one). While it doesn't match the
+  // current source the portfolio is still loading, so Home shows skeletons
+  // instead of an empty state.
+  const [settledFor, setSettledFor] = useState(null);
   const saveTimerRef = useRef(null);
   const [formData, setFormData] = useState({
     itemName: '',
@@ -49,14 +54,16 @@ export const useItems = (steamId) => {
           }
           setIsLoaded(true);
           setLoadedFor(steamId);
+          setSettledFor(steamId);
         })
-        .catch(() => setIsLoaded(true));
+        .catch(() => { setIsLoaded(true); setSettledFor(steamId); });
     } else {
       try {
         const saved = localStorage.getItem('cs2-trading-items');
         if (saved) setItems(JSON.parse(saved));
       } catch {}
       setIsLoaded(true);
+      setSettledFor('guest');
     }
   }, [steamId]);
 
@@ -300,6 +307,8 @@ export const useItems = (steamId) => {
     setItems,
     // True once the logged-in user's portfolio has loaded from the API.
     portfolioReady: !!steamId && loadedFor === steamId,
+    // True until the list for the current user (or guest) has been loaded.
+    itemsLoading: settledFor !== (steamId || 'guest'),
     formData,
     setFormData,
     sellData,

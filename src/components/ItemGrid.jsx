@@ -100,13 +100,14 @@ function CardMedia({ item, wear, countdown, count, hideWear, theme }) {
   );
 }
 
-// Name (up to two lines), wear + float, and notes.
-function CardTitle({ item, baseName, wear, theme }) {
-  const sub = [wear, typeof item.floatValue === 'number' ? `Float ${item.floatValue.toFixed(4)}` : null]
+// Name (up to two lines), float, and notes. The wear is shown as a badge on the
+// image, so it is only repeated here when that badge is hidden (select mode).
+function CardTitle({ item, baseName, wear, showWear, theme }) {
+  const sub = [showWear ? wear : null, typeof item.floatValue === 'number' ? `Float ${item.floatValue.toFixed(4)}` : null]
     .filter(Boolean).join(' · ');
   return (
     <div className="min-w-0">
-      {/* Fixed height for name + wear + one notes line so cost rows line up across a grid row */}
+      {/* Fixed height for name + float + one notes line so cost rows line up across a grid row */}
       <div className="min-h-[4.625rem]">
         <h3 title={item.itemName} className={`text-[13px] font-semibold ${theme.text} leading-snug line-clamp-2`}>
           {baseName}
@@ -141,7 +142,7 @@ function CostRow({ item, theme }) {
   );
 }
 
-// Lowest Buff / CSFloat listing for an owned item (Home only). The one that
+// Lowest YouPin / CSFloat listing for an owned item (Home only). The one that
 // pays more after fees gets a dot; hover shows fee, profit and age.
 function sellPriceTitle(r, item) {
   if (r.state !== 'ok') return `${r.label}: ${r.note}`;
@@ -169,7 +170,7 @@ function BestDot({ show }) {
 }
 
 function SellPriceRow({ item, sellPrices, theme }) {
-  const { rows, best } = sellPricesFor(sellPrices.prices, item.itemName, Date.now());
+  const { rows, best } = sellPricesFor(sellPrices.prices, item, Date.now());
   return (
     <div className={`grid grid-cols-2 gap-2 pt-2 border-t ${theme.cardBorder}`}>
       {rows.map((r) => (
@@ -186,7 +187,7 @@ function SellPriceRow({ item, sellPrices, theme }) {
 }
 
 function SellPriceCell({ item, sellPrices, theme }) {
-  const { rows, best } = sellPricesFor(sellPrices.prices, item.itemName, Date.now());
+  const { rows, best } = sellPricesFor(sellPrices.prices, item, Date.now());
   return (
     <div className="flex flex-col leading-tight">
       {rows.map((r) => (
@@ -614,7 +615,7 @@ function ItemCard({
       />
 
       <div className="flex-1 p-3 min-w-0 flex flex-col gap-3">
-        <CardTitle item={item} baseName={baseName} wear={wear} theme={theme} />
+        <CardTitle item={item} baseName={baseName} wear={wear} showWear={selectMode} theme={theme} />
 
         {/* Cost row — active/pending only, hidden when sell is open */}
         {!item.sold && !sellOpen && <CostRow item={item} theme={theme} />}
@@ -798,7 +799,7 @@ function StackedCard({ items, theme, onExpand, menuActions = false, sellPrices =
       {/* Spacer matching ItemCard's accent bar so rows line up */}
       <div className="h-[3px]" />
       <div className="flex-1 p-3 flex flex-col gap-3">
-        <CardTitle item={rep} baseName={baseName} wear={wear} theme={theme} />
+        <CardTitle item={rep} baseName={baseName} theme={theme} />
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">
             <p className={`text-[11px] font-medium ${theme.subtext}`}>Cost each</p>

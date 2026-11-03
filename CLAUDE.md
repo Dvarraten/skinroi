@@ -127,17 +127,18 @@ with neither, the free csgotrader.app Buff163 dump is used) and
 `SNIPES_MIN_PRICE_CENTS` (default 200). A source that answers 429 pauses 15 min. Dopplers without a known phase
 are skipped so phases never get mixed.
 
-**Sell prices on Home**: each unsold item shows the lowest Buff163 and
+**Sell prices on Home**: each unsold item shows the lowest YouPin and
 CSFloat listing, at most 1 hour old, with a dot on the one that pays more after
-fees. The extension fetches them from the user's browser (`lib/sellprices.js`):
-CSFloat `api/v1/listings?market_hash_name=…&sort_by=lowest_price`, up to 10
-names per poll that are 30+ min old. Buff163: one request per 15 min (the
-user wants at most ~4 an hour) to `api/market/steam_inventory`, whose
-`goods_infos` carry `sell_min_price` (CNY) for every item in the Steam
-inventory; needs the user signed in on buff.163.com in Chrome (the site need
-not be open). Every poll it reads `GET /api/items?sellPrices=1` (owned names +
-price ages) and POSTs results back. The site reads the
-same GET and hides prices older than 1 hour. Doppler prices are not per phase.
+fees. YouPin comes from SteamDT on the server (`loadSteamDtRows` in
+`snipes/reference.js`, same 30 min cache and 1-call-a-minute gate as Snipes),
+added on each site `GET /api/items?sellPrices=1`; never use the user's own
+YouPin session. CSFloat is fetched by the extension (`lib/sellprices.js`):
+`api/v1/listings?market_hash_name=…&sort_by=lowest_price`, up to 10 names per
+poll that are 30+ min old, POSTed to the same URL. The site hides prices older
+than 1 hour. Prices are keyed per Doppler phase (`api/_lib/doppler-phase.js`,
+mirrored in `src/utils/sellPrices.js`): phase from the item name ("Doppler
+Phase 2") or its paint index; CSFloat filters by `paint_index`. SteamDT has no
+per-phase prices, so Dopplers show no YouPin price.
 
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
 Guest users → `localStorage` key `cs2-trading-items`.
@@ -201,7 +202,7 @@ npm run items:update
 | `skinroi:ext-pair:{code}`        | Short-lived pairing code (10 min TTL)             |
 | `skinroi:ext-secret:{secret}`    | Reverse lookup: Bearer secret → steamId           |
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
-| `skinroi:sellprices:{steamId}`   | Buff163/CSFloat sell prices for owned items        |
+| `skinroi:sellprices:{steamId}`   | CSFloat sell prices for owned items (from extension) |
 | `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (2 min TTL) |
 | `skinroi:snipes:deals`           | Current snipe candidates (30 min window)          |
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |

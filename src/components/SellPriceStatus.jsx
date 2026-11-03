@@ -1,6 +1,6 @@
-// One-line note next to "Active items" when Buff / CSFloat sell prices can't
-// be shown: a market the extension failed on (e.g. not signed in to Buff), or
-// no fresh prices at all (extension not running). Silent when all is well.
+// One-line note next to "Active items" when YouPin / CSFloat sell prices can't
+// be shown: a market that failed (e.g. SteamDT key missing, CSFloat 429), or
+// no fresh prices at all. Silent when all is well.
 import React from "react";
 import { SELL_PRICE_MARKETS, SELL_PRICE_MAX_AGE_MS } from "../utils/sellPrices";
 
@@ -11,14 +11,14 @@ export default function SellPriceStatus({ sellPrices, hasItems }) {
 
   const problems = SELL_PRICE_MARKETS
     .map((m) => ({ ...m, s: status[m.id] }))
-    .filter(({ s }) => s && !s.ok && now - s.at < SELL_PRICE_MAX_AGE_MS)
+    .filter(({ s }) => s && s.ok === false && now - s.at < SELL_PRICE_MAX_AGE_MS)
     .map(({ label, s }) => `${label}: ${s.error}`);
 
   const anyFresh = Object.values(prices).some((entry) =>
     SELL_PRICE_MARKETS.some((m) => entry?.[m.id]?.at && now - entry[m.id].at <= SELL_PRICE_MAX_AGE_MS)
   );
   if (!problems.length && !anyFresh) {
-    problems.push("Sell prices: waiting for the SkinROI extension (is Chrome open?)");
+    problems.push("Sell prices: none yet (CSFloat needs the SkinROI extension running)");
   }
   if (!problems.length) return null;
 
