@@ -355,7 +355,11 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
     return filtered.slice(0, 30).map((it) => ({ ...it, matchType: 'browse' }));
   }, [browseQuery, allActiveItems]);
 
-  const visibleCandidates = browseAll ? browseResults : candidates;
+  // While searching, nothing is listed (or selectable) until the user types.
+  const visibleCandidates = useMemo(() => {
+    if (!browseAll) return candidates;
+    return browseQuery.trim() ? browseResults : [];
+  }, [browseAll, browseQuery, browseResults, candidates]);
 
   useEffect(() => {
     if (visibleCandidates.length === 0) { setSelectedId(''); return; }
@@ -389,7 +393,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
   const isFuzzyOnly =
     !browseAll && candidates.length > 0 && candidates.every((c) => c.matchType === 'fuzzy');
 
-  const showExpansion = browseAll || isFuzzyOnly || platform === 'other';
+  const showExpansion = isFuzzyOnly || platform === 'other';
 
   const selectedCandidate = visibleCandidates.find(c => String(c.id) === selectedId);
   const saleAmt = parseFloat(usdSalePrice);
@@ -401,22 +405,16 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
     ? (estProfit / selectedCandidate.purchasePrice) * 100
     : null;
 
-  // Browse search / fuzzy warning / custom fee. An extra table row in list
-  // view, the bottom of the card in grid view.
+  const toggleBrowse = () => { setBrowseAll((prev) => !prev); setBrowseQuery(''); };
+  const fieldWidth = grid ? 'w-full' : 'w-48';
+
+  // Fuzzy warning / custom fee. An extra table row in list view, the bottom
+  // of the card in grid view.
   const expansion = showExpansion && (
     <div className={`${grid ? '' : 'ml-12'} flex items-center gap-2 flex-wrap`}>
-      {browseAll && (
-        <input
-          type="text"
-          value={browseQuery}
-          onChange={(e) => setBrowseQuery(e.target.value)}
-          placeholder={`Search active items (${(allActiveItems || []).length} total)…`}
-          className={`flex-1 max-w-md h-7 ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
-        />
-      )}
-      {isFuzzyOnly && !browseAll && (
+      {isFuzzyOnly && (
         <span className="text-[10px] text-warn">
-          Near-matches only. Toggle Search to confirm the right item.
+          Near-match only. Use search to confirm the right item.
         </span>
       )}
       {platform === 'other' && (
@@ -452,20 +450,46 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
           </div>
         </Cell>
 
-        <Cell grid={grid} theme={theme} label="Tracked match" className="px-3 py-2 align-middle">
-          {visibleCandidates.length > 0 ? (
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className={`h-7 ${grid ? 'w-full' : 'w-48'} ${theme.input} rounded-lg px-2 text-xs ${theme.text} focus:outline-none border`}
-            >
-              {visibleCandidates.map((c) => (
-                <option key={c.id} value={c.id}>{formatCandidateLabel(c)}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="text-[10px] text-warn">No match — toggle Search {grid ? '↓' : '→'}</span>
-          )}
+        {/* Tracked match only when there is one; otherwise just a search field.
+            The search icon switches between the two when a match exists. */}
+        <Cell grid={grid} theme={theme} label={browseAll ? undefined : 'Tracked match'} className="px-3 py-2 align-middle">
+          <div className="flex items-start gap-1.5">
+            <div className={`${fieldWidth} flex flex-col gap-1`}>
+              {browseAll && (
+                <input
+                  type="text"
+                  value={browseQuery}
+                  onChange={(e) => setBrowseQuery(e.target.value)}
+                  placeholder="Search active items…"
+                  className={`h-7 w-full ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
+                />
+              )}
+              {visibleCandidates.length > 0 && (
+                <select
+                  value={selectedId}
+                  onChange={(e) => setSelectedId(e.target.value)}
+                  className={`h-7 w-full ${theme.input} rounded-lg px-2 text-xs ${theme.text} focus:outline-none border`}
+                >
+                  {visibleCandidates.map((c) => (
+                    <option key={c.id} value={c.id}>{formatCandidateLabel(c)}</option>
+                  ))}
+                </select>
+              )}
+              {browseAll && browseQuery.trim() && visibleCandidates.length === 0 && (
+                <span className="text-[10px] text-slate-600">No active items match.</span>
+              )}
+            </div>
+            {candidates.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleBrowse}
+                title={browseAll ? 'Back to tracked match' : 'Search active items'}
+                className={`h-7 w-7 shrink-0 rounded-lg border inline-flex items-center justify-center transition-all ${theme.card} ${theme.cardBorder} ${browseAll ? theme.text : 'text-slate-600'}`}
+              >
+                {browseAll ? <X size={11} /> : <Search size={11} />}
+              </button>
+            )}
+          </div>
         </Cell>
 
         <Cell grid={grid} theme={theme} label="Sale price" className="px-3 py-2 align-middle">
@@ -495,17 +519,6 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
           </div>
         </Cell>
 
-        <Cell grid={grid} theme={theme} label="Search all items" inline className="px-2 py-2 align-middle text-center">
-          <button
-            type="button"
-            onClick={() => { setBrowseAll((prev) => !prev); setBrowseQuery(''); }}
-            title={browseAll ? 'Back to suggestions' : 'Browse all tracked items'}
-            className={`h-7 w-7 rounded-lg border inline-flex items-center justify-center transition-all ${theme.card} ${theme.cardBorder} ${browseAll ? theme.text : 'text-slate-600'}`}
-          >
-            <Search size={11} />
-          </button>
-        </Cell>
-
         {grid && expansion}
 
         <Cell grid={grid} theme={theme} className="px-3 py-2 align-middle text-right" gridClassName="mt-auto">
@@ -513,7 +526,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
             type="button"
             disabled={confirming || !parseFloat(usdSalePrice) || !selectedId || isFuzzyOnly}
             onClick={submit}
-            title={isFuzzyOnly ? 'No confident match — toggle Search to pick manually' : undefined}
+            title={isFuzzyOnly ? 'No confident match. Use search to pick manually' : undefined}
             className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
               ${confirming ? 'bg-profit text-white border-transparent scale-95' : `${theme.card} ${theme.cardBorder} ${theme.text}`}
               disabled:opacity-40 disabled:cursor-not-allowed`}
@@ -534,10 +547,10 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
         </Cell>
       </RowShell>
 
-      {/* Expansion row (browse search / fuzzy warning / custom fee) */}
+      {/* Expansion row (fuzzy warning / custom fee) */}
       {!grid && showExpansion && (
         <tr className={`border-b ${theme.cardBorder}`}>
-          <td colSpan={7} className="px-3 pb-2.5 pt-0">
+          <td colSpan={6} className="px-3 pb-2.5 pt-0">
             {expansion}
           </td>
         </tr>
@@ -923,7 +936,6 @@ export default function HandleItemsPage({
                     <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Tracked match</th>
                     <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Sale price</th>
                     <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Platform</th>
-                    <th className={`text-center px-2 py-2 ${tableHeaderCls}`}>Search</th>
                     <th className={`text-right px-3 py-2 ${tableHeaderCls}`}>Action</th>
                     <th className="w-8"></th>
                   </tr>
