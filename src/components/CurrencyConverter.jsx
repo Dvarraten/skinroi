@@ -20,7 +20,7 @@ function CopyButton({ value }) {
       onClick={handleCopy}
       disabled={!value}
       title="Copy value"
-      className={`p-1.5 rounded-md transition-all shrink-0 ${
+      className={`p-1.5 rounded-md transition shrink-0 ${
         copied
           ? "text-profit bg-profit/10"
           : "text-slate-600 hover:text-slate-300 hover:bg-white/8 disabled:opacity-30 disabled:cursor-not-allowed"

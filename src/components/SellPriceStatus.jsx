@@ -24,7 +24,7 @@ export default function SellPriceStatus({ sellPrices, hasItems }) {
 
   const text = problems.join(" · ");
   return (
-    <span title={text} className="text-[11px] text-warn truncate min-w-0">
+    <span title={text} className="text-xs text-warn truncate min-w-0">
       · {text}
     </span>
   );

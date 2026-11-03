@@ -25,7 +25,7 @@ export const LOSS_COLOR   = '#ef4444';
 export const WARN_COLOR   = '#f59e0b';
 
 export const themes = {
-  // ── 1. Original (default — finance terminal, amber accent) ──────────────
+  // ── 1. Original (finance terminal, amber accent) ──────────────
   bloomberg: {
     name: "Original",
     dot: "bg-amber-500",
@@ -59,7 +59,7 @@ export const themes = {
     chartColors: [WARN_COLOR, SAP_CHART_COLORS[10], SAP_CHART_COLORS[3], SAP_CHART_COLORS[1], SAP_CHART_COLORS[6], SAP_CHART_COLORS[5]],
   },
 
-  // ── 2. Dark ─────────────────────────────────────────────────────────────
+  // ── 2. Dark (default) ──────────────────────────────────────────────────────────
   dark: {
     name: "Dark",
     dot: "bg-[#09090b]",

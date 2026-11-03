@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --accent is set on <html> from the active theme (App.js). */
+:root {
+  --accent: #f59e0b;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 @layer base {
   * { box-sizing: border-box; }
 
@@ -10,10 +16,39 @@
     color: #f1f5f9;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
+  /* Browser surfaces carry the theme too: selection, caret, focus, scrollbars. */
+  ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+  input, textarea { caret-color: var(--accent); }
+  input[type='checkbox'], input[type='radio'], input[type='range'] { accent-color: var(--accent); }
+  :focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  /* Fields mark focus with their own border (most set focus:outline-none). */
+  input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline-offset: 0;
+    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+
+  /* Buttons answer the press. Subtle, fast, and only transform. */
+  button:not(:disabled) {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform, scale;
+    transition-duration: 160ms;
+    transition-timing-function: var(--ease-out);
+  }
+  /* `scale` composes with any translate a button already has. */
+  button:not(:disabled):active { scale: 0.97; }
+
+  /* Digits that stack in every price column. */
+  .font-mono, input[type='number'] { font-variant-numeric: tabular-nums; }
+
+  * { scrollbar-width: thin; scrollbar-color: #2a2f3e transparent; }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #0a0b0f; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #1e2028; border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: #2a2f3e; }
 }
@@ -27,4 +62,19 @@
   .profit-text { @apply text-profit font-mono font-medium; }
   .loss-text   { @apply text-loss   font-mono font-medium; }
   .warn-text   { @apply text-warn   font-mono font-medium; }
+
+  /* Popovers and menus grow from their trigger: set origin-* next to it. */
+  .pop-in { animation: pop-in 180ms var(--ease-out); }
 }
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop-in { animation: fade-in 120ms ease; }
+  button:not(:disabled):active { scale: none; }
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }

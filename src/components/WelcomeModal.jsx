@@ -23,7 +23,7 @@ export default function WelcomeModal({ onLogin, onContinue, theme }) {
         <div className="w-full flex flex-col gap-3">
           <button
             onClick={onLogin}
-            className="w-full flex items-center justify-center gap-3 bg-[#1b2838] hover:bg-[#2a475e] border border-white/10 text-white px-4 py-3 rounded-xl font-medium transition-all"
+            className="w-full flex items-center justify-center gap-3 bg-[#1b2838] hover:bg-[#2a475e] border border-white/10 text-white px-4 py-3 rounded-xl font-medium transition"
           >
             <img src={steamLogo} alt="" className="h-5 w-5" />
             Sign in with Steam
@@ -31,7 +31,7 @@ export default function WelcomeModal({ onLogin, onContinue, theme }) {
 
           <button
             onClick={onContinue}
-            className={`w-full flex items-center justify-center gap-2 ${theme?.card || 'bg-white/5'} border ${panelBorder} ${textSecondary} px-4 py-3 rounded-xl text-sm transition-all ${theme?.itemHoverBg || 'hover:bg-white/10'}`}
+            className={`w-full flex items-center justify-center gap-2 ${theme?.card || 'bg-white/5'} border ${panelBorder} ${textSecondary} px-4 py-3 rounded-xl text-sm transition ${theme?.itemHoverBg || 'hover:bg-white/10'}`}
           >
             Continue without account
           </button>

@@ -69,13 +69,13 @@ export default function AnalyticsPage({
       colored: false,
     },
     {
-      label: "Total Profit",
+      label: "Total profit",
       value: `${totalProfit >= 0 ? "+" : ""}$${totalProfit.toFixed(2)}`,
       colored: true,
       val: totalProfit,
     },
     {
-      label: "Profit Rate",
+      label: "Profit rate",
       value: winRate,
       colored: false,
     },
@@ -88,28 +88,34 @@ export default function AnalyticsPage({
   ];
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-      <div className={`max-w-3xl mx-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-4">
+      <div className={`max-w-4xl mx-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl overflow-hidden`}>
         <div className={`flex items-center px-6 py-4 border-b ${theme.panelBorder}`}>
-          <h2 className={`font-semibold ${theme.text}`}>Profit Analytics</h2>
+          <h2 className={`font-semibold ${theme.text}`}>Profit analytics</h2>
         </div>
 
         <div className="p-6 space-y-6">
           {/* Period selector + total in period */}
-          <div className="flex items-center gap-2">
-            {PERIODS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setChartPeriod(p.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  chartPeriod === p.key
-                    ? `${theme.accentBg} text-white`
-                    : `${theme.subtext} hover:text-slate-300 bg-white/5`
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-5">
+            {PERIODS.map((p) => {
+              const active = chartPeriod === p.key;
+              return (
+                <button
+                  key={p.key}
+                  onClick={() => setChartPeriod(p.key)}
+                  aria-pressed={active}
+                  className={`relative py-1 text-sm font-medium transition-colors ${
+                    active ? theme.text : `${theme.subtext} ${theme.textHover}`
+                  }`}
+                >
+                  {p.label}
+                  <span
+                    className={`absolute -bottom-0.5 left-0 h-[2px] w-full rounded-full origin-left transition-transform duration-200 ${active ? 'scale-x-100' : 'scale-x-0'}`}
+                    style={{ backgroundColor: theme.accentColor }}
+                  />
+                </button>
+              );
+            })}
             <span
               className={`ml-auto text-sm font-mono font-semibold ${totalInPeriod >= 0 ? "text-profit" : "text-loss"}`}
             >
@@ -120,25 +126,22 @@ export default function AnalyticsPage({
           {/* Cumulative line chart */}
           <div className="h-52">
             {cumulativeData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-slate-600 text-sm">
-                No data yet
+              <div className={`h-full flex items-center justify-center text-sm ${theme.subtext}`}>
+                No sales in this period yet
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={cumulativeData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={theme.chartGrid}
-                  />
+                  <CartesianGrid stroke={theme.chartGrid} vertical={false} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fill: "#475569", fontSize: 11 }}
+                    tick={{ fill: theme.chartAxis, fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tick={{ fill: "#475569", fontSize: 11 }}
+                    tick={{ fill: theme.chartAxis, fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v) => `$${v}`}
@@ -150,7 +153,7 @@ export default function AnalyticsPage({
                       border: `1px solid ${theme.chartTooltipBorder}`,
                       borderRadius: 8,
                     }}
-                    labelStyle={{ color: "#94a3b8", fontSize: 12 }}
+                    labelStyle={{ color: theme.chartAxis, fontSize: 12 }}
                     formatter={(v) => [
                       `$${parseFloat(v).toFixed(2)}`,
                       "Cumulative",
@@ -174,16 +177,16 @@ export default function AnalyticsPage({
             {summaryCards.map((card) => (
               <div
                 key={card.label}
-                className={`${theme.card} border ${theme.cardBorder} rounded-xl p-4 text-center`}
+                className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}
               >
-                <p className="text-xs text-slate-600 mb-1.5">{card.label}</p>
+                <p className={`text-xs ${theme.subtext} mb-1`}>{card.label}</p>
                 <p
-                  className={`text-base font-mono font-semibold ${
+                  className={`text-lg font-mono font-semibold tabular-nums ${
                     card.colored
                       ? (card.val ?? 0) >= 0
                         ? "text-profit"
                         : "text-loss"
-                      : theme.textSecondary
+                      : theme.text
                   }`}
                 >
                   {card.value}
@@ -194,8 +197,8 @@ export default function AnalyticsPage({
 
           {/* Daily P&L heatmap */}
           <div>
-            <p className="text-xs text-slate-600 mb-3 uppercase tracking-wide">
-              Daily P&L — Last 30 days
+            <p className={`text-xs ${theme.subtext} mb-3`}>
+              Daily P&L, last 30 days
             </p>
             <div className="flex flex-wrap gap-1">
               {heatmapDays.map((d) => {
@@ -214,7 +217,7 @@ export default function AnalyticsPage({
                 return (
                   <div key={d.date} className="relative group">
                     <div
-                      className="w-4 h-4 rounded-sm cursor-default transition-all duration-150 group-hover:scale-[1.5] group-hover:ring-1 group-hover:ring-white/20 group-hover:z-10"
+                      className="w-4 h-4 rounded-sm cursor-default transition duration-150 group-hover:scale-[1.5] group-hover:ring-1 group-hover:ring-white/20 group-hover:z-10"
                       style={{ backgroundColor: bg }}
                     />
                     <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 rounded-lg text-[10px] whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 ${theme.panel} border ${theme.cardBorder} shadow-lg`}>

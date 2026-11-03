@@ -6,7 +6,7 @@ import { PLATFORMS } from "../utils/platforms";
 
 const TX_PLATFORMS = PLATFORMS.filter(p => p.value !== 'other');
 
-const labelCls = "block text-xs text-slate-500 font-medium uppercase tracking-wide mb-1.5";
+const labelCls = "block text-xs text-slate-500 font-medium mb-1.5";
 
 export default function TransactionPage({ onAdd, theme, items = [] }) {
   const [type, setType] = useState('withdrawal');
@@ -60,7 +60,7 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
           <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
             <div className="flex items-center gap-2 mb-1">
               <ArrowDown size={12} className="text-profit" />
-              <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Deposits</p>
+              <p className={`text-xs font-medium ${theme.subtext}`}>Deposits</p>
             </div>
             <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
               ${stats.depositTotal.toFixed(2)}
@@ -70,7 +70,7 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
           <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
             <div className="flex items-center gap-2 mb-1">
               <ArrowUp size={12} className="text-loss" />
-              <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Withdrawals</p>
+              <p className={`text-xs font-medium ${theme.subtext}`}>Withdrawals</p>
             </div>
             <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
               ${stats.withdrawalTotal.toFixed(2)}
@@ -80,7 +80,7 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
           <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
             <div className="flex items-center gap-2 mb-1">
               <ArrowDownUp size={12} className="text-loss" />
-              <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Total fees paid</p>
+              <p className={`text-xs font-medium ${theme.subtext}`}>Total fees paid</p>
             </div>
             <p className="text-lg font-mono font-semibold text-loss tabular-nums">
               −${stats.totalFees.toFixed(2)}
@@ -197,7 +197,7 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
               <button
                 onClick={handleSubmit}
                 disabled={!amt || amt <= 0}
-                className={`relative group w-full flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium border transition-all
+                className={`relative group w-full flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium border transition
                   ${(!amt || amt <= 0) ? 'opacity-40 cursor-not-allowed' : ''}
                   ${success
                     ? 'text-profit border-profit/30 bg-profit/10'
@@ -210,7 +210,7 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
                 }
                 {!success && amt > 0 && (
                   <span
-                    className="absolute bottom-0 left-0 h-[2px] w-0 rounded-full transition-all duration-200 group-hover:w-full"
+                    className="absolute bottom-0 left-0 h-[2px] w-0 rounded-full transition duration-200 group-hover:w-full"
                     style={{ backgroundColor: theme.accentColor }}
                   />
                 )}
@@ -232,7 +232,7 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
             ) : (
               <div className="overflow-y-auto max-h-[520px]">
                 <table className="w-full text-sm">
-                  <thead className={`text-[10px] uppercase tracking-wide ${theme.subtext}`}>
+                  <thead className={`text-xs font-medium ${theme.subtext}`}>
                     <tr className={`border-b ${theme.cardBorder}`}>
                       <th className="text-left px-4 py-2 font-semibold">Type</th>
                       <th className="text-left px-3 py-2 font-semibold">Platform</th>

@@ -5,7 +5,7 @@ import PlatformPicker from '../components/PlatformPicker';
 import { TabButton } from '../components/TabsAndSearchbar';
 import RecentSales from '../components/RecentSales';
 import { PLATFORMS } from '../utils/platforms';
-import { PROFIT_COLOR, LOSS_COLOR } from '../themes/themes';
+import { SAP_CHART_COLORS } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
 import { useLocalPriceSync } from '../hooks/useLocalPriceSync';
 import { nameMatchScore } from '../utils/nameMatch';
@@ -159,7 +159,7 @@ function RowShell({ grid, theme, children }) {
 function Cell({ grid, className = '', gridClassName = '', label, inline, theme, children, ...rest }) {
   if (!grid) return <td className={className} {...rest}>{children}</td>;
   const labelEl = label && (
-    <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext} ${inline ? '' : 'mb-1'}`}>{label}</p>
+    <p className={`text-[11px] font-medium ${theme.subtext} ${inline ? '' : 'mb-1'}`}>{label}</p>
   );
   return (
     <div className={`${inline ? 'flex items-center justify-between gap-2' : ''} ${gridClassName}`}>
@@ -300,7 +300,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
           type="button"
           onClick={() => setOnHold(h => !h)}
           title={onHold ? 'Trade-protected (on hold)' : 'Not protected'}
-          className={`h-7 w-7 rounded-lg border inline-flex items-center justify-center transition-all ${theme.card} ${theme.cardBorder} ${onHold ? 'text-warn' : 'text-slate-600'}`}
+          className={`h-7 w-7 rounded-lg border inline-flex items-center justify-center transition ${theme.card} ${theme.cardBorder} ${onHold ? 'text-warn' : 'text-slate-600'}`}
         >
           <Clock size={12} />
         </button>
@@ -311,7 +311,7 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
           type="button"
           disabled={confirming || !parseFloat(usdPrice)}
           onClick={submit}
-          className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
+          className={`h-7 px-3 rounded-lg border text-xs font-medium transition inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
             ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text}
             disabled:opacity-40 disabled:cursor-not-allowed`}
         >
@@ -484,7 +484,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
                 type="button"
                 onClick={toggleBrowse}
                 title={browseAll ? 'Back to tracked match' : 'Search active items'}
-                className={`h-7 w-7 shrink-0 rounded-lg border inline-flex items-center justify-center transition-all ${theme.card} ${theme.cardBorder} ${browseAll ? theme.text : 'text-slate-600'}`}
+                className={`h-7 w-7 shrink-0 rounded-lg border inline-flex items-center justify-center transition ${theme.card} ${theme.cardBorder} ${browseAll ? theme.text : 'text-slate-600'}`}
               >
                 {browseAll ? <X size={11} /> : <Search size={11} />}
               </button>
@@ -527,7 +527,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
             disabled={confirming || !parseFloat(usdSalePrice) || !selectedId || isFuzzyOnly}
             onClick={submit}
             title={isFuzzyOnly ? 'No confident match. Use search to pick manually' : undefined}
-            className={`h-7 px-3 rounded-lg border text-xs font-medium transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
+            className={`h-7 px-3 rounded-lg border text-xs font-medium transition active:scale-[0.97] inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
               ${confirming ? 'bg-profit text-white border-transparent scale-95' : `${theme.card} ${theme.cardBorder} ${theme.text}`}
               disabled:opacity-40 disabled:cursor-not-allowed`}
           >
@@ -592,8 +592,8 @@ function HandleStats({ items, incomingCount, outgoingCount, theme }) {
   const monthSold = activity[activity.length - 1]?.sold ?? 0;
 
   const statCards = [
-    { label: 'Incoming queue', value: incomingCount, hint: 'pending review', icon: ArrowDownCircle, color: 'text-profit' },
-    { label: 'Outgoing queue', value: outgoingCount, hint: 'awaiting match', icon: ArrowUpCircle, color: 'text-loss' },
+    { label: 'Incoming queue', value: incomingCount, hint: 'pending review', icon: ArrowDownCircle },
+    { label: 'Outgoing queue', value: outgoingCount, hint: 'awaiting match', icon: ArrowUpCircle },
     { label: 'This month', value: `${monthBought}↓ / ${monthSold}↑`, hint: 'bought / sold', plain: true },
     { label: 'All-time', value: `${totalReceived}↓ / ${totalSold}↑`, hint: 'received / sold', plain: true },
   ];
@@ -603,20 +603,24 @@ function HandleStats({ items, incomingCount, outgoingCount, theme }) {
       {statCards.map((card, i) => (
         <div key={i} className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
           <div className="flex items-center gap-2 mb-1">
-            {card.icon && <card.icon size={12} className={card.color} />}
-            <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>{card.label}</p>
+            {card.icon && <card.icon size={12} className={theme.subtext} />}
+            <p className={`text-xs font-medium ${theme.subtext}`}>{card.label}</p>
           </div>
-          <p className={`text-lg font-mono font-semibold tabular-nums ${card.plain ? theme.text : card.color}`}>
+          <p className={`text-lg font-mono font-semibold tabular-nums ${theme.text}`}>
             {card.value}
           </p>
           <p className={`text-xs ${theme.subtext}`}>{card.hint}</p>
         </div>
       ))}
 
-      <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-3 py-2.5 flex flex-col`}>
-        <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext} mb-1`}>
-          Activity · 6 mo
-        </p>
+      <div className={`col-span-2 md:col-span-1 ${theme.card} border ${theme.cardBorder} rounded-xl px-3 py-2.5 flex flex-col`}>
+        <div className={`flex items-center justify-between gap-2 text-xs ${theme.subtext} mb-1`}>
+          <p className="font-medium">Activity · 6 mo</p>
+          <span className="flex items-center gap-2 text-[11px]">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: theme.chartLine }} />Bought</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: SAP_CHART_COLORS.neutral }} />Sold</span>
+          </span>
+        </div>
         <div className="flex-1 min-h-[60px]">
           <ResponsiveContainer width="100%" height={62}>
             <BarChart data={activity} margin={{ top: 4, right: 0, bottom: 0, left: 0 }} barCategoryGap={2}>
@@ -627,8 +631,8 @@ function HandleStats({ items, incomingCount, outgoingCount, theme }) {
                 labelStyle={{ color: '#94a3b8', fontSize: 10 }}
                 cursor={{ fill: 'rgba(255,255,255,0.04)' }}
               />
-              <Bar dataKey="bought" fill={PROFIT_COLOR} radius={[2, 2, 0, 0]} maxBarSize={10} />
-              <Bar dataKey="sold" fill={LOSS_COLOR} radius={[2, 2, 0, 0]} maxBarSize={10} />
+              <Bar dataKey="bought" fill={theme.chartLine} radius={[2, 2, 0, 0]} maxBarSize={10} />
+              <Bar dataKey="sold" fill={SAP_CHART_COLORS.neutral} radius={[2, 2, 0, 0]} maxBarSize={10} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -666,7 +670,12 @@ export default function HandleItemsPage({
   }, [sortBy]);
   // Table or card view for incoming/outgoing, remembered per browser.
   const [viewMode, setViewMode] = useState(() => {
-    try { return localStorage.getItem('skinroi-handle-view') === 'grid' ? 'grid' : 'list'; } catch { return 'list'; }
+    // Phones default to cards: the table needs about 900px.
+    const fallback = typeof window !== 'undefined' && window.innerWidth < 768 ? 'grid' : 'list';
+    try {
+      const saved = localStorage.getItem('skinroi-handle-view');
+      return saved === 'grid' || saved === 'list' ? saved : fallback;
+    } catch { return fallback; }
   });
   useEffect(() => {
     try { localStorage.setItem('skinroi-handle-view', viewMode); } catch {}
@@ -788,19 +797,19 @@ export default function HandleItemsPage({
     }
   }, [outgoing, searchTerm, sortBy]);
 
-  const tableHeaderCls = `text-[10px] uppercase tracking-wide font-semibold ${theme.subtext}`;
+  const tableHeaderCls = `text-xs font-medium ${theme.subtext}`;
   const grid = viewMode === 'grid';
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-4">
       <div className="flex gap-6 items-start">
-        <div className="flex-1 min-w-[600px] space-y-4">
+        <div className="flex-1 min-w-0 md:min-w-[600px] space-y-4">
 
         {/* Analytics */}
         <HandleStats items={items} incomingCount={incomingCount} outgoingCount={outgoingCount} theme={theme} />
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className={`flex items-center gap-6 border-b ${theme.cardBorder}`}>
           <TabButton
             label="Incoming"
             count={incomingCount}
@@ -810,7 +819,7 @@ export default function HandleItemsPage({
             accentColor={theme.accentColor}
             badgeClass={
               incomingCount > 0
-                ? 'bg-profit/20 text-profit'
+                ? `bg-white/10 ${theme.text}`
                 : tab === 'incoming' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
             }
           />
@@ -823,7 +832,7 @@ export default function HandleItemsPage({
             accentColor={theme.accentColor}
             badgeClass={
               outgoingCount > 0
-                ? 'bg-loss/20 text-loss'
+                ? `bg-white/10 ${theme.text}`
                 : tab === 'outgoing' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
             }
           />
@@ -831,14 +840,14 @@ export default function HandleItemsPage({
 
         {/* Search + sort */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+          <div className="relative flex-1 sm:flex-none sm:w-72 min-w-[180px]">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={tab === 'incoming' ? `Search ${incomingCount} incoming items…` : `Search ${outgoingCount} outgoing items…`}
-              className={`w-full pl-8 pr-3 py-2 ${theme.card} border ${theme.cardBorder} rounded-lg text-sm ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors`}
+              className={`w-full pl-8 pr-3 py-[6px] ${theme.card} border ${theme.cardBorder} rounded-lg text-xs ${theme.textSecondary} placeholder-slate-500 focus:outline-none transition-colors`}
             />
           </div>
           <div className={`flex items-center rounded-lg border ${theme.cardBorder} overflow-hidden`}>
@@ -883,7 +892,7 @@ export default function HandleItemsPage({
         </div>
 
         {/* Table */}
-        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-x-auto`}>
+        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl overflow-x-auto`}>
           {tab === 'incoming' && (
             incoming.length === 0 ? (
               <EmptyState theme={theme} text="No new items detected. You're all caught up." />
@@ -964,7 +973,7 @@ export default function HandleItemsPage({
         </div>
         </div>
         <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 sticky top-0">
-          <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext} mb-2 px-1`}>Recent Sales</p>
+          <p className={`text-xs font-medium ${theme.subtext} mb-2 px-1`}>Recent sales</p>
           <RecentSales items={items} theme={theme} />
         </div>
       </div>

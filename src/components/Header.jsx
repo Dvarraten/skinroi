@@ -110,15 +110,52 @@ export default function Header({
   }, [currencyOpen]);
 
   const navBtn = (active) =>
-    `relative px-1 py-1.5 text-[11px] font-semibold uppercase tracking-widest transition-colors group ${
-      active ? (theme?.text || "text-white") : `text-slate-400 ${theme?.textHover || "hover:text-white"}`
+    `relative shrink-0 px-0.5 py-2 text-[13px] font-medium transition-colors group ${
+      active ? (theme?.text || "text-white") : `${theme?.subtext || "text-slate-400"} ${theme?.textHover || "hover:text-white"}`
     }`;
 
   const dotColor = theme?.accentColor || theme?.dotColor || '#3b82f6';
 
+  const navItems = [
+    { key: 'home',         label: 'Home',         icon: Home,        onClick: onHomeClick,        badge: 0 },
+    { key: 'addItem',      label: 'Add item',     icon: PackagePlus, onClick: onAddItemClick,     badge: 0 },
+    { key: 'handleItems',  label: 'Handle items', icon: Inbox,       onClick: onHandleItemsClick, badge: pendingCount },
+    { key: 'transactions', label: 'Transactions', icon: ArrowDownUp, onClick: onTransactionClick, badge: 0 },
+    { key: 'snipes',       label: 'Snipes',       icon: Crosshair,   onClick: onSnipesClick,      badge: 0 },
+    { key: 'analytics',    label: 'Analytics',    icon: BarChart3,   onClick: onAnalyticsClick,   badge: 0 },
+    { key: 'about',        label: 'About',        icon: Info,        onClick: onAboutClick,       badge: 0 },
+  ];
+
+  // One nav row, rendered in the bar on desktop and as a scrollable strip
+  // under it on phones. The active page is marked by a 2px accent line as
+  // wide as its label; hover draws the same line in from the left.
+  const renderNav = (showIcons) => navItems.map(({ key, label, icon: Icon, onClick, badge }) => {
+    const active = key === 'home' ? !activePage : activePage === key;
+    return (
+      <button
+        key={key}
+        onClick={onClick}
+        aria-current={active ? 'page' : undefined}
+        className={`flex items-center gap-1.5 ${navBtn(active)}`}
+      >
+        {showIcons && <Icon size={15} strokeWidth={1.75} />}
+        <span>{label}</span>
+        {badge > 0 && (
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-loss text-white text-[10px] font-semibold leading-none tabular-nums">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+        <span
+          className={`absolute bottom-0 left-0 h-[2px] w-full rounded-full origin-left transition-transform duration-200 ${active ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}
+          style={{ backgroundColor: dotColor }}
+        />
+      </button>
+    );
+  });
+
   return (
     <header className={`w-full sticky top-0 z-50 px-4 pt-3 pb-1 ${theme?.bg || 'bg-[#0c1120]'}`}>
-      <div className={`px-5 h-14 flex items-center justify-between rounded-2xl shadow-lg ${theme?.header || "bg-gradient-to-b from-[#0e1a32] to-[#070c16]"}`}>
+      <div className={`px-4 md:px-5 h-14 flex items-center justify-between rounded-2xl shadow-lg ${theme?.header || "bg-gradient-to-b from-[#0e1a32] to-[#070c16]"}`}>
         {/* LEFT: Logo + Nav */}
         <div className="flex items-center gap-8">
           <button
@@ -133,36 +170,8 @@ export default function Header({
               style={{ height: "52px", width: "auto" }}
             />
           </button>
-          <nav className="hidden md:flex items-center gap-6">
-            {(() => {
-              const items = [
-                { key: 'home',         label: 'Home',         icon: Home,        onClick: onHomeClick,        badge: 0 },
-                { key: 'addItem',      label: 'Add Item',     icon: PackagePlus, onClick: onAddItemClick,     badge: 0 },
-                { key: 'handleItems',  label: 'Handle Items', icon: Inbox,       onClick: onHandleItemsClick, badge: pendingCount },
-                { key: 'transactions', label: 'Transactions', icon: ArrowDownUp, onClick: onTransactionClick, badge: 0 },
-                { key: 'snipes',       label: 'Snipes',       icon: Crosshair,   onClick: onSnipesClick,      badge: 0 },
-                { key: 'analytics',    label: 'Analytics',    icon: BarChart3,   onClick: onAnalyticsClick,   badge: 0 },
-                { key: 'about',        label: 'About',        icon: Info,        onClick: onAboutClick,       badge: 0 },
-              ];
-              return items.map(({ key, label, icon: Icon, onClick, badge }) => {
-                const active = key === 'home' ? !activePage : activePage === key;
-                return (
-                  <button key={key} onClick={onClick} className={`flex items-center gap-1.5 ${navBtn(active)}`}>
-                    <Icon size={15} />
-                    <span>{label}</span>
-                    {badge > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-                        {badge > 99 ? '99+' : badge}
-                      </span>
-                    )}
-                    <span
-                      className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${active ? 'w-full' : 'w-0 group-hover:w-full'}`}
-                      style={{ backgroundColor: dotColor }}
-                    />
-                  </button>
-                );
-              });
-            })()}
+          <nav aria-label="Main" className="hidden md:flex items-center gap-5">
+            {renderNav(true)}
           </nav>
         </div>
 
@@ -173,7 +182,7 @@ export default function Header({
             <button
               onClick={() => setCurrencyOpen(o => !o)}
               title="Currency converter"
-              className={`p-2 rounded-lg transition-all ${
+              className={`p-2 rounded-lg transition ${
                 currencyOpen
                   ? `${theme?.text || 'text-white'} bg-white/8`
                   : 'text-slate-400 hover:text-white hover:bg-white/8'
@@ -183,8 +192,8 @@ export default function Header({
             </button>
 
             {currencyOpen && (
-              <div className={`absolute right-0 top-12 w-72 rounded-xl border ${theme?.panelBorder || 'border-white/10'} ${theme?.panel || 'bg-[#151f35]'} shadow-xl p-4 z-[60]`}>
-                <p className={`text-xs font-semibold ${theme?.subtext || 'text-slate-400'} uppercase tracking-wide mb-3`}>Currency Converter</p>
+              <div className={`pop-in origin-top-right absolute right-0 top-12 w-72 rounded-xl border ${theme?.panelBorder || 'border-white/10'} ${theme?.panel || 'bg-[#151f35]'} shadow-xl p-4 z-[60]`}>
+                <p className={`text-xs font-medium ${theme?.subtext || 'text-slate-400'} mb-3`}>Currency converter</p>
                 <CurrencyConverter
                   usdAmount={usdAmount}
                   rmbAmount={rmbAmount}
@@ -229,7 +238,7 @@ export default function Header({
               <button
                 onClick={() => setDropdownOpen((o) => !o)}
                 title={ringTitle}
-                className="rounded-full p-0.5 transition-all"
+                className="rounded-full p-0.5 transition"
               >
                 {user.avatarUrl && !avatarFailed ? (
                   <img
@@ -237,12 +246,12 @@ export default function Header({
                     alt={user.personaName || ""}
                     referrerPolicy="no-referrer"
                     onError={() => setAvatarFailed(true)}
-                    className={`w-10 h-10 rounded-full transition-all ${dropdownOpen ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
+                    className={`w-10 h-10 rounded-full transition ${dropdownOpen ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
                     style={{ boxShadow: `0 0 0 2px ${ringColor}` }}
                   />
                 ) : (
                   <div
-                    className={`w-10 h-10 rounded-full transition-all flex items-center justify-center ${theme?.card || 'bg-white/10'}`}
+                    className={`w-10 h-10 rounded-full transition flex items-center justify-center ${theme?.card || 'bg-white/10'}`}
                     style={{ boxShadow: `0 0 0 2px ${ringColor}` }}
                   >
                     <User size={18} className="text-slate-400" />
@@ -251,7 +260,7 @@ export default function Header({
               </button>
 
               {dropdownOpen && (
-                <div className={`absolute right-0 top-12 w-80 rounded-xl border ${theme?.panelBorder || 'border-white/10'} ${theme?.panel || 'bg-[#151f35]'} shadow-xl overflow-hidden z-50`}>
+                <div className={`pop-in origin-top-right absolute right-0 top-12 w-80 rounded-xl border ${theme?.panelBorder || 'border-white/10'} ${theme?.panel || 'bg-[#151f35]'} shadow-xl overflow-hidden z-50`}>
                   {user.personaName && (
                     <div className={`px-4 py-3 border-b ${theme?.panelBorder || 'border-white/10'}`}>
                       <p className={`${theme?.text || 'text-white'} text-sm font-medium truncate`}>
@@ -274,7 +283,7 @@ export default function Header({
                       href={`https://steamcommunity.com/profiles/${user.steamId}`}
                       target="_blank"
                       rel="noreferrer"
-                      className={`flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition-all`}
+                      className={`flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
                       onClick={() => setDropdownOpen(false)}
                     >
                       <ExternalLink size={15} />
@@ -284,7 +293,7 @@ export default function Header({
                       href={`https://steamcommunity.com/profiles/${user.steamId}/inventory/#730`}
                       target="_blank"
                       rel="noreferrer"
-                      className={`flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition-all`}
+                      className={`flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
                       onClick={() => setDropdownOpen(false)}
                     >
                       <ExternalLink size={15} />
@@ -293,7 +302,7 @@ export default function Header({
                     {onExportCSV && (
                       <button
                         onClick={() => { onExportCSV(); setDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition-all`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
                       >
                         <Download size={15} />
                         Export CSV
@@ -314,7 +323,7 @@ export default function Header({
                         />
                         <button
                           onClick={() => importInputRef.current?.click()}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition-all`}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
                         >
                           <Upload size={15} />
                           Import CSV
@@ -323,7 +332,7 @@ export default function Header({
                     )}
                     <button
                       onClick={() => { onAnalyticsClick(); setDropdownOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition-all`}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
                     >
                       <BarChart3 size={15} />
                       Analytics
@@ -331,7 +340,7 @@ export default function Header({
                     <div className={`border-t ${theme?.panelBorder || 'border-white/10'} mt-1 pt-1`}>
                       <button
                         onClick={() => { onLogout(); setDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 ${theme?.itemHoverBg || 'hover:bg-white/8'} transition-all`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
                       >
                         <LogOut size={15} />
                         Sign out
@@ -344,15 +353,18 @@ export default function Header({
           ) : (
             <button
               onClick={onLogin}
-              className={`relative flex items-center gap-1.5 px-1 py-1.5 text-[11px] font-semibold uppercase tracking-widest transition-colors group text-slate-400 ${theme?.textHover || "hover:text-white"}`}
+              className={`relative flex items-center gap-1.5 px-0.5 py-2 text-[13px] font-medium transition-colors group ${theme?.subtext || "text-slate-400"} ${theme?.textHover || "hover:text-white"}`}
             >
               <SteamIcon className="h-3.5 w-3.5" />
               Sign in
-              <span className="absolute bottom-0 left-0 h-[2px] w-0 rounded-full transition-all duration-200 group-hover:w-full" style={{ backgroundColor: dotColor }} />
+              <span className="absolute bottom-0 left-0 h-[2px] w-full rounded-full origin-left scale-x-0 transition-transform duration-200 group-hover:scale-x-100" style={{ backgroundColor: dotColor }} />
             </button>
           )}
         </div>
       </div>
+      <nav aria-label="Main" className="md:hidden flex items-center gap-5 overflow-x-auto px-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {renderNav(false)}
+      </nav>
     </header>
   );
 }

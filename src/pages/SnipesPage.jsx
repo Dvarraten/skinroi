@@ -1,7 +1,7 @@
 // Snipes page — listings on CSFloat / DMarket priced below YouPin (or Buff163)
 // after fees, filtered for liquidity so hard-to-sell items stay hidden.
 import React, { useEffect, useMemo, useState } from "react";
-import { ExternalLink, RefreshCw, RotateCcw, AlertTriangle, Lock, Sticker } from "lucide-react";
+import { ExternalLink, RefreshCw, RotateCcw, AlertTriangle, Lock, Sticker, SlidersHorizontal } from "lucide-react";
 import { useSnipes } from "../hooks/useSnipes";
 import { DEFAULT_SNIPE_FILTERS, SNIPE_MARKETS, selectSnipes } from "../utils/snipes";
 import { PlatformBadge } from "../components/PlatformBadge";
@@ -31,6 +31,8 @@ export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }
   const { deals, meta, error, loading, refresh } = useSnipes();
   const [filters, setFilters] = useState(loadFilters);
   const [now, setNow] = useState(Date.now());
+  // Phones show the filters behind a toggle so the deals come first.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(filters)); } catch { /* ignore */ }
@@ -54,8 +56,9 @@ export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }
   const set = (key) => (value) => setFilters((f) => ({ ...f, [key]: value }));
 
   return (
-    <div className="flex-1 min-h-0 flex gap-4 px-6 py-4 overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-4 px-4 md:px-6 py-4 overflow-y-auto md:overflow-hidden">
       <FilterPanel
+        open={filtersOpen}
         theme={theme}
         filters={filters}
         set={set}
@@ -63,17 +66,24 @@ export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }
         onReset={() => setFilters(DEFAULT_SNIPE_FILTERS)}
       />
 
-      <div className={`flex-1 min-w-0 flex flex-col ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
-        <div className={`flex items-center gap-3 px-5 py-3 border-b ${theme.panelBorder}`}>
+      <div className={`md:flex-1 min-w-0 flex flex-col ${theme.panel} border ${theme.panelBorder} rounded-2xl md:overflow-hidden`}>
+        <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-4 md:px-5 py-3 border-b ${theme.panelBorder}`}>
           <h2 className={`font-semibold ${theme.text}`}>Snipes</h2>
           <span className={`text-xs ${theme.subtext}`}>
             {visible.length} of {deals.length} shown
           </span>
           <ScanStatus meta={meta} now={now} theme={theme} />
           <button
+            onClick={() => setFiltersOpen((o) => !o)}
+            aria-expanded={filtersOpen}
+            className={`md:hidden ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs ${theme.cardBorder} ${filtersOpen ? theme.text : theme.subtext}`}
+          >
+            <SlidersHorizontal size={13} /> Filters
+          </button>
+          <button
             onClick={refresh}
             title="Refresh"
-            className="ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors"
+            className="md:ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors"
           >
             <RefreshCw size={15} />
           </button>
@@ -86,7 +96,7 @@ export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="md:flex-1 md:overflow-y-auto">
           {error && <p className="p-6 text-sm text-loss">{error}</p>}
           {!error && loading && <p className={`p-6 text-sm ${theme.subtext}`}>Scanning markets…</p>}
           {!error && !loading && visible.length === 0 && (
@@ -151,12 +161,12 @@ function SnipeImage({ image, name }) {
   const fallback = useItemImage({ name });
   const [failed, setFailed] = useState([]);
   const src = [image, fallback].find((u) => u && !failed.includes(u));
-  if (!src) return <div className="w-16 h-12 shrink-0" />;
+  if (!src) return <div className="w-12 h-9 md:w-16 md:h-12 shrink-0" />;
   return (
     <img
       src={src}
       alt=""
-      className="w-16 h-12 object-contain shrink-0"
+      className="w-12 h-9 md:w-16 md:h-12 object-contain shrink-0"
       loading="lazy"
       onError={() => setFailed((f) => [...f, src])}
     />
@@ -172,10 +182,10 @@ function SnipeRow({ deal: d, theme, money, now }) {
   ].filter(Boolean).join(" · ") || "liquidity unknown";
 
   return (
-    <div className={`flex items-center gap-4 px-5 py-3 border-b ${theme.panelBorder} ${theme.itemHoverBg || "hover:bg-white/5"}`}>
+    <div className={`flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3 border-b ${theme.panelBorder} ${theme.itemHoverBg || "hover:bg-white/5"}`}>
       <SnipeImage image={d.image} name={d.name} />
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 basis-[calc(100%-4rem)] md:basis-auto">
         <p className={`text-sm font-medium truncate ${theme.text}`} title={d.name}>
           {d.name}
           {d.phase && <span className={`ml-1.5 ${theme.accent}`}>{d.phase}</span>}
@@ -195,27 +205,27 @@ function SnipeRow({ deal: d, theme, money, now }) {
         </div>
       </div>
 
-      <div className="w-32 shrink-0 text-right">
+      <div className="md:w-32 shrink-0 md:text-right">
         <PlatformBadge platform={d.market} size="xs" />
         <p className={`text-sm font-mono ${theme.text}`}>{money(d.priceUsd)}</p>
       </div>
 
-      <div className="w-36 shrink-0 text-right">
+      <div className="md:w-36 shrink-0 md:text-right">
         <PlatformBadge platform={d.refMarket} size="xs" />
         <p className={`text-sm font-mono ${theme.textSecondary}`}>{money(d.ref.priceUsd)}</p>
-        <p className={`text-[10px] ${theme.subtext}`}>{liquidityText}</p>
+        <p className={`text-[11px] ${theme.subtext}`}>{liquidityText}</p>
       </div>
 
-      <div className="w-28 shrink-0 text-right">
+      <div className="ml-auto md:ml-0 md:w-28 shrink-0 text-right">
         <p className="text-sm font-mono font-semibold text-profit">+{money(d.profitUsd)}</p>
-        <p className="text-xs font-mono text-profit">{(d.roi * 100).toFixed(1)}%</p>
+        <p className={`text-xs font-mono ${theme.subtext}`}>{(d.roi * 100).toFixed(1)}%</p>
       </div>
 
       <a
         href={d.url}
         target="_blank"
         rel="noreferrer"
-        className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white ${theme.accentBg}`}
+        className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97]`}
       >
         Buy <ExternalLink size={12} />
       </a>
@@ -223,8 +233,8 @@ function SnipeRow({ deal: d, theme, money, now }) {
   );
 }
 
-function FilterPanel({ theme, filters: f, set, symbol, onReset }) {
-  const label = `text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`;
+function FilterPanel({ open, theme, filters: f, set, symbol, onReset }) {
+  const label = `text-xs font-medium ${theme.subtext}`;
   const input = `w-full px-2 py-1.5 rounded-lg text-sm border ${theme.input} ${theme.text} focus:outline-none`;
 
   const numberField = (key, text, suffix) => (
@@ -253,7 +263,7 @@ function FilterPanel({ theme, filters: f, set, symbol, onReset }) {
     set("markets")(f.markets.includes(m) ? f.markets.filter((x) => x !== m) : [...f.markets, m]);
 
   return (
-    <aside className={`w-72 shrink-0 overflow-y-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg p-4 space-y-4`}>
+    <aside className={`${open ? '' : 'hidden'} md:block order-first w-full md:w-72 shrink-0 md:overflow-y-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl p-4 space-y-4`}>
       <div className="flex items-center">
         <h3 className={`font-semibold ${theme.text}`}>Filters</h3>
         <button
