@@ -40,14 +40,17 @@ function parseCookies(str = '') {
   );
 }
 
-function cookieFlags() {
-  const isSecure = (process.env.APP_URL || '').startsWith('https');
+function cookieFlags(req) {
+  // Prefer the forwarded protocol header set by Vercel/reverse proxies. Fall
+  // back to APP_URL for environments that set it but don't forward the header.
+  const proto = ((req?.headers?.['x-forwarded-proto'] || '').split(',')[0] || '').trim();
+  const isSecure = proto === 'https' || (!proto && (process.env.APP_URL || '').startsWith('https'));
   return `HttpOnly; Path=/; Max-Age=${MAX_AGE_S}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
 }
 
-export function setSessionCookie(res, steamId) {
+export function setSessionCookie(res, steamId, req) {
   const token = sign(steamId);
-  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; ${cookieFlags()}`);
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; ${cookieFlags(req)}`);
 }
 
 export function clearSessionCookie(res) {

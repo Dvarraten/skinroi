@@ -28,6 +28,6 @@ export default async function handler(req, res) {
   if (!match) return res.status(400).send('Invalid Steam ID in response');
   const steamId = match[1];
 
-  setSessionCookie(res, steamId);
+  setSessionCookie(res, steamId, req);
   res.redirect(302, '/');
 }
