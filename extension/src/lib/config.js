@@ -35,12 +35,15 @@ export const INSPECT_MIN_DELAY_MS = 250;
 export const CSFLOAT_LISTINGS_URL =
   'https://csfloat.com/api/v1/listings?sort_by=most_recent&type=buy_now&limit=50';
 
-// Sell prices for Home (see lib/sellprices.js). Up to SELL_PRICES_PER_RUN
-// items per market each poll; a price is refreshed once it is 30 min old so
-// the site (which hides prices older than 1 hour) always has a fresh one.
+// Sell prices for Home (see lib/sellprices.js). CSFloat: up to
+// SELL_PRICES_PER_RUN items each poll; a price is refreshed once it is 30 min
+// old so the site (which hides prices older than 1 hour) always has a fresh
+// one. Buff163: one request every BUFF_INVENTORY_INTERVAL_MS (4 per hour) to
+// Buff's view of the user's Steam inventory, which prices every item at once.
 export const CSFLOAT_LISTINGS_API = 'https://csfloat.com/api/v1/listings';
-export const BUFF_GOODS_SEARCH_URL =
-  'https://buff.163.com/api/market/goods?game=csgo&page_num=1&page_size=50';
+export const BUFF_INVENTORY_URL =
+  'https://buff.163.com/api/market/steam_inventory?game=csgo&force=0&page_num=1&page_size=500&search=&state=all';
+export const BUFF_INVENTORY_INTERVAL_MS = 15 * 60 * 1000;
 export const SELL_PRICES_PER_RUN = 10;
 export const SELL_PRICES_REFRESH_AFTER_MS = 30 * 60 * 1000;
 export const SELL_PRICES_RETRY_ERROR_MS = 10 * 60 * 1000;
@@ -64,4 +67,5 @@ export const STORAGE_KEYS = {
   INSPECT_CACHE: 'skinroi_inspectCache',
   ACTIVITY_LOG: 'activity_log',
   VERBOSE_LOGGING: 'skinroi_verboseLogging',
+  BUFF_LAST_FETCH: 'skinroi_buffLastFetch',
 };
