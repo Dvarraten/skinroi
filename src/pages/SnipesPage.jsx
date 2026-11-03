@@ -1,9 +1,11 @@
-// Snipes page — listings on CSFloat / DMarket priced below YouPin (or Buff163)
-// after fees, filtered for liquidity so hard-to-sell items stay hidden.
+// Snipes page — items to buy on one market and sell on another after fees,
+// filtered for liquidity so hard-to-sell items stay hidden.
 import React, { useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, RotateCcw, AlertTriangle, Lock, Sticker, SlidersHorizontal } from "lucide-react";
 import { useSnipes } from "../hooks/useSnipes";
-import { DEFAULT_SNIPE_FILTERS, SNIPE_MARKETS, selectSnipes } from "../utils/snipes";
+import {
+  BUY_MARKETS, DEFAULT_SNIPE_FILTERS, SELL_MARKETS, SNIPE_MARKETS, migrateFilters, selectSnipes,
+} from "../utils/snipes";
 import { PlatformBadge } from "../components/PlatformBadge";
 import { useItemImage } from "../utils/itemImages";
 import { CURRENCIES } from "../hooks/useExchangeRate";
@@ -12,11 +14,11 @@ const STORAGE_KEY = "skinroi-snipes-filters";
 // Snipes has its own currency (USD by default), separate from the site-wide
 // display currency, because marketplace prices are compared in dollars.
 const CURRENCY_KEY = "skinroi-snipes-currency";
-const MARKET_LABELS = { csfloat: "CSFloat", dmarket: "DMarket" };
+const MARKET_LABELS = { csfloat: "CSFloat", dmarket: "DMarket", youpin: "YouPin", buff163: "Buff163" };
 
 function loadFilters() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    const saved = migrateFilters(JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"));
     return saved ? { ...DEFAULT_SNIPE_FILTERS, ...saved } : DEFAULT_SNIPE_FILTERS;
   } catch {
     return DEFAULT_SNIPE_FILTERS;
@@ -199,11 +201,14 @@ function SnipeImage({ image, name }) {
 
 function SnipeRow({ deal: d, theme, money, now }) {
   const liq = d.liquidity;
-  const liquidityText = [
+  const liquidityText = liq.score != null ? `Liquidity ${liq.score}` : "Liquidity unknown";
+  const liquidityDetail = [
+    liq.bidCount != null && `${liq.bidCount} buy orders`,
+    liq.bidAsk != null && `best buy order ${Math.round(liq.bidAsk * 100)}% of lowest ask`,
     liq.count != null && `${liq.count} listed`,
-    liq.score != null && `liq ${liq.score}`,
-    liq.bidAsk != null && `bid ${Math.round(liq.bidAsk * 100)}%`,
-  ].filter(Boolean).join(" · ") || "liquidity unknown";
+    liq.sales != null && `${liq.sales} CSFloat sales`,
+    liq.steamVolume != null && `${liq.steamVolume} sold on Steam today`,
+  ].filter(Boolean).join(" · ");
 
   return (
     <div className={`flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3 border-b ${theme.panelBorder} ${theme.itemHoverBg || "hover:bg-white/5"}`}>
@@ -215,6 +220,7 @@ function SnipeRow({ deal: d, theme, money, now }) {
           {d.phase && <span className={`ml-1.5 ${theme.accent}`}>{d.phase}</span>}
         </p>
         <div className={`flex items-center gap-2 text-[11px] ${theme.subtext}`}>
+          {d.itemLevel && <span>Lowest listing</span>}
           {d.float != null && <span>Float {Number(d.float).toFixed(4)}</span>}
           {d.stickers?.length > 0 && (
             <span className="flex items-center gap-0.5" title={d.stickers.map((s) => s.name).join(", ")}>
@@ -237,7 +243,7 @@ function SnipeRow({ deal: d, theme, money, now }) {
       <div className="md:w-36 shrink-0 md:text-right">
         <PlatformBadge platform={d.refMarket} size="xs" />
         <p className={`text-sm font-mono ${theme.textSecondary}`}>{money(d.ref.priceUsd)}</p>
-        <p className={`text-[11px] ${theme.subtext}`}>{liquidityText}</p>
+        <p className={`text-[11px] ${theme.subtext}`} title={liquidityDetail || undefined}>{liquidityText}</p>
       </div>
 
       <div className="ml-auto md:ml-0 md:w-28 shrink-0 text-right">
@@ -283,8 +289,20 @@ function FilterPanel({ open, theme, filters: f, set, symbol, onReset }) {
     </label>
   );
 
-  const toggleMarket = (m) =>
-    set("markets")(f.markets.includes(m) ? f.markets.filter((x) => x !== m) : [...f.markets, m]);
+  const marketChecks = (key, markets) => (
+    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+      {markets.map((m) => (
+        <label key={m} className={`flex items-center gap-1.5 text-sm cursor-pointer ${theme.textSecondary}`}>
+          <input
+            type="checkbox"
+            checked={f[key].includes(m)}
+            onChange={() => set(key)(f[key].includes(m) ? f[key].filter((x) => x !== m) : [...f[key], m])}
+          />
+          {MARKET_LABELS[m]}
+        </label>
+      ))}
+    </div>
+  );
 
   return (
     <aside className={`${open ? '' : 'hidden'} md:block order-first w-full md:w-72 shrink-0 md:overflow-y-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl p-4 space-y-4`}>
@@ -308,24 +326,14 @@ function FilterPanel({ open, theme, filters: f, set, symbol, onReset }) {
 
       <div>
         <span className={label}>Buy on</span>
-        <div className="flex gap-3 mt-1">
-          {SNIPE_MARKETS.map((m) => (
-            <label key={m} className={`flex items-center gap-1.5 text-sm cursor-pointer ${theme.textSecondary}`}>
-              <input type="checkbox" checked={f.markets.includes(m)} onChange={() => toggleMarket(m)} />
-              {MARKET_LABELS[m]}
-            </label>
-          ))}
-        </div>
+        {marketChecks("buyMarkets", BUY_MARKETS)}
       </div>
 
-      <label className="block">
-        <span className={label}>Reference price</span>
-        <select value={f.reference} onChange={(e) => set("reference")(e.target.value)} className={`${input} mt-1`}>
-          <option value="auto">YouPin, else Buff163</option>
-          <option value="youpin">YouPin only</option>
-          <option value="buff163">Buff163 only</option>
-        </select>
-      </label>
+      <div>
+        <span className={label}>Sell on</span>
+        {marketChecks("sellMarkets", SELL_MARKETS)}
+        <p className={`text-[11px] mt-1 ${theme.subtext}`}>Each deal uses the sell market that pays most after fees.</p>
+      </div>
 
       <label className="block">
         <span className={label}>Sort by</span>
@@ -347,11 +355,7 @@ function FilterPanel({ open, theme, filters: f, set, symbol, onReset }) {
 
       <div className={`pt-3 border-t ${theme.panelBorder} space-y-3`}>
         <p className={label}>Liquidity</p>
-        <div className="grid grid-cols-2 gap-2">
-          {numberField("minListings", "Min listings")}
-          {numberField("minLiquidity", "Min score")}
-        </div>
-        {numberField("minBidAsk", "Min buy order / ask", "%")}
+        {numberField("minLiquidity", "Min liquidity score (0–100)")}
         {toggle("hideUnknownLiquidity", "Hide unknown liquidity")}
         {toggle("hideVolatile", "Hide volatile prices")}
         {f.hideVolatile && numberField("maxChange7d", "Max 7d change", "%")}

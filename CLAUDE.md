@@ -110,8 +110,13 @@ CSFloat listings come from the extension instead: every poll (2 min) it fetches
 `csfloat.com/api/v1/listings?sort_by=most_recent` with the browser session (no
 API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
 "too many IPs" when Vercel fetches them, because functions call out from many
-IPs. Both paths price listings against YouPin (fallback Buff163) and store every
-listing at least 2% under reference for 30 min. Fees, ROI and liquidity filters
+IPs. Both paths price listings against YouPin, Buff163 and CSFloat (CSFloat's
+own appraisal, learned from CSFloat listings and cached 1 h) and store every
+listing at least 2% under the best of them for 30 min. "Item deals" add an
+item's lowest YouPin / Buff163 ask when another market pays more; the page
+picks buy and sell markets and the best net sell price, and scores liquidity
+0–100 on the sell market (buy orders, spread and listings on YouPin / Buff163;
+CSFloat sales and Steam volume on CSFloat). Fees, ROI and liquidity filters
 run in the browser (`src/utils/snipes.js`). DMarket is read from
 `/marketplace-api/v2/offers`, which needs `DMARKET_PUBLIC_KEY`/
 `DMARKET_SECRET_KEY` (requests are Ed25519-signed). Other env vars:
