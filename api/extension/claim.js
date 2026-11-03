@@ -38,6 +38,7 @@ export default async function handler(req, res) {
       steamId: result.steamId,
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message || String(err) });
+    console.error('[claim] unexpected error:', err);
+    return res.status(500).json({ error: 'internal error' });
   }
 }

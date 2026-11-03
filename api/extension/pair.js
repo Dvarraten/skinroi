@@ -71,6 +71,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST, DELETE');
     return res.status(405).json({ error: 'method not allowed' });
   } catch (err) {
-    return res.status(500).json({ error: err.message || String(err) });
+    console.error('[pair] unexpected error:', err);
+    return res.status(500).json({ error: 'internal error' });
   }
 }
