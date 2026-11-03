@@ -34,7 +34,8 @@ skinroi/
 │   ├── items/
 │   │   └── index.js       GET/POST — load and save the tracked item portfolio
 │   └── snipes/
-│       └── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~45s)
+│       └── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~45s);
+│                          POST — extension pushes raw CSFloat listings (Bearer secret)
 ├── extension/            Chrome extension (Manifest V3, load unpacked)
 │   ├── manifest.json
 │   └── src/
@@ -103,19 +104,21 @@ is the same copy (same `assetid`, or for items without one: same name, exact
 float and paint seed). Everything else stays in Handle Items for the user.
 Items added via Handle Items store the Steam `assetid` for this matching.
 
-**Snipes**: `GET /api/snipes` (logged-in only) rescans when the last scan is
-older than 45s, guarded by a Redis lock. A scan pulls the newest CSFloat and
-DMarket listings, prices them against YouPin (fallback Buff163) and stores
-every listing at least 2% under reference for 30 min. Fees, ROI and liquidity
-filters run in the browser (`src/utils/snipes.js`). Env vars:
-`CSFLOAT_API_KEY` (required for CSFloat), `CSPRICEAPI_KEY` (YouPin + Buff163
-with listing counts; without it the free csgotrader.app Buff163 dump is used),
-optional `DMARKET_PUBLIC_KEY`/`DMARKET_SECRET_KEY` (signed requests) and
-`SNIPES_MIN_PRICE_CENTS` (default 200). Dopplers without a known phase are
-skipped so phases never get mixed. DMarket is read from
-`/marketplace-api/v2/offers` (the old `/exchange/v1/market/items` returns 410).
-CSFloat is polled at most every 2 min and pauses 15 min after a 429; CSFloat
-rate-limits an API key that is used from many IPs, which Vercel functions do.
+**Snipes**: `GET /api/snipes` (logged-in only) rescans server-fetched sources
+(DMarket) when the last scan is older than 45s, guarded by a Redis lock.
+CSFloat listings come from the extension instead: every poll (2 min) it fetches
+`csfloat.com/api/v1/listings?sort_by=most_recent` with the browser session (no
+API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
+"too many IPs" when Vercel fetches them, because functions call out from many
+IPs. Both paths price listings against YouPin (fallback Buff163) and store every
+listing at least 2% under reference for 30 min. Fees, ROI and liquidity filters
+run in the browser (`src/utils/snipes.js`). DMarket is read from
+`/marketplace-api/v2/offers`, which needs `DMARKET_PUBLIC_KEY`/
+`DMARKET_SECRET_KEY` (requests are Ed25519-signed). Other env vars:
+`CSPRICEAPI_KEY` (YouPin + Buff163 with listing counts; without it the free
+csgotrader.app Buff163 dump is used) and `SNIPES_MIN_PRICE_CENTS` (default
+200). A source that answers 429 pauses 15 min. Dopplers without a known phase
+are skipped so phases never get mixed.
 
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
 Guest users → `localStorage` key `cs2-trading-items`.
@@ -250,6 +253,10 @@ Every theme in `src/themes/themes.js` has two representations of its accent colo
 When adding a new theme, always set both fields.
 
 ### 4. Deployment
+The Vercel Hobby plan allows at most 12 serverless functions (every file under
+`api/` outside `_lib/`). A 13th fails the deploy, so add new routes as methods
+on an existing function instead of new files.
+
 Pushing to `main` triggers an automatic Vercel production deploy — no manual
 step required. To deploy manually:
 

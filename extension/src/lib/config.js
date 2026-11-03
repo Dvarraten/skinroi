@@ -29,6 +29,12 @@ export const STEAM_GET_TRADE_STATUS = 'https://api.steampowered.com/IEconService
 export const CSFLOAT_INSPECT_API = 'https://api.csfloat.com/';
 export const INSPECT_MIN_DELAY_MS = 250;
 
+// Newest CSFloat buy-now listings for the Snipes tab. Fetched here rather than
+// on the server because CSFloat rate-limits requests coming from many IPs
+// (Vercel functions); the extension runs on the user's single IP.
+export const CSFLOAT_LISTINGS_URL =
+  'https://csfloat.com/api/v1/listings?sort_by=most_recent&type=buy_now&limit=50';
+
 // Only offers in state 3 (Accepted) count as completed trades — items have
 // transferred to inventory (possibly in trade-protected context 16 for the
 // 7-day hold, but the trade itself is done and the item is ours).

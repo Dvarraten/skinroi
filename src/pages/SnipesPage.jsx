@@ -102,25 +102,40 @@ export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }
   );
 }
 
+// CSFloat listings arrive from the browser extension; if none came in for
+// this long, the extension is probably not running (Chrome closed, not paired).
+const EXTENSION_STALE_MS = 10 * 60 * 1000;
+
+function sourceText(name, s, now) {
+  if (!s || (s.via === "extension" && now - s.lastRun > EXTENSION_STALE_MS)) {
+    return name === "csfloat" ? "· waiting for the SkinROI extension (is Chrome open?)" : "· not checked yet";
+  }
+  if (s.ok) return `· ${s.count}`;
+  if (s.pausedUntil && s.pausedUntil > now) {
+    return `· rate limited, retrying in ${Math.ceil((s.pausedUntil - now) / 60000)}m`;
+  }
+  return `· failed: ${s.error}`;
+}
+
 function ScanStatus({ meta, now, theme }) {
   if (!meta) return null;
+  const sources = meta.sources || {};
   return (
     <span className={`flex items-center gap-3 text-[11px] ${theme.subtext}`}>
       <span>Scanned {ago(meta.lastScan, now)}</span>
-      {Object.entries(meta.sources || {}).map(([name, s]) => (
-        <span
-          key={name}
-          title={s.ok ? `${s.count} listings checked` : s.error}
-          className={`max-w-xs truncate ${s.ok ? "" : "text-loss"}`}
-        >
-          {MARKET_LABELS[name] || name}{" "}
-          {s.ok
-            ? `· ${s.count}`
-            : s.pausedUntil && s.pausedUntil > now
-              ? `· rate limited, retrying in ${Math.ceil((s.pausedUntil - now) / 60000)}m`
-              : `· failed: ${s.error}`}
-        </span>
-      ))}
+      {SNIPE_MARKETS.map((name) => {
+        const s = sources[name];
+        const bad = s && !s.ok;
+        return (
+          <span
+            key={name}
+            title={s?.ok ? `${s.count} listings checked ${ago(s.lastRun, now)}` : s?.error}
+            className={`max-w-xs truncate ${bad ? "text-loss" : ""}`}
+          >
+            {MARKET_LABELS[name] || name} {sourceText(name, s, now)}
+          </span>
+        );
+      })}
       {meta.refError && (
         <span className="text-loss" title={meta.refError}>Reference prices failed</span>
       )}
