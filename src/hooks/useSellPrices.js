@@ -8,7 +8,8 @@ const BASE = process.env.REACT_APP_STEAM_SYNC_URL || "";
 const POLL_MS = 60 * 1000;
 
 export function useSellPrices(enabled) {
-  const [data, setData] = useState({ prices: {}, status: {} });
+  // null until the first answer, so Home doesn't warn "none yet" before it has asked.
+  const [data, setData] = useState(null);
 
   const refresh = useCallback(async () => {
     try {

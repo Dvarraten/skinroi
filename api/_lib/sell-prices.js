@@ -1,15 +1,22 @@
-// Sell prices for the items a user currently owns: lowest Buff163 and CSFloat
+// Sell prices for the items a user currently owns: lowest YouPin and CSFloat
 // listing per item, shown on Home so the user can compare where to sell.
 //
-// The server never fetches these itself. CSFloat rate-limits Vercel's many
-// IPs, and Buff163 only answers logged-in browser sessions, so the SkinROI
-// extension fetches them from the user's own browser and pushes them here.
+// - YouPin comes from SteamDT's open API (STEAMDT_API_KEY, same source and
+//   30 min cache as the Snipes reference prices). It is read on every GET, so
+//   it needs no extension and never touches the user's YouPin account.
+// - CSFloat rate-limits Vercel's many IPs, so the SkinROI extension fetches
+//   those from the user's own browser and pushes them here.
 //
 // Served from /api/items?sellPrices=1 (the Vercel Hobby plan allows only 12
 // functions, so this can't be its own route):
 //   GET  — session cookie (site) or Bearer secret (extension):
-//          { names, prices, status }. The extension uses it to see which
-//          names are due for a refresh; the site uses it to render prices.
+//          { names, targets, prices, status }. Prices are keyed by target
+//          key: the market_hash_name, plus "|Phase 2" etc. for Dopplers (see
+//          doppler-phase.js). The extension uses it to see which keys are
+//          due for a refresh; the site uses it to render prices
+//          (prices[key].youpin is filled in from SteamDT on the fly).
+//          SteamDT has no per-phase prices, so Dopplers get no YouPin price
+//          rather than a wrong one.
 //   POST — Bearer secret only. Body: { results: [{ name, market, priceUsd?,
 //          priceCny?, count?, error? }], status?: { [market]: errorText|null } }
 
@@ -17,22 +24,28 @@ import { getRedis } from './redis.js';
 import { getSessionSteamId } from './auth.js';
 import { extractBearer, resolveSecret } from './extension-store.js';
 import { getCnyPerUsd } from './snipes/fx.js';
+import { loadSteamDtRows } from './snipes/reference.js';
+import { sellPriceTarget, needsPhase } from './doppler-phase.js';
 
-export const MARKETS = ['buff163', 'csfloat'];
-const MAX_RESULTS = 1000; // Buff163 prices every owned item in one push
+// Markets the extension pushes. YouPin is added server-side on GET.
+export const MARKETS = ['csfloat'];
+const MAX_RESULTS = 1000;
 
 const key = (steamId) => `skinroi:sellprices:${steamId}`;
 const itemsKey = (steamId) => `skinroi:items:${steamId}`;
 
-// Unique names of items the user still owns (unsold, not cash transactions).
-export function ownedNames(items) {
-  const names = new Set();
+// One price target per distinct item+phase the user still owns (unsold, not
+// cash transactions), sorted by key.
+export function ownedTargets(items) {
+  const byKey = new Map();
   for (const it of Array.isArray(items) ? items : []) {
     if (!it || it.sold || it.isTransaction) continue;
-    const name = typeof it.itemName === 'string' ? it.itemName.trim() : '';
-    if (name) names.add(name);
+    const t = sellPriceTarget(it);
+    if (!t.name) continue;
+    const prev = byKey.get(t.key);
+    if (!prev || (prev.paintIndex == null && t.paintIndex != null)) byKey.set(t.key, t);
   }
-  return [...names].sort();
+  return [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 
 // Merges pushed results into the stored price map. Pure, so it can be tested.
@@ -64,6 +77,39 @@ export function mergeResults(stored, results, names, cnyPerUsd, now) {
   return prices;
 }
 
+// YouPin lowest listing per target from SteamDT rows (CNY → USD). Keyed by
+// target key. Dopplers get an explanatory error instead of a price.
+export async function youpinPrices(redis, targets) {
+  const now = Date.now();
+  const plain = targets.filter((t) => !needsPhase(t.name));
+  let raw = new Map();
+  let warning = null;
+  try {
+    ({ raw, warning } = await loadSteamDtRows(redis, [...new Set(plain.map((t) => t.name))]));
+  } catch (e) {
+    warning = e.message;
+  }
+  const cnyPerUsd = raw.size ? await getCnyPerUsd() : 1;
+  const prices = {};
+  for (const t of targets) {
+    if (needsPhase(t.name)) {
+      prices[t.key] = { error: 'no YouPin price per Doppler phase from SteamDT' };
+      continue;
+    }
+    const entry = raw.get(t.name);
+    if (!entry) continue;
+    const name = t.key;
+    const row = entry.youpin;
+    prices[name] = {
+      priceUsd: row?.sell ? Math.round((row.sell / cnyPerUsd) * 100) / 100 : null,
+      count: row ? row.sellCount ?? null : 0,
+      at: entry.at,
+      checkedAt: entry.at,
+    };
+  }
+  return { prices, status: warning ? { ok: false, error: warning, at: now } : { ok: true, at: now } };
+}
+
 function toPrice(v) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -77,10 +123,21 @@ export async function handleSellPrices(req, res) {
 
   const redis = getRedis();
   const [items, stored] = await redis.mget(itemsKey(steamId), key(steamId));
-  const names = ownedNames(items);
+  const targets = ownedTargets(items);
+  const names = targets.map((t) => t.key);
 
   if (req.method === 'GET') {
-    return res.json({ names, prices: stored?.prices || {}, status: stored?.status || {} });
+    const prices = { ...(stored?.prices || {}) };
+    const status = { ...(stored?.status || {}) };
+    // The extension only needs names + its own markets; skip SteamDT for it.
+    if (!bearer) {
+      const youpin = await youpinPrices(redis, targets);
+      for (const [name, entry] of Object.entries(youpin.prices)) {
+        prices[name] = { ...(prices[name] || {}), youpin: entry };
+      }
+      status.youpin = youpin.status;
+    }
+    return res.json({ names, targets, prices, status });
   }
 
   if (req.method === 'POST') {

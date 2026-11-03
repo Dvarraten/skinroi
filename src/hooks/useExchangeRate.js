@@ -21,6 +21,12 @@ export const CURRENCIES = [
   { code: 'JPY', symbol: '¥' },
 ];
 
+const FALLBACK_RATES = {
+  USD: 1, CNY: 6.6609, EUR: 0.8961, GBP: 0.7469, SEK: 9.8226, NOK: 9.2130,
+  RUB: 80.62, BRL: 5.4370, AUD: 1.4227, CAD: 1.3968, PLN: 3.9512, TRY: 49.94,
+  KRW: 1332.8, JPY: 157.53,
+};
+
 const getSymbol = (code) => CURRENCIES.find(c => c.code === code)?.symbol || code;
 
 export const useExchangeRate = () => {
@@ -46,21 +52,25 @@ export const useExchangeRate = () => {
   }, []);
 
   useEffect(() => {
-    fetch('https://api.exchangerate-api.com/v4/latest/USD')
+    // open.er-api.com is the free, keyless tier of ExchangeRate-API. Unlike
+    // the old /v4 endpoint it returns full precision (6.660856, not 6.66).
+    // Rates refresh once a day; lastUpdated shows when the provider published
+    // them, not when we fetched.
+    fetch('https://open.er-api.com/v6/latest/USD')
       .then(r => r.json())
       .then(data => {
+        if (data?.result !== 'success' || !data.rates?.CNY) throw new Error('bad fx response');
         setAllRates({ USD: 1, ...data.rates });
-        const now = new Date();
-        const month = now.toLocaleString('en-US', { month: 'short' });
-        const day = now.getDate();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        setLastUpdated(`${month} ${day} ${hh}:${mm}`);
+        const at = new Date(data.time_last_update_unix * 1000);
+        const month = at.toLocaleString('en-US', { month: 'short' });
+        const hh = String(at.getHours()).padStart(2, '0');
+        const mm = String(at.getMinutes()).padStart(2, '0');
+        setLastUpdated(`${month} ${at.getDate()} ${hh}:${mm}`);
       })
       .catch(() => {
-        setAllRates({ USD: 1, CNY: 7.15, EUR: 0.92, GBP: 0.79, SEK: 10.5,
-          NOK: 10.8, RUB: 90, BRL: 5.0, AUD: 1.55, CAD: 1.37,
-          PLN: 4.0, TRY: 32, KRW: 1340, JPY: 155 });
+        // Snapshot from 2026-11-02. Only used when the fetch fails.
+        setAllRates(FALLBACK_RATES);
+        setLastUpdated('offline, approximate');
       });
   }, []);
 

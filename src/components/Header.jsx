@@ -211,7 +211,7 @@ export default function Header({
                 />
                 {lastUpdated && (
                   <p className={`text-[10px] ${theme?.subtext || 'text-slate-500'} mt-2 text-center`}>
-                    Last Updated: {lastUpdated}
+                    Rate from: {lastUpdated}
                   </p>
                 )}
                 {setConverterPinned && (
