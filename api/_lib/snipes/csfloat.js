@@ -36,8 +36,8 @@ function toListing(l) {
     image: item.icon_url ? STEAM_IMG + item.icon_url : null,
     url: `https://csfloat.com/item/${l.id}`,
     listedAt: toMillis(l.created_at),
-    // CSFloat's own appraisal of the item (no float or sticker premium), used
-    // as the CSFloat sell price for any listing of the same item.
+    // CSFloat's own appraisal of the item. Not a sell price (that is the
+    // cheapest CSFloat listing); only used to pick which items to look up.
     csfloatValueUsd: l.reference?.base_price ? l.reference.base_price / 100 : null,
     marketInfo: {
       // Steam Community Market daily volume and the number of CSFloat sales

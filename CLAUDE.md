@@ -110,9 +110,16 @@ CSFloat listings come from the extension instead: every poll (2 min) it fetches
 `csfloat.com/api/v1/listings?sort_by=most_recent` with the browser session (no
 API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
 "too many IPs" when Vercel fetches them, because functions call out from many
-IPs. Both paths price listings against YouPin, Buff163 and CSFloat (CSFloat's
-own appraisal, learned from CSFloat listings and cached 1 h) and store every
-listing at least 2% under the best of them for 30 min. "Item deals" add an
+IPs. Both paths price listings against YouPin, Buff163 and CSFloat and store
+every listing at least 2% under the best of them for 30 min. CSFloat's price is
+its cheapest listing of the same item (never CSFloat's appraisal), excluding
+the listing being priced (`snipes/csfloat-lowest.js`). The server can't look
+it up, so each listings push answers with up to 6 `csfloatLookups` (items with
+no known price, ranked by appraisal or YouPin/Buff price over the buy price);
+the extension (`lib/snipelookups.js`) fetches each one's 3 cheapest listings,
+3 s apart, and POSTs `{ market: 'csfloat', lowest: [{ name, rows }] }`. Results
+are cached 30 min, the listings that waited on them are priced again, and a
+cheaper listing in the feed updates the cache straight away. "Item deals" add an
 item's lowest YouPin / Buff163 ask when another market pays more; the page
 picks buy and sell markets and the best net sell price, and scores liquidity
 0–100 on the sell market (buy orders, spread and listings on YouPin / Buff163;

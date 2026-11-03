@@ -52,7 +52,7 @@ const linear = (v, lo, hi) => (v == null ? null : Math.max(0, Math.min(1, (v - l
 // How easily the item sells on `market`, 0–100, from what that market tells
 // us. YouPin / Buff163: buy orders waiting (demand), how close the best buy
 // order is to the lowest ask (a tight spread sells fast) and listings.
-// CSFloat: recorded sales behind its appraisal and Steam's daily volume.
+// CSFloat: the sales CSFloat has recorded for the item and Steam's daily volume.
 // Missing parts are left out and the rest re-weighted; null if none known.
 export function liquidityScore(market, ref) {
   if (!ref) return null;

@@ -34,6 +34,9 @@ export const INSPECT_MIN_DELAY_MS = 250;
 // (Vercel functions); the extension runs on the user's single IP.
 export const CSFLOAT_LISTINGS_URL =
   'https://csfloat.com/api/v1/listings?sort_by=most_recent&type=buy_now&limit=50';
+// Gap between the per-item lookups of an item's cheapest CSFloat listing
+// (lib/snipelookups.js); the backend asks for at most 6 per push.
+export const SNIPE_LOOKUP_GAP_MS = 3000;
 
 // CSFloat sell prices for Home (see lib/sellprices.js): up to
 // SELL_PRICES_PER_RUN items each poll; a price is refreshed once it is 30 min
