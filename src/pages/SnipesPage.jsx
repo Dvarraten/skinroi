@@ -6,8 +6,12 @@ import { useSnipes } from "../hooks/useSnipes";
 import { DEFAULT_SNIPE_FILTERS, SNIPE_MARKETS, selectSnipes } from "../utils/snipes";
 import { PlatformBadge } from "../components/PlatformBadge";
 import { useItemImage } from "../utils/itemImages";
+import { CURRENCIES } from "../hooks/useExchangeRate";
 
 const STORAGE_KEY = "skinroi-snipes-filters";
+// Snipes has its own currency (USD by default), separate from the site-wide
+// display currency, because marketplace prices are compared in dollars.
+const CURRENCY_KEY = "skinroi-snipes-currency";
 const MARKET_LABELS = { csfloat: "CSFloat", dmarket: "DMarket" };
 
 function loadFilters() {
@@ -27,9 +31,12 @@ function ago(ms, now) {
   return `${Math.round(s / 3600)}h ago`;
 }
 
-export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }) {
+export default function SnipesPage({ theme, rates }) {
   const { deals, meta, error, loading, refresh } = useSnipes();
   const [filters, setFilters] = useState(loadFilters);
+  const [currency, setCurrency] = useState(() => {
+    try { return localStorage.getItem(CURRENCY_KEY) || "USD"; } catch { return "USD"; }
+  });
   const [now, setNow] = useState(Date.now());
   // Phones show the filters behind a toggle so the deals come first.
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -38,14 +45,20 @@ export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(filters)); } catch { /* ignore */ }
   }, [filters]);
 
+  useEffect(() => {
+    try { localStorage.setItem(CURRENCY_KEY, currency); } catch { /* ignore */ }
+  }, [currency]);
+
   // Re-render every 10s so "seen 2m ago" and age filters stay current.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(id);
   }, []);
 
-  const rate = exchangeRate || 1;
-  const symbol = exchangeRate ? currencySymbol : "$";
+  // Until the rates have loaded, show dollars rather than a wrong conversion.
+  const liveRate = currency === "USD" ? 1 : rates?.[currency];
+  const rate = liveRate || 1;
+  const symbol = liveRate ? CURRENCIES.find((c) => c.code === currency)?.symbol || currency : "$";
   const money = (usd) => `${symbol}${(usd * rate).toFixed(2)}`;
 
   const visible = useMemo(
@@ -80,10 +93,21 @@ export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }
           >
             <SlidersHorizontal size={13} /> Filters
           </button>
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            title="Currency"
+            aria-label="Currency"
+            className={`md:ml-auto px-2 py-1 rounded-lg text-xs border ${theme.input} ${theme.text} focus:outline-none`}
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>{c.code}</option>
+            ))}
+          </select>
           <button
             onClick={refresh}
             title="Refresh"
-            className="md:ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors"
           >
             <RefreshCw size={15} />
           </button>

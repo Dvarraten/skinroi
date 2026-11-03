@@ -66,7 +66,7 @@ export default function CS2TradingTracker() {
 
   const {
     usdAmount, rmbAmount,
-    exchangeRate, sidebarRate, lastUpdated, handleUsdChange, handleRmbChange,
+    exchangeRate, sidebarRate, lastUpdated, allRates, handleUsdChange, handleRmbChange,
     currency1, setCurrency1, currency1Symbol,
     displayCurrency, setDisplayCurrency, currencySymbol,
   } = useExchangeRate();
@@ -323,11 +323,7 @@ export default function CS2TradingTracker() {
 
       {/* ── Snipes page ──────────────────────────────────────────────────── */}
       {isSnipesPage && (
-        <SnipesPage
-          theme={themeStyles}
-          exchangeRate={exchangeRate}
-          currencySymbol={currencySymbol}
-        />
+        <SnipesPage theme={themeStyles} rates={allRates} />
       )}
 
       {/* ── Analytics page ───────────────────────────────────────────────── */}
