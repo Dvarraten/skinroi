@@ -141,7 +141,7 @@ function CostRow({ item, theme }) {
   );
 }
 
-// Lowest Buff / CSFloat listing for an owned item (Home only). The one that
+// Lowest YouPin / CSFloat listing for an owned item (Home only). The one that
 // pays more after fees gets a dot; hover shows fee, profit and age.
 function sellPriceTitle(r, item) {
   if (r.state !== 'ok') return `${r.label}: ${r.note}`;
@@ -169,7 +169,7 @@ function BestDot({ show }) {
 }
 
 function SellPriceRow({ item, sellPrices, theme }) {
-  const { rows, best } = sellPricesFor(sellPrices.prices, item.itemName, Date.now());
+  const { rows, best } = sellPricesFor(sellPrices.prices, item, Date.now());
   return (
     <div className={`grid grid-cols-2 gap-2 pt-2 border-t ${theme.cardBorder}`}>
       {rows.map((r) => (
@@ -186,7 +186,7 @@ function SellPriceRow({ item, sellPrices, theme }) {
 }
 
 function SellPriceCell({ item, sellPrices, theme }) {
-  const { rows, best } = sellPricesFor(sellPrices.prices, item.itemName, Date.now());
+  const { rows, best } = sellPricesFor(sellPrices.prices, item, Date.now());
   return (
     <div className="flex flex-col leading-tight">
       {rows.map((r) => (

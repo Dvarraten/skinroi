@@ -119,7 +119,38 @@ function pickCsPriceRow(rows = [], name, phase, priceField, cnyPerUsd) {
 
 async function fromSteamDt(redis, items) {
   const names = [...new Set(items.filter((i) => !needsPhase(i.name)).map((i) => i.name))];
+  let { raw, warning } = await loadSteamDtRows(redis, names);
+
+  // Buff163 from csgotrader for anything SteamDT hasn't covered.
+  let fallback = new Map();
+  if (items.some((i) => !raw.get(i.name)?.buff163)) {
+    try {
+      fallback = await fromCsgoTrader(items);
+    } catch (e) {
+      warning = warning || `csgotrader: ${e.message}`;
+    }
+  }
+
+  const cnyPerUsd = await getCnyPerUsd();
+  const out = new Map();
+  for (const { name, key } of items) {
+    const entry = needsPhase(name) ? null : raw.get(name);
+    out.set(key, {
+      youpin: steamDtRef(entry?.youpin, entry?.at, cnyPerUsd),
+      buff163: steamDtRef(entry?.buff163, entry?.at, cnyPerUsd) || fallback.get(key)?.buff163 || null,
+    });
+  }
+  if (warning) out.warning = warning;
+  return out;
+}
+
+// Raw SteamDT rows for names: Map(name → { youpin, buff163, at }) with CNY
+// prices, from the 30 min Redis cache, plus one batch call for missing names
+// when the shared one-call-a-minute gate is free. Also used by Home's sell
+// prices (_lib/sell-prices.js). Returns { raw, warning }.
+export async function loadSteamDtRows(redis, names) {
   const raw = new Map();
+  if (!process.env.STEAMDT_API_KEY) return { raw, warning: 'STEAMDT_API_KEY is not set' };
   const cached = names.length ? await redis.mget(...names.map(steamDtCacheKey)) : [];
   const missing = [];
   names.forEach((name, i) => {
@@ -147,28 +178,7 @@ async function fromSteamDt(redis, items) {
       await redis.set(STEAMDT_GATE_KEY, { at: Date.now(), error: warning }, { ex: 60 });
     }
   }
-
-  // Buff163 from csgotrader for anything SteamDT hasn't covered.
-  let fallback = new Map();
-  if (items.some((i) => !raw.get(i.name)?.buff163)) {
-    try {
-      fallback = await fromCsgoTrader(items);
-    } catch (e) {
-      warning = warning || `csgotrader: ${e.message}`;
-    }
-  }
-
-  const cnyPerUsd = await getCnyPerUsd();
-  const out = new Map();
-  for (const { name, key } of items) {
-    const entry = needsPhase(name) ? null : raw.get(name);
-    out.set(key, {
-      youpin: steamDtRef(entry?.youpin, entry?.at, cnyPerUsd),
-      buff163: steamDtRef(entry?.buff163, entry?.at, cnyPerUsd) || fallback.get(key)?.buff163 || null,
-    });
-  }
-  if (warning) out.warning = warning;
-  return out;
+  return { raw, warning };
 }
 
 // → Map(name → { youpin, buff163, at }) with raw CNY rows. Names SteamDT
