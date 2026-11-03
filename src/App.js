@@ -22,6 +22,7 @@ import TabsAndSearchbar from './components/TabsAndSearchbar';
 import PortfolioHero from './components/PortfolioHero';
 import RecentSales from './components/RecentSales';
 import SellPriceStatus from './components/SellPriceStatus';
+import { ItemGridSkeleton, RecentSalesSkeleton } from './components/Skeleton';
 import CurrencyConverter from './components/CurrencyConverter';
 import HandleItemsPage from './pages/HandleItemsPage';
 import AboutPage from './pages/AboutPage';
@@ -38,7 +39,7 @@ export default function CS2TradingTracker() {
   const showWelcome = !authLoading && !user && !authDismissed;
 
   const {
-    items, setItems, portfolioReady, formData, setFormData, sellData, setSellData,
+    items, setItems, portfolioReady, itemsLoading, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
     addItemDirect, sellItemDirect, promotePendingItem, handleAddTransaction,
   } = useItems(user?.steamId);
@@ -87,6 +88,8 @@ export default function CS2TradingTracker() {
 
   const isHome             = !activePage;
   const sellPrices = useSellPrices(!!user && isHome);
+  // Auth or portfolio still on its way: Home shows skeletons, not empty states.
+  const homeLoading = authLoading || itemsLoading;
   const isAnalyticsPage    = activePage === 'analytics';
   const isAddItemPage      = activePage === 'addItem';
   const isHandleItemsPage  = activePage === 'handleItems';
@@ -216,6 +219,7 @@ export default function CS2TradingTracker() {
               stats={stats}
               profitChartData={allTimeProfitChartData}
               theme={themeStyles}
+              loading={homeLoading}
             />
           </div>
           <div className="hidden lg:flex w-[280px] shrink-0 flex-col justify-center gap-3">
@@ -244,11 +248,15 @@ export default function CS2TradingTracker() {
             <div className="shrink-0 space-y-2 pr-3 md:pr-[18px]">
               <div className="flex items-baseline gap-2">
                 <h2 className={`text-sm font-semibold ${themeStyles.text}`}>Active items</h2>
-                <span className={`text-xs font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
-                {stats.totalPending > 0 && (
+                {!homeLoading && (
+                  <span className={`text-xs font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
+                )}
+                {!homeLoading && stats.totalPending > 0 && (
                   <span className="text-xs text-warn">· {stats.totalPending} on trade hold</span>
                 )}
-                <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
+                {!homeLoading && (
+                  <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
+                )}
               </div>
               <TabsAndSearchbar
                 theme={themeStyles}
@@ -270,6 +278,9 @@ export default function CS2TradingTracker() {
               />
             </div>
             <div className="flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable]">
+              {homeLoading ? (
+                <ItemGridSkeleton theme={themeStyles} viewMode={viewMode} />
+              ) : (
               <ItemGrid
                 menuActions
                 sellPlatform={sellPlatform} setSellData={setSellData}
@@ -284,6 +295,7 @@ export default function CS2TradingTracker() {
                 viewMode={viewMode}
                 sellPrices={sellPrices}
               />
+              )}
             </div>
           </div>
           <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -291,7 +303,9 @@ export default function CS2TradingTracker() {
               <p className={`text-xs font-medium ${themeStyles.subtext} mb-2 px-1`}>
                 Recent sales
               </p>
-              <RecentSales items={items} theme={themeStyles} />
+              {homeLoading
+                ? <RecentSalesSkeleton theme={themeStyles} />
+                : <RecentSales items={items} theme={themeStyles} />}
             </div>
           </div>
         </div>
