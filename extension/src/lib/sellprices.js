@@ -96,14 +96,17 @@ async function fetchCsfloatPrice(target) {
   const { name, phase, paintIndex } = target;
   const isDoppler = /\bDoppler\b/.test(name);
   if (!isDoppler) return cheapestCsfloat(name, null);
-  if (!phase) throw new Error('Doppler phase unknown (add the phase to the item name)');
+  // Phase unknown: lowest listing of any phase, flagged so the site says so.
+  if (!phase) return { ...(await cheapestCsfloat(name, null)), anyPhase: true };
   const finish = /\bGamma Doppler\b/.test(name) ? 'Gamma Doppler' : 'Doppler';
   const indexes = paintIndex != null ? [paintIndex] : PHASE_PAINT_INDEXES[finish][phase] || [];
   for (const idx of indexes) {
     const hit = await cheapestCsfloat(name, idx);
     if (hit.priceUsd != null) return hit;
   }
-  return { priceUsd: null, count: 0 };
+  // Nothing listed for that phase (or the filter didn't match): fall back to
+  // the lowest of any phase rather than showing nothing.
+  return { ...(await cheapestCsfloat(name, null)), anyPhase: true };
 }
 
 async function cheapestCsfloat(name, paintIndex) {
