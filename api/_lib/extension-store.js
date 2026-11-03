@@ -7,7 +7,8 @@
 // Redis keys:
 //   skinroi:ext-pair:{code}       Short-lived pairing code (TTL 10 min).
 //   skinroi:ext-secret:{secret}   Reverse lookup: secret → steamId (no TTL).
-//   skinroi:ext-info:{steamId}    Extension connection info per user.
+//   skinroi:ext-info:{steamId}    Extension connection info per user (no secret).
+//   skinroi:ext-revoke:{steamId}  Secret held for revocation only (no TTL).
 
 import { randomBytes, randomInt } from 'crypto';
 import { getRedis } from './redis.js';
@@ -15,6 +16,7 @@ import { getRedis } from './redis.js';
 const PAIR_KEY = (code) => `skinroi:ext-pair:${code}`;
 const SECRET_KEY = (secret) => `skinroi:ext-secret:${secret}`;
 const INFO_KEY = (steamId) => `skinroi:ext-info:${steamId}`;
+const REVOKE_KEY = (steamId) => `skinroi:ext-revoke:${steamId}`;
 
 const PAIR_TTL_S = 10 * 60;
 
@@ -68,8 +70,8 @@ export async function claimPairing(code, extVersion) {
   }, { ex: PAIR_TTL_S });
 
   await client.set(SECRET_KEY(secret), steamId);
+  await client.set(REVOKE_KEY(steamId), secret);
   await client.set(INFO_KEY(steamId), {
-    secret,
     extVersion: extVersion || null,
     pairedAt: now,
     lastSeen: null,
@@ -113,8 +115,12 @@ export async function revokeExtension(steamId) {
   const info = await loadExtensionInfo(steamId);
   if (!info) return { revoked: false };
   const client = getRedis();
+  // Read the secret from the dedicated revocation key. Fall back to info.secret
+  // for entries created before the revocation key was introduced.
+  const secret = (await client.get(REVOKE_KEY(steamId))) || info.secret;
   await Promise.all([
-    client.del(SECRET_KEY(info.secret)),
+    secret ? client.del(SECRET_KEY(secret)) : Promise.resolve(),
+    client.del(REVOKE_KEY(steamId)),
     client.del(INFO_KEY(steamId)),
   ]);
   return { revoked: true };
