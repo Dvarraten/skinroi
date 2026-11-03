@@ -7,8 +7,10 @@
 // answers but nothing parses, the error lists the keys we got back so the
 // shape can be fixed quickly.
 //
-// If DMARKET_PUBLIC_KEY + DMARKET_SECRET_KEY are set we sign the request
-// (Ed25519, "dmar ed25519" scheme).
+// The endpoint needs DMARKET_PUBLIC_KEY + DMARKET_SECRET_KEY (Trading API
+// keys from the DMarket account settings); requests are Ed25519-signed with
+// the "dmar ed25519" scheme. Keys are checked up front and a 401 says what
+// was sent, so a bad key setup shows up in the Snipes header.
 
 import crypto from 'node:crypto';
 import { fetchJson, normalizePhase, toMillis, toNumber } from './normalize.js';
@@ -20,15 +22,21 @@ const CS2_GAME_ID = 'a8db';
 const ED25519_PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex');
 
 export async function fetchDmarketListings({ minPriceCents }) {
+  const keys = readKeys();
   const base = { gameId: CS2_GAME_ID, limit: '100', currency: 'USD' };
   // Newest first when DMarket accepts the sort; some API versions reject
   // unknown params with 400, so fall back to the default order.
   let json;
   try {
-    json = await get({ ...base, orderBy: 'updated', orderDir: 'desc' });
+    try {
+      json = await get(keys, { ...base, orderBy: 'createdAt', orderDir: 'desc' });
+    } catch (e) {
+      if (e.status !== 400) throw e;
+      json = await get(keys, base);
+    }
   } catch (e) {
-    if (e.status !== 400) throw e;
-    json = await get(base);
+    if (e.status === 401 || e.status === 403) e.message += ` (${describeKeys(keys)})`;
+    throw e;
   }
 
   const rows = json?.offers || json?.objects || json?.items || (Array.isArray(json?.data) ? json.data : []);
@@ -42,9 +50,44 @@ export async function fetchDmarketListings({ minPriceCents }) {
   return listings.filter((l) => l.priceUsd * 100 >= minPriceCents);
 }
 
-async function get(params) {
+async function get(keys, params) {
   const path = `${OFFERS_PATH}?${new URLSearchParams(params)}`;
-  return fetchJson(API + path, { headers: signHeaders('GET', path) });
+  return fetchJson(API + path, { headers: signHeaders(keys, 'GET', path) });
+}
+
+// Reads and checks the key pair. Returns null when neither key is set; throws
+// a readable error when they are set but can't be right.
+function readKeys() {
+  const clean = (v) => (v || '').trim().replace(/^["']|["']$/g, '').trim().toLowerCase();
+  const pub = clean(process.env.DMARKET_PUBLIC_KEY);
+  const secret = clean(process.env.DMARKET_SECRET_KEY);
+  if (!pub && !secret) return null;
+  if (!pub) throw new Error('DMARKET_SECRET_KEY is set but DMARKET_PUBLIC_KEY is missing');
+  if (!secret) throw new Error('DMARKET_PUBLIC_KEY is set but DMARKET_SECRET_KEY is missing');
+  if (!/^[0-9a-f]{64}$/.test(pub)) {
+    const hint = pub.length === 128 ? ' (are the two keys swapped?)' : /^[0-9a-f]+$/.test(pub) ? '' : ' (not all hex)';
+    throw new Error(`DMARKET_PUBLIC_KEY should be 64 hex characters, got ${pub.length}${hint}`);
+  }
+  if (!/^[0-9a-f]{128}$/.test(secret)) {
+    throw new Error(`DMARKET_SECRET_KEY should be 128 hex characters, got ${secret.length}`);
+  }
+  // DMarket secret keys are hex: 32-byte seed followed by the 32-byte public key.
+  const raw = Buffer.from(secret, 'hex');
+  const privateKey = crypto.createPrivateKey({
+    key: Buffer.concat([ED25519_PKCS8_PREFIX, raw.subarray(0, 32)]),
+    format: 'der',
+    type: 'pkcs8',
+  });
+  const derivedPub = crypto.createPublicKey(privateKey).export({ format: 'der', type: 'spki' }).subarray(-32).toString('hex');
+  if (derivedPub !== pub) {
+    throw new Error('DMARKET_PUBLIC_KEY does not belong to DMARKET_SECRET_KEY (keys from different pairs?)');
+  }
+  return { pub, privateKey };
+}
+
+function describeKeys(keys) {
+  if (!keys) return 'no DMarket keys in this deployment: set DMARKET_PUBLIC_KEY and DMARKET_SECRET_KEY for Production and redeploy';
+  return `signed with public key ${keys.pub.slice(0, 6)}…${keys.pub.slice(-4)}; the key pair is valid, so DMarket rejected it`;
 }
 
 function describe(json, row) {
@@ -55,21 +98,12 @@ function describe(json, row) {
   return `${top}${inner}`;
 }
 
-function signHeaders(method, pathWithQuery, body = '') {
-  const pub = process.env.DMARKET_PUBLIC_KEY;
-  const secret = process.env.DMARKET_SECRET_KEY;
-  if (!pub || !secret) return {};
+function signHeaders(keys, method, pathWithQuery, body = '') {
+  if (!keys) return {};
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  // DMarket secret keys are hex: 32-byte seed followed by the 32-byte public key.
-  const seed = Buffer.from(secret, 'hex').subarray(0, 32);
-  const key = crypto.createPrivateKey({
-    key: Buffer.concat([ED25519_PKCS8_PREFIX, seed]),
-    format: 'der',
-    type: 'pkcs8',
-  });
-  const signature = crypto.sign(null, Buffer.from(method + pathWithQuery + body + timestamp), key);
+  const signature = crypto.sign(null, Buffer.from(method + pathWithQuery + body + timestamp), keys.privateKey);
   return {
-    'X-Api-Key': pub,
+    'X-Api-Key': keys.pub,
     'X-Sign-Date': timestamp,
     'X-Request-Sign': `dmar ed25519 ${signature.toString('hex')}`,
   };
