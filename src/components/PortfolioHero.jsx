@@ -3,8 +3,9 @@ import React, { useMemo } from "react";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { PROFIT_COLOR, LOSS_COLOR } from "../themes/themes";
+import { Bone } from "./Skeleton";
 
-export default function PortfolioHero({ stats, profitChartData, theme }) {
+export default function PortfolioHero({ stats, profitChartData, theme, loading = false }) {
   const profit = stats.totalProfit;
   const roi = stats.totalInvested > 0 ? (profit / stats.totalInvested) * 100 : 0;
 
@@ -31,6 +32,12 @@ export default function PortfolioHero({ stats, profitChartData, theme }) {
         <p className={`text-xs font-medium ${theme.subtext}`}>
           Holding value
         </p>
+        {loading ? (
+          <div className="motion-safe:animate-pulse space-y-2 py-0.5">
+            <Bone theme={theme} className="h-6 w-28" />
+            <Bone theme={theme} className="h-4 w-20 rounded-full" />
+          </div>
+        ) : (<>
         <p className={`text-2xl font-semibold font-mono tracking-tight ${theme.text} tabular-nums leading-none`}>
           ${stats.totalActive.toFixed(2)}
         </p>
@@ -42,11 +49,14 @@ export default function PortfolioHero({ stats, profitChartData, theme }) {
           <span className="opacity-40 mx-0.5">·</span>
           {isGain ? '+' : ''}${Math.abs(profit).toFixed(2)}
         </div>
+        </>)}
       </div>
 
       {/* Chart — compact sparkline, fixed width */}
       <div className="w-[280px] shrink-0 flex items-center">
-        {cumulativeData.length > 1 ? (
+        {loading ? (
+          <div className="w-full h-[80px]" />
+        ) : cumulativeData.length > 1 ? (
           <ResponsiveContainer width="100%" height={80} style={{ pointerEvents: 'none' }}>
             <AreaChart data={cumulativeData} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
               <defs>
@@ -77,23 +87,35 @@ export default function PortfolioHero({ stats, profitChartData, theme }) {
       <div className="flex items-stretch shrink-0 ml-auto">
         <div className={`border-l ${theme.cardBorder} px-4 py-3 flex flex-col justify-center gap-0.5 min-w-[100px]`}>
           <p className={`text-xs font-medium ${theme.subtext}`}>Realised</p>
-          <p className={`text-base font-mono font-semibold ${theme.text} tabular-nums leading-none`}>
-            ${stats.totalSold.toFixed(2)}
-          </p>
-          <p className={`text-[11px] ${theme.subtext}`}>{stats.totalSoldCount} sold</p>
+          {loading ? (
+            <span className="motion-safe:animate-pulse block py-px"><Bone theme={theme} className="h-3.5 w-12" /></span>
+          ) : (
+            <p className={`text-base font-mono font-semibold ${theme.text} tabular-nums leading-none`}>
+              ${stats.totalSold.toFixed(2)}
+            </p>
+          )}
+          <p className={`text-[11px] ${theme.subtext}`}>{loading ? "sold" : `${stats.totalSoldCount} sold`}</p>
         </div>
         <div className={`border-l ${theme.cardBorder} px-4 py-3 flex flex-col justify-center gap-0.5 min-w-[80px]`}>
           <p className={`text-xs font-medium ${theme.subtext}`}>Pending</p>
-          <p className="text-base font-mono font-semibold text-warn tabular-nums leading-none">
-            {stats.totalPending}
-          </p>
+          {loading ? (
+            <span className="motion-safe:animate-pulse block py-px"><Bone theme={theme} className="h-3.5 w-12" /></span>
+          ) : (
+            <p className="text-base font-mono font-semibold text-warn tabular-nums leading-none">
+              {stats.totalPending}
+            </p>
+          )}
           <p className={`text-[11px] ${theme.subtext}`}>incoming</p>
         </div>
         <div className={`border-l ${theme.cardBorder} px-4 py-3 flex flex-col justify-center gap-0.5 min-w-[80px]`}>
           <p className={`text-xs font-medium ${theme.subtext}`}>Active</p>
-          <p className={`text-base font-mono font-semibold ${theme.text} tabular-nums leading-none`}>
-            {stats.totalActiveCount}
-          </p>
+          {loading ? (
+            <span className="motion-safe:animate-pulse block py-px"><Bone theme={theme} className="h-3.5 w-12" /></span>
+          ) : (
+            <p className={`text-base font-mono font-semibold ${theme.text} tabular-nums leading-none`}>
+              {stats.totalActiveCount}
+            </p>
+          )}
           <p className={`text-[11px] ${theme.subtext}`}>items held</p>
         </div>
       </div>
