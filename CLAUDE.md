@@ -123,11 +123,13 @@ are skipped so phases never get mixed.
 **Sell prices on Home**: each unsold item shows the lowest Buff163 and
 CSFloat listing, at most 1 hour old, with a dot on the one that pays more after
 fees. The extension fetches them from the user's browser (`lib/sellprices.js`):
-CSFloat `api/v1/listings?market_hash_name=…&sort_by=lowest_price` and Buff163
-`api/market/goods?search=…` (needs the user signed in on buff.163.com in
-Chrome; prices are CNY, converted on the server). Every poll it reads
-`GET /api/items?sellPrices=1` (owned names + price ages), refreshes up to 10
-names per market that are 30+ min old, and POSTs them back. The site reads the
+CSFloat `api/v1/listings?market_hash_name=…&sort_by=lowest_price`, up to 10
+names per poll that are 30+ min old. Buff163: one request per 15 min (the
+user wants at most ~4 an hour) to `api/market/steam_inventory`, whose
+`goods_infos` carry `sell_min_price` (CNY) for every item in the Steam
+inventory; needs the user signed in on buff.163.com in Chrome (the site need
+not be open). Every poll it reads `GET /api/items?sellPrices=1` (owned names +
+price ages) and POSTs results back. The site reads the
 same GET and hides prices older than 1 hour. Doppler prices are not per phase.
 
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.

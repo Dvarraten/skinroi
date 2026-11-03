@@ -6,21 +6,29 @@
 // browser session (the user must be signed in on buff.163.com in Chrome).
 //
 // Each poll asks the backend which names it owns and how old each price is,
-// refreshes the stalest few per market (gently spaced), and pushes the results.
-// The site hides anything older than an hour, so prices are refreshed once
-// they are REFRESH_AFTER_MS old.
+// refreshes what is due, and pushes the results. The site hides anything
+// older than an hour.
+// - CSFloat: one request per item, the stalest few per poll, gently spaced.
+// - Buff163: one request per 15 min (4 an hour, the user's limit). It reads
+//   Buff's view of the user's Steam inventory, which carries the lowest Buff
+//   listing for every item in it, so all owned items are priced at once.
+//   Items not in the Steam inventory (e.g. still on trade hold elsewhere)
+//   get no Buff price.
 
 import {
-  BUFF_GOODS_SEARCH_URL,
+  BUFF_INVENTORY_URL,
+  BUFF_INVENTORY_INTERVAL_MS,
   CSFLOAT_LISTINGS_API,
+  STORAGE_KEYS,
   SELL_PRICES_PER_RUN,
   SELL_PRICES_REFRESH_AFTER_MS,
   SELL_PRICES_RETRY_ERROR_MS,
 } from './config.js';
 import { getSellPriceState, pushSellPrices } from './skinroi.js';
+import { get, set } from './storage.js';
 
-const MARKETS = {
-  buff163: { fetch: fetchBuffPrice, gapMs: 3000 },
+// Markets priced one item per request.
+const PER_ITEM_MARKETS = {
   csfloat: { fetch: fetchCsfloatPrice, gapMs: 2000 },
 };
 
@@ -53,8 +61,9 @@ export async function runSellPrices() {
   const results = [];
   const status = {};
 
-  await Promise.all(
-    Object.entries(MARKETS).map(async ([market, { fetch: fetchPrice, gapMs }]) => {
+  await Promise.all([
+    runBuff(names, results, status, now),
+    ...Object.entries(PER_ITEM_MARKETS).map(async ([market, { fetch: fetchPrice, gapMs }]) => {
       const due = dueNames(names, state.prices, market, now);
       if (!due.length) return;
       let ok = 0;
@@ -72,8 +81,8 @@ export async function runSellPrices() {
         }
       }
       if (ok > 0) status[market] = null;
-    })
-  );
+    }),
+  ]);
 
   if (!results.length && !Object.keys(status).length) return { skipped: 'fresh' };
   await pushSellPrices({ results, status });
@@ -81,22 +90,51 @@ export async function runSellPrices() {
 }
 
 // ── Buff163 ────────────────────────────────────────────────────────────────
-// The goods search returns sell_min_price (CNY) and sell_num per item. Only
-// an exact market_hash_name match counts (search also returns StatTrak etc.).
-async function fetchBuffPrice(name) {
-  const url = `${BUFF_GOODS_SEARCH_URL}&search=${encodeURIComponent(name)}`;
-  const res = await fetch(url, { credentials: 'include' });
-  if (res.status === 429) throw new MarketError('Buff163 rate limited, retrying later');
-  if (!res.ok) throw new MarketError(`Buff163 HTTP ${res.status}`);
-  const json = await res.json().catch(() => null);
-  if (json?.code === 'Login Required') {
-    throw new MarketError('Not signed in to buff.163.com in this browser');
+// At most one request per BUFF_INVENTORY_INTERVAL_MS, counted from the last
+// attempt (failed ones too), so Buff never sees more than ~4 calls an hour.
+async function runBuff(names, results, status, now) {
+  const last = (await get([STORAGE_KEYS.BUFF_LAST_FETCH]))[STORAGE_KEYS.BUFF_LAST_FETCH] || 0;
+  if (now - last < BUFF_INVENTORY_INTERVAL_MS) return;
+  await set({ [STORAGE_KEYS.BUFF_LAST_FETCH]: now });
+  try {
+    const byName = await fetchBuffInventoryPrices();
+    for (const name of names) {
+      const hit = byName.get(name);
+      results.push(hit
+        ? { name, market: 'buff163', ...hit }
+        : { name, market: 'buff163', error: 'not in your Steam inventory on Buff163' });
+    }
+    status.buff163 = null;
+  } catch (err) {
+    status.buff163 = err.message || String(err);
   }
-  if (json?.code !== 'OK') throw new MarketError(`Buff163: ${json?.msg || json?.code || 'unexpected answer'}`);
-  const hit = (json.data?.items || []).find((g) => g?.market_hash_name === name);
-  if (!hit) throw new Error('not found on Buff163');
-  const count = Number(hit.sell_num) || 0;
-  return { priceCny: count > 0 ? Number(hit.sell_min_price) : null, count };
+}
+
+// Buff's sell page data: the user's Steam inventory plus goods_infos, one
+// entry per item type with sell_min_price (CNY, lowest listing) and sell_num.
+// Returns Map(market_hash_name → { priceCny, count }).
+async function fetchBuffInventoryPrices() {
+  const res = await fetch(BUFF_INVENTORY_URL, { credentials: 'include' });
+  if (res.status === 429) throw new Error('Buff163 rate limited, retrying in 15 min');
+  if (!res.ok) throw new Error(`Buff163 HTTP ${res.status}`);
+  const json = await res.json().catch(() => null);
+  if (json?.code === 'Login Required') throw new Error('Not signed in to buff.163.com in this browser');
+  if (json?.code !== 'OK') throw new Error(`Buff163: ${json?.msg || json?.error || json?.code || 'unexpected answer'}`);
+  const infos = json.data?.goods_infos;
+  if (!infos || typeof infos !== 'object') {
+    throw new Error(`Buff163: no goods_infos (got ${Object.keys(json.data || {}).slice(0, 8).join(', ')})`);
+  }
+  const out = new Map();
+  for (const g of Object.values(infos)) {
+    if (!g?.market_hash_name) continue;
+    const count = Number(g.sell_num);
+    const price = Number(g.sell_min_price);
+    out.set(g.market_hash_name, {
+      priceCny: price > 0 && count !== 0 ? price : null,
+      count: Number.isFinite(count) ? count : null,
+    });
+  }
+  return out;
 }
 
 // ── CSFloat ────────────────────────────────────────────────────────────────

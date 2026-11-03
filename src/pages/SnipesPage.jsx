@@ -5,6 +5,7 @@ import { ExternalLink, RefreshCw, RotateCcw, AlertTriangle, Lock, Sticker, Slide
 import { useSnipes } from "../hooks/useSnipes";
 import { DEFAULT_SNIPE_FILTERS, SNIPE_MARKETS, selectSnipes } from "../utils/snipes";
 import { PlatformBadge } from "../components/PlatformBadge";
+import { useItemImage } from "../utils/itemImages";
 
 const STORAGE_KEY = "skinroi-snipes-filters";
 const MARKET_LABELS = { csfloat: "CSFloat", dmarket: "DMarket" };
@@ -153,6 +154,25 @@ function ScanStatus({ meta, now, theme }) {
   );
 }
 
+// The listing's own image is missing on some CSFloat/DMarket rows, and some
+// of the URLs they send don't load. Fall back to the items.json picture for
+// the same name, then to an empty box.
+function SnipeImage({ image, name }) {
+  const fallback = useItemImage({ name });
+  const [failed, setFailed] = useState([]);
+  const src = [image, fallback].find((u) => u && !failed.includes(u));
+  if (!src) return <div className="w-12 h-9 md:w-16 md:h-12 shrink-0" />;
+  return (
+    <img
+      src={src}
+      alt=""
+      className="w-12 h-9 md:w-16 md:h-12 object-contain shrink-0"
+      loading="lazy"
+      onError={() => setFailed((f) => [...f, src])}
+    />
+  );
+}
+
 function SnipeRow({ deal: d, theme, money, now }) {
   const liq = d.liquidity;
   const liquidityText = [
@@ -163,11 +183,7 @@ function SnipeRow({ deal: d, theme, money, now }) {
 
   return (
     <div className={`flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3 border-b ${theme.panelBorder} ${theme.itemHoverBg || "hover:bg-white/5"}`}>
-      {d.image ? (
-        <img src={d.image} alt="" className="w-12 h-9 md:w-16 md:h-12 object-contain shrink-0" loading="lazy" />
-      ) : (
-        <div className="w-12 h-9 md:w-16 md:h-12 shrink-0" />
-      )}
+      <SnipeImage image={d.image} name={d.name} />
 
       <div className="flex-1 min-w-0 basis-[calc(100%-4rem)] md:basis-auto">
         <p className={`text-sm font-medium truncate ${theme.text}`} title={d.name}>
