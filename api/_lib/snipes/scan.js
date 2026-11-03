@@ -118,6 +118,7 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}) 
   if (wanted.length) {
     try {
       refs = await getReferencePrices(redis, wanted);
+      refError = refs.warning || null;
     } catch (e) {
       refError = e.message;
       console.warn('[snipes] reference prices failed:', e.message);

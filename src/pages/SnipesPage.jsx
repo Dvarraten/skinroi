@@ -92,7 +92,7 @@ export default function SnipesPage({ theme, exchangeRate, currencySymbol = "$" }
         {meta?.refProvider === "csgotrader" && (
           <div className="px-5 py-2 text-xs text-warn border-b border-white/5 flex items-center gap-2">
             <AlertTriangle size={13} />
-            Using free Buff163 prices (no listing counts). Set CSPRICEAPI_KEY for YouPin prices and liquidity data.
+            Using free Buff163 prices (no listing counts). Set STEAMDT_API_KEY for YouPin prices and listing counts.
           </div>
         )}
 
@@ -148,7 +148,7 @@ function ScanStatus({ meta, now, theme }) {
         );
       })}
       {meta.refError && (
-        <span className="text-loss" title={meta.refError}>Reference prices failed</span>
+        <span className="text-loss">Reference prices · {meta.refError}</span>
       )}
     </span>
   );
