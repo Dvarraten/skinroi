@@ -15,8 +15,8 @@
 //          doppler-phase.js). The extension uses it to see which keys are
 //          due for a refresh; the site uses it to render prices
 //          (prices[key].youpin is filled in from SteamDT on the fly).
-//          SteamDT has no per-phase prices, so Dopplers get no YouPin price
-//          rather than a wrong one.
+//          SteamDT has no per-phase prices, so a Doppler's YouPin price is
+//          the lowest of any phase, flagged anyPhase so the site says so.
 //   POST — Bearer secret only. Body: { results: [{ name, market, priceUsd?,
 //          priceCny?, count?, error? }], status?: { [market]: errorText|null } }
 
@@ -68,6 +68,7 @@ export function mergeResults(stored, results, names, cnyPerUsd, now) {
       next = {
         priceUsd: usd != null ? Math.round(usd * 100) / 100 : null, // null = no listings
         count: Number.isFinite(Number(r.count)) ? Number(r.count) : null,
+        ...(r.anyPhase ? { anyPhase: true } : {}),
         at: now,
         checkedAt: now,
       };
@@ -78,24 +79,20 @@ export function mergeResults(stored, results, names, cnyPerUsd, now) {
 }
 
 // YouPin lowest listing per target from SteamDT rows (CNY → USD). Keyed by
-// target key. Dopplers get an explanatory error instead of a price.
+// target key. SteamDT doesn't split Dopplers by phase, so theirs is the
+// lowest listing of any phase and is flagged anyPhase.
 export async function youpinPrices(redis, targets) {
   const now = Date.now();
-  const plain = targets.filter((t) => !needsPhase(t.name));
   let raw = new Map();
   let warning = null;
   try {
-    ({ raw, warning } = await loadSteamDtRows(redis, [...new Set(plain.map((t) => t.name))]));
+    ({ raw, warning } = await loadSteamDtRows(redis, [...new Set(targets.map((t) => t.name))]));
   } catch (e) {
     warning = e.message;
   }
   const cnyPerUsd = raw.size ? await getCnyPerUsd() : 1;
   const prices = {};
   for (const t of targets) {
-    if (needsPhase(t.name)) {
-      prices[t.key] = { error: 'no YouPin price per Doppler phase from SteamDT' };
-      continue;
-    }
     const entry = raw.get(t.name);
     if (!entry) continue;
     const name = t.key;
@@ -103,6 +100,7 @@ export async function youpinPrices(redis, targets) {
     prices[name] = {
       priceUsd: row?.sell ? Math.round((row.sell / cnyPerUsd) * 100) / 100 : null,
       count: row ? row.sellCount ?? null : 0,
+      ...(needsPhase(t.name) ? { anyPhase: true } : {}),
       at: entry.at,
       checkedAt: entry.at,
     };

@@ -56,7 +56,7 @@ export function describePrice(entry, market, now) {
   }
   if (entry.priceUsd == null) return { state: "none", note: `Nothing listed · checked ${formatAge(age)}` };
   const net = entry.priceUsd * (1 - getPlatformFee(market));
-  return { state: "ok", priceUsd: entry.priceUsd, net, age };
+  return { state: "ok", priceUsd: entry.priceUsd, net, age, anyPhase: !!entry.anyPhase };
 }
 
 // Both markets for one item, plus which one pays more after fees.
@@ -66,7 +66,12 @@ export function sellPricesFor(prices, item, now) {
     ...m,
     ...describePrice(prices?.[name]?.[m.id], m.id, now),
   }));
+  // Only compare like with like: a phase price against a lowest-of-any-phase
+  // price says nothing about where this copy sells best.
   const priced = rows.filter((r) => r.state === "ok");
+  if (priced.length > 1 && priced.some((r) => r.anyPhase !== priced[0].anyPhase)) {
+    return { rows, best: null };
+  }
   const best = priced.length > 1 ? priced.reduce((a, b) => (b.net > a.net ? b : a)).id : null;
   return { rows, best };
 }
