@@ -42,3 +42,11 @@ test("Doppler phase comes from the name or the paint index", () => {
   expect(sellPriceKey({ itemName: "★ Karambit | Doppler (Factory New)" })).toBe("★ Karambit | Doppler (Factory New)");
   expect(sellPriceKey({ itemName: "AK-47 | Redline (Field-Tested)", paintIndex: 415 })).toBe("AK-47 | Redline (Field-Tested)");
 });
+
+test("no best pick when one price is per phase and the other any phase", () => {
+  const key = "★ Karambit | Doppler (Factory New)|Phase 2";
+  const prices = { [key]: { youpin: { priceUsd: 500, at: NOW, anyPhase: true }, csfloat: { priceUsd: 700, at: NOW } } };
+  const { rows, best } = sellPricesFor(prices, { itemName: "★ Karambit | Doppler Phase 2 (Factory New)" }, NOW);
+  expect(best).toBe(null);
+  expect(rows[0].anyPhase).toBe(true);
+});

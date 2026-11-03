@@ -132,8 +132,10 @@ YouPin session. CSFloat is fetched by the extension (`lib/sellprices.js`):
 poll that are 30+ min old, POSTed to the same URL. The site hides prices older
 than 1 hour. Prices are keyed per Doppler phase (`api/_lib/doppler-phase.js`,
 mirrored in `src/utils/sellPrices.js`): phase from the item name ("Doppler
-Phase 2") or its paint index; CSFloat filters by `paint_index`. SteamDT has no
-per-phase prices, so Dopplers show no YouPin price.
+Phase 2") or its paint index; CSFloat filters by `paint_index`. When the
+phase is unknown (or CSFloat has nothing for it), and always for YouPin
+(SteamDT has no per-phase prices), the price is the lowest of any phase,
+flagged `anyPhase` and shown with a `*`; no "best" dot then.
 
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
 Guest users → `localStorage` key `cs2-trading-items`.

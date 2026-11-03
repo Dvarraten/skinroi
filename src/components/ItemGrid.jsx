@@ -151,11 +151,12 @@ function sellPriceTitle(r, item) {
     `Lowest ${r.label} listing $${r.priceUsd.toFixed(2)}`,
     `$${r.net.toFixed(2)} after fee (${profit >= 0 ? '+' : '−'}$${Math.abs(profit).toFixed(2)} vs cost)`,
     `updated ${formatAge(r.age)}`,
+    ...(r.anyPhase ? ['* lowest of any Doppler phase'] : []),
   ].join(' · ');
 }
 
 function sellPriceText(r) {
-  if (r.state === 'ok') return `$${r.priceUsd.toFixed(2)}`;
+  if (r.state === 'ok') return `$${r.priceUsd.toFixed(2)}${r.anyPhase ? '*' : ''}`;
   return r.state === 'none' ? 'none' : '—';
 }
 
