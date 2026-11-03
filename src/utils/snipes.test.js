@@ -51,6 +51,11 @@ test("uses buy-order spread when listing counts are unknown", () => {
   expect(passes(buffOnly(null), f({ hideUnknownLiquidity: false }))).toBe(true);
 });
 
+test("ignores the buy-order spread when a listing count is known", () => {
+  const withCount = deal({ refs: { youpin: ref({ count: 500, liquidity: null, bidUsd: 60 }) } });
+  expect(passes(withCount)).toBe(true);
+});
+
 test("hides volatile, stale, old and unprofitable deals", () => {
   expect(passes(deal({ refs: { youpin: ref({ change7d: -30 }) } }))).toBe(false);
   expect(passes(deal({ refs: { youpin: ref({ updatedAt: NOW - 3 * 3600_000 }) } }))).toBe(false);

@@ -77,7 +77,8 @@ export function passesFilters(d, f, { rate = 1, now = Date.now() } = {}) {
   const { count, score, bidAsk } = d.liquidity;
   if (count != null && count < f.minListings) return false;
   if (score != null && score < f.minLiquidity) return false;
-  if (bidAsk != null && bidAsk * 100 < f.minBidAsk) return false;
+  // Buy order / ask only stands in when there is no listing count or score.
+  if (count == null && score == null && bidAsk != null && bidAsk * 100 < f.minBidAsk) return false;
   if (f.hideUnknownLiquidity && count == null && score == null && bidAsk == null) return false;
 
   if (f.hideVolatile && d.ref.change7d != null && Math.abs(d.ref.change7d) > f.maxChange7d) return false;

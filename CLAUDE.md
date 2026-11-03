@@ -115,9 +115,11 @@ listing at least 2% under reference for 30 min. Fees, ROI and liquidity filters
 run in the browser (`src/utils/snipes.js`). DMarket is read from
 `/marketplace-api/v2/offers`, which needs `DMARKET_PUBLIC_KEY`/
 `DMARKET_SECRET_KEY` (requests are Ed25519-signed). Other env vars:
-`CSPRICEAPI_KEY` (YouPin + Buff163 with listing counts; without it the free
-csgotrader.app Buff163 dump is used) and `SNIPES_MIN_PRICE_CENTS` (default
-200). A source that answers 429 pauses 15 min. Dopplers without a known phase
+`STEAMDT_API_KEY` (free SteamDT key: YouPin + Buff163 with listing counts;
+the batch endpoint allows one call a minute, so names are cached 30 min and
+uncovered ones fall back to csgotrader), `CSPRICEAPI_KEY` (paid, wins if set;
+with neither, the free csgotrader.app Buff163 dump is used) and
+`SNIPES_MIN_PRICE_CENTS` (default 200). A source that answers 429 pauses 15 min. Dopplers without a known phase
 are skipped so phases never get mixed.
 
 **Sell prices on Home**: each unsold item shows the lowest Buff163 and
