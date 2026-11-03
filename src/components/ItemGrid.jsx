@@ -9,6 +9,7 @@ import { PlatformBadge } from "./PlatformBadge";
 import { PROFIT_COLOR, LOSS_COLOR, WARN_COLOR } from "../themes/themes";
 import { useItemImage } from "../utils/itemImages";
 import { useLocalPriceSync } from "../hooks/useLocalPriceSync";
+import { sellPricesFor, formatAge } from "../utils/sellPrices";
 import buff163Icon  from "../assets/platforms/buff163.webp";
 import csfloatIcon  from "../assets/platforms/csfloat.webp";
 import csmoneyIcon  from "../assets/platforms/csmoney.webp";
@@ -136,6 +137,65 @@ function CostRow({ item, theme }) {
         {item.platform && <PlatformBadge platform={item.platform} size="xs" />}
         <span className={`${theme.subtext} pr-1.5`}>{formatShortDate(item.datePurchased)}</span>
       </div>
+    </div>
+  );
+}
+
+// Lowest Buff / CSFloat listing for an owned item (Home only). The one that
+// pays more after fees gets a dot; hover shows fee, profit and age.
+function sellPriceTitle(r, item) {
+  if (r.state !== 'ok') return `${r.label}: ${r.note}`;
+  const profit = r.net - item.purchasePrice;
+  return [
+    `Lowest ${r.label} listing $${r.priceUsd.toFixed(2)}`,
+    `$${r.net.toFixed(2)} after fee (${profit >= 0 ? '+' : '−'}$${Math.abs(profit).toFixed(2)} vs cost)`,
+    `updated ${formatAge(r.age)}`,
+  ].join(' · ');
+}
+
+function sellPriceText(r) {
+  if (r.state === 'ok') return `$${r.priceUsd.toFixed(2)}`;
+  return r.state === 'none' ? 'none' : '—';
+}
+
+function sellPriceClass(r, best, theme) {
+  if (r.state !== 'ok') return theme.subtext;
+  return best === r.id ? `font-semibold ${theme.text}` : theme.textSecondary;
+}
+
+function BestDot({ show }) {
+  if (!show) return null;
+  return <span title="Pays more after fees" className="inline-block h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: PROFIT_COLOR }} />;
+}
+
+function SellPriceRow({ item, sellPrices, theme }) {
+  const { rows, best } = sellPricesFor(sellPrices.prices, item.itemName, Date.now());
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {rows.map((r) => (
+        <div key={r.id} title={sellPriceTitle(r, item)} className="min-w-0">
+          <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`}>{r.label}</p>
+          <p className={`flex items-center gap-1 font-mono text-xs leading-tight ${sellPriceClass(r, best, theme)}`}>
+            {sellPriceText(r)}
+            <BestDot show={best === r.id} />
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SellPriceCell({ item, sellPrices, theme }) {
+  const { rows, best } = sellPricesFor(sellPrices.prices, item.itemName, Date.now());
+  return (
+    <div className="flex flex-col leading-tight">
+      {rows.map((r) => (
+        <span key={r.id} title={sellPriceTitle(r, item)} className={`flex items-center gap-1 text-[11px] font-mono ${sellPriceClass(r, best, theme)}`}>
+          <span className={`w-12 font-sans font-normal ${theme.subtext}`}>{r.label}</span>
+          {sellPriceText(r)}
+          <BestDot show={best === r.id} />
+        </span>
+      ))}
     </div>
   );
 }
@@ -408,6 +468,7 @@ function ItemCard({
   exchangeRate, currencySymbol, displayCurrency,
   initialSellOpen = false,
   menuActions = false,
+  sellPrices = null,
 }) {
   const [barColor, setBarColor] = useState(accentHex);
   const [localSellAmount, setLocalSellAmount] = useState('');
@@ -557,6 +618,7 @@ function ItemCard({
 
         {/* Cost row — active/pending only, hidden when sell is open */}
         {!item.sold && !sellOpen && <CostRow item={item} theme={theme} />}
+        {!item.sold && !sellOpen && sellPrices && <SellPriceRow item={item} sellPrices={sellPrices} theme={theme} />}
 
         {/* Action zone — on Home it only appears once Sell is picked from the menu */}
         {(!menuActions || sellOpen) && (
@@ -714,7 +776,7 @@ function ItemCard({
 // --- StackedCard ---
 // Representative card with xN badge. Clicking Sell expands the group to individual cards.
 // Read-only (Home) stacks have no button.
-function StackedCard({ items, theme, onExpand, menuActions = false }) {
+function StackedCard({ items, theme, onExpand, menuActions = false, sellPrices = null }) {
   const rep = items[0];
   const countdown = rep.pending ? formatDeliveryCountdown(rep.expectedDelivery) : null;
   const { baseName, wear } = parseItemName(rep.itemName);
@@ -747,6 +809,7 @@ function StackedCard({ items, theme, onExpand, menuActions = false }) {
             <span className={theme.subtext}>{formatShortDate(rep.datePurchased)}</span>
           </div>
         </div>
+        {sellPrices && <SellPriceRow item={rep} sellPrices={sellPrices} theme={theme} />}
         {!menuActions && (
         <div className="mt-auto">
           <button
@@ -776,6 +839,7 @@ function ListRow({
   exchangeRate, currencySymbol, displayCurrency,
   onExpandGroup,
   menuActions = false,
+  sellPrices = null,
 }) {
   const [sellOpen, setSellOpen] = useState(false);
   const [localSellAmount, setLocalSellAmount] = useState('');
@@ -864,6 +928,13 @@ function ListRow({
             }
           </span>
         </td>
+
+        {/* Sell prices (Home only) */}
+        {sellPrices && (
+          <td className="px-3 py-2 whitespace-nowrap">
+            {!item.sold && !item.isTransaction && <SellPriceCell item={item} sellPrices={sellPrices} theme={theme} />}
+          </td>
+        )}
 
         {/* Acquired / Dates */}
         <td className="px-3 py-2 whitespace-nowrap">
@@ -1097,6 +1168,7 @@ export default function ItemGrid({
   exchangeRate, currencySymbol, displayCurrency,
   viewMode = 'grid',
   menuActions = false,
+  sellPrices = null,
 }) {
   const accentHex = theme.dotColor;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -1158,6 +1230,7 @@ export default function ItemGrid({
     selectMode, selectedIds, onToggleSelect,
     exchangeRate, currencySymbol, displayCurrency,
     menuActions,
+    sellPrices,
   };
 
   const loadMore = hasMore ? (
@@ -1179,6 +1252,9 @@ export default function ItemGrid({
             <tr className={`border-b ${theme.cardBorder}`}>
               <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Item</th>
               <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Cost</th>
+              {sellPrices && (
+                <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`} title="Lowest listing, max 1 hour old">Sell at</th>
+              )}
               <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
                 {activeTab === 'sold' ? 'Dates' : 'Acquired'}
               </th>
@@ -1200,7 +1276,7 @@ export default function ItemGrid({
             ))}
             {flatRows.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-slate-400">
+                <td colSpan={sellPrices ? 7 : 6} className="text-center py-12 text-slate-400">
                   <p className="text-base">{emptyText}</p>
                 </td>
               </tr>
@@ -1229,6 +1305,7 @@ export default function ItemGrid({
             items={row.items}
             theme={theme}
             menuActions={menuActions}
+            sellPrices={sellPrices}
             onExpand={() => setExpandedGroups(prev => new Set([...prev, row.key]))}
           />
         ) : (

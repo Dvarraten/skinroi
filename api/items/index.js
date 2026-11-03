@@ -1,6 +1,9 @@
 // GET /api/items  — load items for the authenticated user
 // POST /api/items — save (replace) items for the authenticated user
+// /api/items?sellPrices=1 — Buff163/CSFloat sell prices for owned items
+//                           (see _lib/sell-prices.js)
 import { getSessionSteamId } from '../_lib/auth.js';
+import { handleSellPrices } from '../_lib/sell-prices.js';
 import { Redis } from '@upstash/redis';
 
 function getClient() {
@@ -20,6 +23,8 @@ function legacyItemsKey(steamId) {
 }
 
 export default async function handler(req, res) {
+  if (req.query?.sellPrices) return handleSellPrices(req, res);
+
   const steamId = getSessionSteamId(req);
   if (!steamId) return res.status(401).json({ error: 'not authenticated' });
 

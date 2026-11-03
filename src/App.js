@@ -11,6 +11,7 @@ import { useChartData } from './hooks/useChartData';
 import { useSteamSync } from './hooks/useSteamSync';
 import { useCsfloatAutoSync } from './hooks/useCsfloatAutoSync';
 import { usePortfolioView } from './hooks/usePortfolioView';
+import { useSellPrices } from './hooks/useSellPrices';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
 
@@ -20,6 +21,7 @@ import ItemGrid from './components/ItemGrid';
 import TabsAndSearchbar from './components/TabsAndSearchbar';
 import PortfolioHero from './components/PortfolioHero';
 import RecentSales from './components/RecentSales';
+import SellPriceStatus from './components/SellPriceStatus';
 import CurrencyConverter from './components/CurrencyConverter';
 import HandleItemsPage from './pages/HandleItemsPage';
 import AboutPage from './pages/AboutPage';
@@ -83,6 +85,7 @@ export default function CS2TradingTracker() {
   });
 
   const isHome             = !activePage;
+  const sellPrices = useSellPrices(!!user && isHome);
   const isAnalyticsPage    = activePage === 'analytics';
   const isAddItemPage      = activePage === 'addItem';
   const isHandleItemsPage  = activePage === 'handleItems';
@@ -240,6 +243,7 @@ export default function CS2TradingTracker() {
                 {stats.totalPending > 0 && (
                   <span className="text-[11px] text-warn">· {stats.totalPending} on trade hold</span>
                 )}
+                <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
               </div>
               <TabsAndSearchbar
                 theme={themeStyles}
@@ -273,6 +277,7 @@ export default function CS2TradingTracker() {
                 theme={themeStyles} sortedItems={sortedItems}
                 searchTerm={searchTerm} activeTab="active"
                 viewMode={viewMode}
+                sellPrices={sellPrices}
               />
             </div>
           </div>
