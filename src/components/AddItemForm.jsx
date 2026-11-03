@@ -11,7 +11,7 @@ import { useItemImage } from "../utils/itemImages";
 import { PLATFORMS } from "../utils/platforms";
 
 const label =
-  "block text-xs text-slate-500 font-medium uppercase tracking-wide mb-2";
+  "block text-xs text-slate-500 font-medium mb-2";
 const inputH = "h-9";
 
 export default function AddItemForm({
@@ -61,7 +61,7 @@ export default function AddItemForm({
       {!bare && (
         <div className="flex items-center gap-2 mb-5">
           <PackagePlus size={16} className="text-slate-400" />
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          <h3 className="text-xs font-medium text-slate-500">
             Add New Item
           </h3>
         </div>
@@ -194,7 +194,7 @@ export default function AddItemForm({
       >
         <button
           onClick={onAdd}
-          className={`relative group flex items-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition-all duration-200
+          className={`relative group flex items-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition duration-200
             ${theme.card} ${theme.cardBorder} ${success ? "text-profit" : theme.text}`}
         >
           {success ? (
@@ -206,7 +206,7 @@ export default function AddItemForm({
           ) : (
             "Add Item"
           )}
-          <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${success ? `w-full bg-profit` : `w-0 group-hover:w-full ${theme.dot}`}`} />
+          <span className={`absolute bottom-0 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-200 ${success ? `scale-x-100 bg-profit` : `scale-x-0 group-hover:scale-x-100 ${theme.dot}`}`} />
         </button>
 
         <button
@@ -222,13 +222,13 @@ export default function AddItemForm({
             });
           }}
           title="Item is Steam trade-protected (not yet received)"
-          className={`relative group flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium border transition-all
+          className={`relative group flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium border transition
             ${theme.card} ${theme.cardBorder}
             ${formData.pending ? "text-warn" : `${theme.subtext} ${theme.textHover}`}`}
         >
           <Clock size={15} />
           Protected
-          <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 bg-warn ${formData.pending ? "w-full" : "w-0 group-hover:w-full"}`} />
+          <span className={`absolute bottom-0 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-200 bg-warn ${formData.pending ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
         </button>
 
         {formData.pending && (

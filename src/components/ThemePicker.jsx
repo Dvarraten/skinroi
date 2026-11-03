@@ -16,7 +16,7 @@ export default function ThemePicker({
     <div className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => setShowThemePicker((p) => !p)}
-        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-all"
+        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition"
         title="Change theme"
       >
         <Palette size={18} />
@@ -27,7 +27,7 @@ export default function ThemePicker({
           className={`absolute right-0 ${dropUp ? 'bottom-full mb-2' : 'mt-2'} w-52 ${themeStyles.panel} border ${themeStyles.panelBorder} rounded-xl shadow-2xl z-50 overflow-hidden`}
         >
           <div
-            className={`px-3 py-2 text-xs font-semibold uppercase tracking-widest ${themeStyles.subtext} border-b ${themeStyles.panelBorder}`}
+            className={`px-3 py-2 text-sm font-semibold ${themeStyles.subtext} border-b ${themeStyles.panelBorder}`}
           >
             Choose Theme
           </div>
@@ -38,7 +38,7 @@ export default function ThemePicker({
                 setTheme(key);
                 setShowThemePicker(false);
               }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-all ${
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition ${
                 theme === key
                   ? `${themeStyles.text} bg-white/10`
                   : `${themeStyles.subtext} ${themeStyles.textHover} hover:bg-white/5`

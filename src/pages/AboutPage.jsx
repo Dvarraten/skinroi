@@ -52,7 +52,7 @@ export default function AboutPage({ theme }) {
 
           {/* Pages guide */}
           <div>
-            <p className={`text-[10px] font-semibold uppercase tracking-widest ${theme?.subtext} mb-3`}>Pages</p>
+            <p className={`text-xs font-medium ${theme?.subtext} mb-3`}>Pages</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {PAGES.map(({ icon: Icon, title, desc }) => (
                 <div
@@ -73,7 +73,7 @@ export default function AboutPage({ theme }) {
 
           {/* Features */}
           <div>
-            <p className={`text-[10px] font-semibold uppercase tracking-widest ${theme?.subtext} mb-3`}>Features</p>
+            <p className={`text-xs font-medium ${theme?.subtext} mb-3`}>Features</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {FEATURES.map(({ icon: Icon, title, desc }) => (
                 <div

@@ -87,7 +87,7 @@ export default function StatsCards({ stats, theme }) {
       {cards.map(({ label, value, sub, icon: Icon, iconColor, iconBg, valueColor }) => (
         <div key={label} className={`${theme.card} border ${theme.cardBorder} rounded-xl p-3`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">{label}</span>
+            <span className="text-xs text-slate-500 font-medium">{label}</span>
             <div className={`p-1.5 rounded-lg ${iconBg}`}>
               <Icon size={13} className={iconColor} />
             </div>

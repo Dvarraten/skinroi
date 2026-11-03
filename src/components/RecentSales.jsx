@@ -9,8 +9,7 @@ function SaleRow({ item, theme }) {
   const profit = item.profit ?? 0;
   const isGain = profit >= 0;
   return (
-    <div className={`flex items-center gap-3 p-2.5 rounded-lg ${theme.card} border ${theme.cardBorder} transition-colors`}>
-      <div className={`w-0.5 self-stretch rounded-full shrink-0 ${isGain ? "bg-profit" : "bg-loss"}`} />
+    <div className={`flex items-center gap-3 px-3 py-2.5 border-b last:border-b-0 ${theme.cardBorder}`}>
       {item.isTransaction ? (
         <div className="w-8 h-8 rounded shrink-0 bg-white/5 flex items-center justify-center">
           <ArrowDownUp size={14} className={item.transactionType === 'deposit' ? 'text-profit/60' : 'text-loss/60'} />
@@ -23,11 +22,11 @@ function SaleRow({ item, theme }) {
       <div className="flex-1 min-w-0">
         <p className={`text-xs ${theme.textSecondary} truncate font-medium`}>{item.itemName}</p>
         {item.isTransaction ? (
-          <p className="text-xs text-slate-600 mt-0.5 font-mono capitalize">
+          <p className={`text-[11px] ${theme.subtext} mt-0.5 font-mono capitalize`}>
             ${item.transactionAmount?.toFixed(2)} · fee {item.transactionFeePercent}%
           </p>
         ) : (
-          <p className="text-xs text-slate-600 mt-0.5 font-mono">
+          <p className={`text-[11px] ${theme.subtext} mt-0.5 font-mono`}>
             ${item.purchasePrice.toFixed(2)} → ${(item.salePrice ?? 0).toFixed(2)}
           </p>
         )}
@@ -36,7 +35,7 @@ function SaleRow({ item, theme }) {
         <p className={`text-xs font-mono font-semibold ${isGain ? "text-profit" : "text-loss"}`}>
           {isGain ? "+" : ""}${profit.toFixed(2)}
         </p>
-        <p className={`text-xs font-mono ${isGain ? "text-profit/70" : "text-loss/70"}`}>
+        <p className={`text-[11px] font-mono mt-0.5 ${theme.subtext}`}>
           {isGain ? "+" : ""}{(item.profitPercent ?? 0).toFixed(1)}%
         </p>
       </div>
@@ -55,11 +54,15 @@ export default function RecentSales({ items, theme }) {
     .slice(0, 6);
 
   if (!sold.length) {
-    return <div className="text-center py-6 text-slate-600 text-sm">No sales yet</div>;
+    return (
+      <div className={`rounded-xl border ${theme.cardBorder} px-4 py-6 text-center text-xs ${theme.subtext}`}>
+        No sales yet. Items you mark sold show up here.
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-2">
+    <div className={`rounded-xl border ${theme.cardBorder} ${theme.card}`}>
       {sold.map(item => <SaleRow key={item.id} item={item} theme={theme} />)}
     </div>
   );

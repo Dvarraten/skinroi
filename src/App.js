@@ -76,7 +76,8 @@ export default function CS2TradingTracker() {
   const { searchTerm, setSearchTerm, sortBy, setSortBy, sortedItems } = usePortfolioView(items, 'active');
   const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'snipes' | 'analytics' | 'about'
   const [chartPeriod, setChartPeriod] = useState('30d');
-  const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'bloomberg'); return themes[r] ? r : 'bloomberg'; });
+  // Dark is the default; a theme the user picked is kept in localStorage.
+  const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'dark'); return themes[r] ? r : 'dark'; });
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [converterPinned, setConverterPinned] = useState(() => !!localStorage.getItem('skinroi-converter-pinned'));
   const [viewMode, setViewMode] = useState(() => {
@@ -98,7 +99,11 @@ export default function CS2TradingTracker() {
   const themeStyles = themes[theme];
   const { profitChartData, allTimeProfitChartData } = useChartData(items, chartPeriod);
 
-  useEffect(() => { localStorage.setItem('cs2-theme', theme); }, [theme]);
+  useEffect(() => {
+    localStorage.setItem('cs2-theme', theme);
+    // Selection, caret and focus rings in index.css read the theme accent.
+    document.documentElement.style.setProperty('--accent', themes[theme].accentColor || themes[theme].dotColor);
+  }, [theme]);
   useEffect(() => { localStorage.setItem('skinroi-view-mode', viewMode); }, [viewMode]);
   useEffect(() => {
     if (converterPinned) localStorage.setItem('skinroi-converter-pinned', '1');
@@ -202,7 +207,7 @@ export default function CS2TradingTracker() {
 
       {/* ── Home view ─────────────────────────────────────────────────────── */}
       {isHome && (
-      <div className="flex flex-1 min-h-0 flex-col gap-3 px-6 pt-3 pb-4 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col gap-4 px-4 md:px-6 pt-3 pb-4 overflow-hidden">
 
         {/* Row 1 — hero (centered) + currency converter (right, same height) */}
         <div className="shrink-0 flex items-stretch gap-6">
@@ -214,7 +219,7 @@ export default function CS2TradingTracker() {
             />
           </div>
           <div className="hidden lg:flex w-[280px] shrink-0 flex-col justify-center gap-3">
-            <p className={`text-[9px] font-semibold uppercase tracking-widest ${themeStyles.subtext}`}>Currency Converter</p>
+            <p className={`text-xs font-medium ${themeStyles.subtext}`}>Currency converter</p>
             <CurrencyConverter
               usdAmount={usdAmount}
               rmbAmount={rmbAmount}
@@ -235,13 +240,13 @@ export default function CS2TradingTracker() {
 
         {/* Row 2+3 — tabs + grid (left) and recent sales (right) */}
         <div className="flex-1 min-h-0 flex gap-6 overflow-hidden">
-          <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden px-10">
+          <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden lg:px-10">
             <div className="shrink-0 space-y-2">
               <div className="flex items-baseline gap-2">
-                <h2 className={`text-xs font-semibold uppercase tracking-widest ${themeStyles.text}`}>Active items</h2>
-                <span className={`text-[11px] font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
+                <h2 className={`text-sm font-semibold ${themeStyles.text}`}>Active items</h2>
+                <span className={`text-xs font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
                 {stats.totalPending > 0 && (
-                  <span className="text-[11px] text-warn">· {stats.totalPending} on trade hold</span>
+                  <span className="text-xs text-warn">· {stats.totalPending} on trade hold</span>
                 )}
                 <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
               </div>
@@ -283,8 +288,8 @@ export default function CS2TradingTracker() {
           </div>
           <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div>
-              <p className={`text-[10px] font-semibold uppercase tracking-wide ${themeStyles.subtext} mb-2 px-1`}>
-                Recent Sales
+              <p className={`text-xs font-medium ${themeStyles.subtext} mb-2 px-1`}>
+                Recent sales
               </p>
               <RecentSales items={items} theme={themeStyles} />
             </div>

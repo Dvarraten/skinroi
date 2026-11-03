@@ -22,7 +22,7 @@ export default function PasteButton({ onPaste }) {
       type="button"
       onClick={handlePaste}
       title="Paste from clipboard"
-      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md transition-all
+      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md transition
         ${pasted
           ? "text-emerald-400 bg-emerald-400/10"
           : "text-slate-500 hover:text-slate-300 hover:bg-white/8"}`}

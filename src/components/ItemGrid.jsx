@@ -130,7 +130,7 @@ function CostRow({ item, theme }) {
   return (
     <div className="flex items-end justify-between gap-2">
       <div className="min-w-0">
-        <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`}>Cost</p>
+        <p className={`text-[11px] font-medium ${theme.subtext}`}>Cost</p>
         <p className={`font-mono text-base font-semibold ${theme.text} leading-tight`}>${item.purchasePrice.toFixed(2)}</p>
       </div>
       <div className={`flex flex-col items-end gap-0.5 text-[11px] ${theme.textSecondary} min-w-0`}>
@@ -171,10 +171,10 @@ function BestDot({ show }) {
 function SellPriceRow({ item, sellPrices, theme }) {
   const { rows, best } = sellPricesFor(sellPrices.prices, item.itemName, Date.now());
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className={`grid grid-cols-2 gap-2 pt-2 border-t ${theme.cardBorder}`}>
       {rows.map((r) => (
         <div key={r.id} title={sellPriceTitle(r, item)} className="min-w-0">
-          <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`}>{r.label}</p>
+          <p className={`text-[11px] font-medium ${theme.subtext}`}>{r.label}</p>
           <p className={`flex items-center gap-1 font-mono text-xs leading-tight ${sellPriceClass(r, best, theme)}`}>
             {sellPriceText(r)}
             <BestDot show={best === r.id} />
@@ -290,7 +290,7 @@ function DeleteButton({ onDelete, onConfirmingChange }) {
       ref={btnRef}
       onClick={handleClick}
       title={confirming ? 'Click again to delete' : 'Delete item'}
-      className={`p-1.5 rounded-lg transition-all ${
+      className={`p-1.5 rounded-lg transition ${
         confirming
           ? 'text-white bg-red-500 hover:bg-red-400'
           : 'text-slate-600 hover:text-red-400 hover:bg-red-500/10'
@@ -438,7 +438,7 @@ function ActionMenu({ actions, theme, className = '' }) {
         <MoreHorizontal size={14} />
       </button>
       {open && (
-        <div className={`absolute right-0 top-full mt-1 z-40 min-w-[150px] py-1 rounded-lg border shadow-xl ${theme.card} ${theme.cardBorder}`}>
+        <div className={`pop-in origin-top-right absolute right-0 top-full mt-1 z-40 min-w-[150px] py-1 rounded-lg border shadow-xl ${theme.card} ${theme.cardBorder}`}>
           {actions.map((a) => (
             <button
               key={a.label}
@@ -552,9 +552,9 @@ function ItemCard({
 
   return (
     <div
-      className={`relative group flex flex-col h-full ${theme.panel} backdrop-blur-sm rounded-xl border ${
+      className={`relative group flex flex-col h-full ${theme.panel} rounded-xl border ${
         selectMode && isSelected ? 'border-red-500 ring-2 ring-red-500/40' : `${theme.cardBorder} ${theme.cardHover}`
-      } transition-all duration-300 overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30
+      } transition duration-200 overflow-hidden
         ${exiting ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}
         ${soldFeedback && !item.sold ? 'ring-2 ring-profit/60' : ''}
         ${selectMode ? 'cursor-pointer' : ''}
@@ -577,7 +577,7 @@ function ItemCard({
             type="button"
             onClick={() => setSellOpen(false)}
             title="Cancel sell"
-            className="p-1.5 rounded-lg transition-all bg-black/40 text-red-300/70 hover:text-red-400 hover:bg-red-500/20 active:text-red-500"
+            className="p-1.5 rounded-lg transition bg-black/40 text-red-300/70 hover:text-red-400 hover:bg-red-500/20 active:text-red-500"
           >
             <X size={13} />
           </button>
@@ -704,7 +704,7 @@ function ItemCard({
                       </div>
                       <button
                         onClick={onSell}
-                        className={`px-2 h-8 rounded-lg text-xs font-medium transition-all duration-300 active:scale-95 flex items-center gap-1
+                        className={`px-2 h-8 rounded-lg text-xs font-medium transition active:scale-[0.97] flex items-center gap-1
                           ${soldFeedback ? 'bg-profit text-white scale-95' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                       >
                         {soldFeedback ? <><CheckCircle size={12} /> Sold!</> : 'Sell'}
@@ -746,8 +746,8 @@ function ItemCard({
           ) : (
             <div className="space-y-2">
               <div className={`grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] ${theme.textSecondary}`}>
-                <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`}>Bought</p>
-                <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`} title="Sale price after platform fee">Sold · net</p>
+                <p className={`text-[11px] font-medium ${theme.subtext}`}>Bought</p>
+                <p className={`text-[11px] font-medium ${theme.subtext}`} title="Sale price after platform fee">Sold · net</p>
                 <p className="font-mono text-slate-400">${item.purchasePrice.toFixed(2)}</p>
                 <p className={`font-mono font-semibold ${theme.text}`}>${(item.purchasePrice + item.profit).toFixed(2)}</p>
                 <div className="-ml-1.5 min-w-0">{item.platform ? <PlatformBadge platform={item.platform} size="xs" /> : <span className="pl-1.5 text-slate-600">—</span>}</div>
@@ -784,7 +784,7 @@ function StackedCard({ items, theme, onExpand, menuActions = false, sellPrices =
 
   return (
     <div
-      className={`relative group flex flex-col h-full ${theme.panel} backdrop-blur-sm rounded-xl border ${theme.cardBorder} ${theme.cardHover} overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30`}
+      className={`relative group flex flex-col h-full ${theme.panel} rounded-xl border ${theme.cardBorder} ${theme.cardHover} overflow-hidden transition-colors`}
       style={{ animation: 'fadeSlideIn 0.3s ease both' }}
     >
       {menuActions && (
@@ -801,7 +801,7 @@ function StackedCard({ items, theme, onExpand, menuActions = false, sellPrices =
         <CardTitle item={rep} baseName={baseName} wear={wear} theme={theme} />
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <p className={`text-[9px] font-semibold uppercase tracking-wider ${theme.subtext}`}>Cost each</p>
+            <p className={`text-[11px] font-medium ${theme.subtext}`}>Cost each</p>
             <p className={`font-mono text-base font-semibold ${theme.text} leading-tight`}>${rep.purchasePrice.toFixed(2)}</p>
           </div>
           <div className={`flex flex-col items-end gap-0.5 text-[11px] ${theme.textSecondary} min-w-0`}>
@@ -1071,7 +1071,7 @@ function ListRow({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setSellOpen(false); }}
-                    className="p-1.5 rounded-lg transition-all text-red-400/50 hover:text-red-400 hover:bg-red-500/10"
+                    className="p-1.5 rounded-lg transition text-red-400/50 hover:text-red-400 hover:bg-red-500/10"
                   >
                     <X size={12} />
                   </button>
@@ -1135,7 +1135,7 @@ function ListRow({
                 </div>
                 <button
                   onClick={onSell}
-                  className={`px-2 h-8 rounded-lg text-xs font-medium transition-all duration-300 active:scale-95 flex items-center gap-1
+                  className={`px-2 h-8 rounded-lg text-xs font-medium transition active:scale-[0.97] flex items-center gap-1
                     ${soldFeedback ? 'bg-profit text-white scale-95' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                 >
                   {soldFeedback ? <><CheckCircle size={12} /> Sold!</> : 'Sell'}
@@ -1250,17 +1250,17 @@ export default function ItemGrid({
         <table className="w-full border-collapse">
           <thead>
             <tr className={`border-b ${theme.cardBorder}`}>
-              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Item</th>
-              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Cost</th>
+              <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`}>Item</th>
+              <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`}>Cost</th>
               {sellPrices && (
-                <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`} title="Lowest listing, max 1 hour old">Sell at</th>
+                <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`} title="Lowest listing, max 1 hour old">Sell at</th>
               )}
-              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
+              <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`}>
                 {activeTab === 'sold' ? 'Dates' : 'Acquired'}
               </th>
-              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Platform</th>
-              <th className={`text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Status</th>
-              <th className={`text-right px-3 py-2 text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>
+              <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`}>Platform</th>
+              <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`}>Status</th>
+              <th className={`text-right px-3 py-2 text-xs font-medium ${theme.subtext}`}>
                 {menuActions ? '' : activeTab === 'sold' ? 'P&L' : 'Action'}
               </th>
             </tr>

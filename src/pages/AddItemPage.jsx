@@ -68,7 +68,7 @@ export default function AddItemPage({
           <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
             <div className="flex items-center gap-2 mb-1">
               <PackagePlus size={12} className={theme.accent} />
-              <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Total items</p>
+              <p className={`text-xs font-medium ${theme.subtext}`}>Total items</p>
             </div>
             <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
               {stats.total}
@@ -78,7 +78,7 @@ export default function AddItemPage({
           <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
             <div className="flex items-center gap-2 mb-1">
               <Package size={12} className="text-profit" />
-              <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Active</p>
+              <p className={`text-xs font-medium ${theme.subtext}`}>Active</p>
             </div>
             <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
               {stats.active}
@@ -88,7 +88,7 @@ export default function AddItemPage({
           <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
             <div className="flex items-center gap-2 mb-1">
               <CheckCircle2 size={12} className="text-loss" />
-              <p className={`text-[10px] font-semibold uppercase tracking-wide ${theme.subtext}`}>Sold</p>
+              <p className={`text-xs font-medium ${theme.subtext}`}>Sold</p>
             </div>
             <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
               {stats.sold}
@@ -128,7 +128,7 @@ export default function AddItemPage({
             ) : (
               <div className="overflow-y-auto max-h-[520px]">
                 <table className="w-full">
-                  <thead className={`text-[10px] uppercase tracking-wide font-semibold ${theme.subtext}`}>
+                  <thead className={`text-xs font-medium ${theme.subtext}`}>
                     <tr className={`border-b ${theme.cardBorder}`}>
                       <th className="text-left px-4 py-2">Item</th>
                       <th className="text-right px-3 py-2">Cost</th>

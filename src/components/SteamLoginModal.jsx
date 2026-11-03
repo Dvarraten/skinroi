@@ -80,7 +80,7 @@ export default function SteamLoginModal({ onClose, onSuccess, theme }) {
 
 
   const btnClass = (active) =>
-    `relative group flex-1 flex items-center justify-center h-9 rounded-lg text-sm font-medium border transition-all
+    `relative group flex-1 flex items-center justify-center h-9 rounded-lg text-sm font-medium border transition
     ${theme?.card} ${theme?.cardBorder} ${active ? theme?.text : theme?.subtext}
     disabled:opacity-40`;
 
@@ -134,7 +134,7 @@ export default function SteamLoginModal({ onClose, onSuccess, theme }) {
                 className={`${btnClass(false)} w-full`}
               >
                 Cancel
-                <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 w-0 group-hover:w-full ${theme?.dot}`} />
+                <span className={`absolute bottom-0 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-200 scale-x-0 group-hover:scale-x-100 ${theme?.dot}`} />
               </button>
             </>
           )}
@@ -160,7 +160,7 @@ export default function SteamLoginModal({ onClose, onSuccess, theme }) {
                 className={`${btnClass(true)} w-full`}
               >
                 {loading ? 'Connecting…' : 'Connect'}
-                <span className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-200 ${loading ? 'w-full bg-profit' : `w-0 group-hover:w-full ${theme?.dot}`}`} />
+                <span className={`absolute bottom-0 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-200 ${loading ? 'scale-x-100 bg-profit' : `scale-x-0 group-hover:scale-x-100 ${theme?.dot}`}`} />
               </button>
             </>
           )}

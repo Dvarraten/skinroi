@@ -25,7 +25,7 @@ export const LOSS_COLOR   = '#ef4444';
 export const WARN_COLOR   = '#f59e0b';
 
 export const themes = {
-  // ── 1. Original (default — finance terminal, amber accent) ──────────────
+  // ── 1. Original (finance terminal, amber accent) ──────────────
   bloomberg: {
     name: "Original",
     dot: "bg-amber-500",
@@ -50,7 +50,7 @@ export const themes = {
     itemHoverBg: "hover:bg-amber-900/25",
     soldCard: "bg-[#1a1600] border-[#2a2010]",
     sidebarItem: "bg-amber-950/40 hover:bg-amber-900/30 border-[#2a2010]",
-    header: "bg-gradient-to-b from-[#181200] to-[#0a0800] border border-[#2a2010]",
+    header: "bg-[#0f0d06] border border-[#2a2010]",
     chartGrid: "#251d08",
     chartAxis: "#a37820",
     chartTooltipBg: "#111008",
@@ -59,7 +59,7 @@ export const themes = {
     chartColors: [WARN_COLOR, SAP_CHART_COLORS[10], SAP_CHART_COLORS[3], SAP_CHART_COLORS[1], SAP_CHART_COLORS[6], SAP_CHART_COLORS[5]],
   },
 
-  // ── 2. Dark ─────────────────────────────────────────────────────────────
+  // ── 2. Dark (default) ──────────────────────────────────────────────────────────
   dark: {
     name: "Dark",
     dot: "bg-[#09090b]",
@@ -83,7 +83,7 @@ export const themes = {
     textHover: "hover:text-white",
     soldCard: "bg-[#1a1f2e] border-[#1e2028]",
     sidebarItem: "bg-[#1e2330] hover:bg-[#252b3a] border-[#1e2028]",
-    header: "bg-gradient-to-b from-[#181c24] to-[#0d1117] border border-[#1e2028]",
+    header: "bg-[#0d1117] border border-[#1e2028]",
     chartGrid: "#1e2028",
     chartAxis: SAP_CHART_COLORS.neutral,
     chartTooltipBg: "#111318",
@@ -151,7 +151,7 @@ export const themes = {
     itemHoverBg: "hover:bg-white/8",
     soldCard: "bg-[#1a2540] border-slate-600/30",
     sidebarItem: "bg-slate-700/50 hover:bg-slate-600/50 border-slate-600/50",
-    header: "bg-gradient-to-b from-[#1e2d4a] to-[#0f1929] border border-slate-700/40",
+    header: "bg-[#111827] border border-slate-700/40",
     chartGrid: "#334155",
     chartAxis: SAP_CHART_COLORS.neutral,
     chartTooltipBg: "#1e293b",
@@ -185,7 +185,7 @@ export const themes = {
     itemHoverBg: "hover:bg-[#5d36ff]/8",
     soldCard: "bg-[#1a1a35] border-[#1e1e3a]",
     sidebarItem: "bg-[#1a1a35]/60 hover:bg-[#1e1e40] border-[#1e1e3a]",
-    header: "bg-gradient-to-b from-[#1a1a35] to-[#0e0e1a] border border-[#1e1e3a]",
+    header: "bg-[#111124] border border-[#1e1e3a]",
     chartGrid: "#1e1e3a",
     chartAxis: SAP_CHART_COLORS.neutral,
     chartTooltipBg: "#14142b",

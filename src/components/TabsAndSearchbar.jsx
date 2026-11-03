@@ -28,7 +28,7 @@ export function TabButton({ label, count, isActive, onClick, theme, accentColor,
   return (
     <button
       onClick={onClick}
-      className={`relative px-4 py-2 text-[11px] font-semibold uppercase tracking-widest transition-all border flex items-center gap-2 group overflow-hidden rounded-lg ${
+      className={`relative px-4 py-2 text-[13px] font-medium transition-colors border flex items-center gap-2 group overflow-hidden rounded-lg ${
         isActive
           ? `${theme.card} ${theme.cardBorder} ${theme.text}`
           : `bg-transparent ${theme.cardBorder} ${theme.subtext} ${theme.textHover} hover:bg-white/5`
@@ -39,7 +39,7 @@ export function TabButton({ label, count, isActive, onClick, theme, accentColor,
         {count}
       </span>
       <span
-        className={`absolute bottom-0 left-0 h-[2px] transition-all duration-200 ${isActive ? "w-full" : "w-0 group-hover:w-full"}`}
+        className={`absolute bottom-0 left-0 h-[2px] w-full origin-left transition-transform duration-200 ${isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`}
         style={{ backgroundColor: accentColor }}
       />
     </button>
@@ -164,7 +164,7 @@ export default function TabsAndSearchbar({
         )}
 
         {/* Divider + Select — pushed to far right */}
-        <div className="h-5 w-px bg-slate-600/40 ml-auto" />
+        <div className="hidden sm:block h-5 w-px bg-slate-600/40 ml-auto" />
         {!allowSelect ? actions : !selectMode ? (
           <button
             onClick={onEnterSelectMode}

@@ -416,7 +416,7 @@ export default function ItemAutoComplete({ value, onChange, placeholder, theme }
               }`}
             >
               <div className="text-sm font-medium truncate">{s.name}</div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-400 shrink-0">
+              <div className="text-xs font-mediumr text-slate-400 shrink-0">
                 {CATEGORY_LABEL[s.category]}
               </div>
             </div>

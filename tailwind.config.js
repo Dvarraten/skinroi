@@ -33,6 +33,14 @@ module.exports = {
         loss: '#ef4444',
         warn: '#f59e0b',
       },
+      // Strong ease-out for UI feedback; `transition` without a duration
+      // class gets 160ms on this curve instead of Tailwind's softer default.
+      transitionTimingFunction: {
+        DEFAULT: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        out: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        'in-out': 'cubic-bezier(0.77, 0, 0.175, 1)',
+      },
+      transitionDuration: { DEFAULT: '160ms' },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
