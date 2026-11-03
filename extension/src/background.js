@@ -33,6 +33,7 @@ import {
   resolveDescriptionsViaTradeStatus,
 } from './lib/steam.js';
 import { enrichOffersWithInspect } from './lib/inspect.js';
+import { runSellPrices } from './lib/sellprices.js';
 import { pushOffers, pushSnipeListings } from './lib/skinroi.js';
 
 const ALARM_NAME = 'skinroi-poll';
@@ -59,6 +60,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
     runPoll({ manual: false }).catch((err) => console.error('[skinroi] poll failed', err));
     runSnipes().catch((err) => console.error('[skinroi] snipes failed', err));
+    runSellPricesSafe();
   }
 });
 
@@ -67,6 +69,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === 'runPollNow') {
     runSnipes().catch((err) => console.error('[skinroi] snipes failed', err));
+    runSellPricesSafe();
     runPoll({ manual: true }).then(
       (result) => sendResponse({ ok: true, result }),
       (err) => sendResponse({ ok: false, error: String(err) })
@@ -119,6 +122,26 @@ async function runSnipes() {
     }
   } finally {
     snipesInFlight = false;
+  }
+}
+
+// ── Sell prices for Home: Buff163 + CSFloat lowest listing per owned item ──
+let sellPricesInFlight = false;
+
+async function runSellPricesSafe() {
+  if (sellPricesInFlight) return;
+  sellPricesInFlight = true;
+  try {
+    const { secret } = await getPairing();
+    if (!secret) return;
+    const result = await runSellPrices();
+    for (const [market, err] of Object.entries(result?.status || {})) {
+      if (err) await safeLogError(`Sell prices (${market}): ${err}`);
+    }
+  } catch (err) {
+    await safeLogError(`Sell prices: ${err.message || err}`);
+  } finally {
+    sellPricesInFlight = false;
   }
 }
 

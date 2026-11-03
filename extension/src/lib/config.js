@@ -35,6 +35,16 @@ export const INSPECT_MIN_DELAY_MS = 250;
 export const CSFLOAT_LISTINGS_URL =
   'https://csfloat.com/api/v1/listings?sort_by=most_recent&type=buy_now&limit=50';
 
+// Sell prices for Home (see lib/sellprices.js). Up to SELL_PRICES_PER_RUN
+// items per market each poll; a price is refreshed once it is 30 min old so
+// the site (which hides prices older than 1 hour) always has a fresh one.
+export const CSFLOAT_LISTINGS_API = 'https://csfloat.com/api/v1/listings';
+export const BUFF_GOODS_SEARCH_URL =
+  'https://buff.163.com/api/market/goods?game=csgo&page_num=1&page_size=50';
+export const SELL_PRICES_PER_RUN = 10;
+export const SELL_PRICES_REFRESH_AFTER_MS = 30 * 60 * 1000;
+export const SELL_PRICES_RETRY_ERROR_MS = 10 * 60 * 1000;
+
 // Only offers in state 3 (Accepted) count as completed trades — items have
 // transferred to inventory (possibly in trade-protected context 16 for the
 // 7-day hold, but the trade itself is done and the item is ours).

@@ -58,3 +58,18 @@ export async function pushSnipeListings(listings) {
     body: { market: 'csfloat', listings, extVersion: EXT_VERSION },
   });
 }
+
+// Owned item names + stored sell prices (with their age), so the worker can
+// refresh only what is due.
+export async function getSellPriceState() {
+  return request('/api/items?sellPrices=1', { auth: true });
+}
+
+// Push freshly fetched Buff163 / CSFloat sell prices for Home.
+export async function pushSellPrices({ results, status }) {
+  return request('/api/items?sellPrices=1', {
+    method: 'POST',
+    auth: true,
+    body: { results, status, extVersion: EXT_VERSION },
+  });
+}

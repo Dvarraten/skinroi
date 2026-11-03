@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SkinROI Sync",
   "short_name": "SkinROI",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "CS2 trade sync for SkinROI. Auto-populates float, paint seed, and stickers so trades land in Handle Items with full context.",
   "author": "SkinROI",
 
@@ -19,6 +19,7 @@
     "*://*.steampowered.com/*",
     "https://api.csfloat.com/*",
     "https://csfloat.com/*",
+    "https://buff.163.com/*",
     "https://www.skinroi.com/*",
     "https://skinroi.com/*",
     "https://dvich-cs2-tracker.vercel.app/*",

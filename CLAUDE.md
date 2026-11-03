@@ -120,6 +120,16 @@ csgotrader.app Buff163 dump is used) and `SNIPES_MIN_PRICE_CENTS` (default
 200). A source that answers 429 pauses 15 min. Dopplers without a known phase
 are skipped so phases never get mixed.
 
+**Sell prices on Home**: each unsold item shows the lowest Buff163 and
+CSFloat listing, at most 1 hour old, with a dot on the one that pays more after
+fees. The extension fetches them from the user's browser (`lib/sellprices.js`):
+CSFloat `api/v1/listings?market_hash_name=…&sort_by=lowest_price` and Buff163
+`api/market/goods?search=…` (needs the user signed in on buff.163.com in
+Chrome; prices are CNY, converted on the server). Every poll it reads
+`GET /api/items?sellPrices=1` (owned names + price ages), refreshes up to 10
+names per market that are 30+ min old, and POSTs them back. The site reads the
+same GET and hides prices older than 1 hour. Doppler prices are not per phase.
+
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
 Guest users → `localStorage` key `cs2-trading-items`.
 
@@ -182,6 +192,7 @@ npm run items:update
 | `skinroi:ext-pair:{code}`        | Short-lived pairing code (10 min TTL)             |
 | `skinroi:ext-secret:{secret}`    | Reverse lookup: Bearer secret → steamId           |
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
+| `skinroi:sellprices:{steamId}`   | Buff163/CSFloat sell prices for owned items        |
 | `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (2 min TTL) |
 | `skinroi:snipes:deals`           | Current snipe candidates (30 min window)          |
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |
