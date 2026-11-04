@@ -111,7 +111,7 @@ export const useExchangeRate = () => {
   return {
     usdAmount, rmbAmount: localAmount,
     setUsdAmount, setRmbAmount: setLocalAmount,
-    exchangeRate, sidebarRate, lastUpdated,
+    exchangeRate, sidebarRate, lastUpdated, allRates,
     currency1, setCurrency1, currency1Symbol,
     displayCurrency, setDisplayCurrency, currencySymbol,
     handleUsdChange, handleRmbChange,
