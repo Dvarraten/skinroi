@@ -1,4 +1,6 @@
-import { DEFAULT_SNIPE_FILTERS, evaluateDeal, passesFilters, selectSnipes } from "./snipes";
+import {
+  DEFAULT_SNIPE_FILTERS, evaluateDeal, liquidityScore, migrateFilters, passesFilters, selectSnipes,
+} from "./snipes";
 
 const NOW = 1_800_000_000_000;
 
@@ -38,7 +40,6 @@ test("buy fee is added to cost", () => {
 test("hides illiquid items", () => {
   expect(passes(deal())).toBe(true);
   expect(passes(deal({ refs: { youpin: ref({ count: 3 }) } }))).toBe(false);
-  expect(passes(deal({ refs: { youpin: ref({ liquidity: 2 }) } }), f({ minLiquidity: 5 }))).toBe(false);
 });
 
 test("uses buy-order spread when listing counts are unknown", () => {
@@ -51,9 +52,36 @@ test("uses buy-order spread when listing counts are unknown", () => {
   expect(passes(buffOnly(null), f({ hideUnknownLiquidity: false }))).toBe(true);
 });
 
-test("ignores the buy-order spread when a listing count is known", () => {
-  const withCount = deal({ refs: { youpin: ref({ count: 500, liquidity: null, bidUsd: 60 }) } });
-  expect(passes(withCount)).toBe(true);
+test("liquidity score weighs buy orders, spread and listings", () => {
+  expect(liquidityScore("youpin", ref({ bidCount: 100, bidUsd: 95, askUsd: 100, count: 200 }))).toBe(96);
+  expect(liquidityScore("youpin", ref({ bidCount: 2, bidUsd: 70, askUsd: 100, count: 5 }))).toBeLessThan(25);
+  expect(liquidityScore("csfloat", { priceUsd: 100, sales: 50, steamVolume: 50 })).toBe(100);
+  expect(liquidityScore("csfloat", { priceUsd: 100 })).toBe(null);
+});
+
+test("sells where it pays most among liquid sell markets", () => {
+  const csfloat = { priceUsd: 120, sales: 40, steamVolume: 30 };
+  const d = deal({ refs: { youpin: ref(), csfloat } });
+  expect(evaluateDeal(d, f()).refMarket).toBe("youpin");
+  const both = evaluateDeal(d, f({ sellMarkets: ["youpin", "csfloat"] }));
+  expect(both.refMarket).toBe("csfloat");
+  expect(both.profitUsd).toBeCloseTo(120 * 0.98 - 80);
+  // A higher price on an illiquid market loses to a liquid one.
+  const thin = deal({ refs: { youpin: ref(), csfloat: { priceUsd: 120, sales: 1, steamVolume: 0 } } });
+  expect(evaluateDeal(thin, f({ sellMarkets: ["youpin", "csfloat"] })).refMarket).toBe("youpin");
+});
+
+test("a YouPin lowest ask is never sold back on YouPin", () => {
+  const d = deal({ id: "youpin:x", market: "youpin", itemLevel: true, refs: { youpin: ref(), buff163: ref({ priceUsd: 90 }) } });
+  expect(evaluateDeal(d, f()).refMarket).toBe("buff163");
+  expect(passes(d)).toBe(false); // YouPin isn't a default buy market
+  expect(passes(d, f({ buyMarkets: ["youpin"] }))).toBe(true);
+});
+
+test("old saved filters keep their buy markets and lose the old liquidity fields", () => {
+  const m = migrateFilters({ markets: ["dmarket"], reference: "youpin", minListings: 20, minBidAsk: 85, minLiquidity: 0, minRoi: 8 });
+  expect(m).toEqual({ buyMarkets: ["dmarket"], minRoi: 8, version: DEFAULT_SNIPE_FILTERS.version });
+  expect(migrateFilters(null)).toBe(null);
 });
 
 test("hides volatile, stale, old and unprofitable deals", () => {
@@ -64,7 +92,7 @@ test("hides volatile, stale, old and unprofitable deals", () => {
 });
 
 test("market, search and type filters", () => {
-  expect(passes(deal(), f({ markets: ["dmarket"] }))).toBe(false);
+  expect(passes(deal(), f({ buyMarkets: ["dmarket"] }))).toBe(false);
   expect(passes(deal(), f({ search: "ak redline" }))).toBe(true);
   expect(passes(deal(), f({ search: "awp" }))).toBe(false);
   expect(passes(deal({ name: "Souvenir AWP | Dragon Lore (Factory New)" }))).toBe(false);

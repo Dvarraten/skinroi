@@ -59,6 +59,16 @@ export async function pushSnipeListings(listings) {
   });
 }
 
+// Cheapest CSFloat listings of the items the backend asked about after a
+// pushSnipeListings: [{ name, rows: raw /api/v1/listings rows }].
+export async function pushCsfloatLowest(lowest) {
+  return request('/api/snipes', {
+    method: 'POST',
+    auth: true,
+    body: { market: 'csfloat', lowest, extVersion: EXT_VERSION },
+  });
+}
+
 // Owned item names + stored sell prices (with their age), so the worker can
 // refresh only what is due.
 export async function getSellPriceState() {

@@ -35,6 +35,7 @@ import {
 import { enrichOffersWithInspect } from './lib/inspect.js';
 import { runSellPrices } from './lib/sellprices.js';
 import { pushOffers, pushSnipeListings } from './lib/skinroi.js';
+import { runSnipeLookups } from './lib/snipelookups.js';
 
 const ALARM_NAME = 'skinroi-poll';
 
@@ -95,6 +96,7 @@ async function safeLogError(msg) {
 }
 
 // ── Snipes: forward the newest CSFloat listings to the backend ──────────────
+// and look up the cheapest CSFloat listing of the items it asks about.
 // Independent of the Steam poll: it only needs a pairing, not a Steam login.
 // No API key is sent; CSFloat serves listings to the browser session as-is.
 let snipesInFlight = false;
@@ -115,11 +117,16 @@ async function runSnipes() {
       await safeLogError(`CSFloat listings: ${err.message || err}`);
       return;
     }
+    let pushed;
     try {
-      await pushSnipeListings(rows);
+      pushed = await pushSnipeListings(rows);
     } catch (err) {
       await safeLogError(`Snipes push: ${err.message || err}`);
+      return;
     }
+    // Then the cheapest CSFloat listing of the items the backend asks about.
+    const lookupError = await runSnipeLookups(pushed?.csfloatLookups);
+    if (lookupError) await safeLogError(lookupError);
   } finally {
     snipesInFlight = false;
   }

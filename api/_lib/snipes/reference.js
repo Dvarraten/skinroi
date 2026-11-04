@@ -212,6 +212,7 @@ async function fetchSteamDtBatch(names) {
         sell,
         sellCount: toNumber(p.sellCount),
         bid: toNumber(p.biddingPrice),
+        bidCount: toNumber(p.biddingCount),
       };
     }
   }
@@ -220,12 +221,15 @@ async function fetchSteamDtBatch(names) {
 
 function steamDtRef(row, at, cnyPerUsd) {
   if (!row) return null;
-  return buildRef({
-    askUsd: row.sell / cnyPerUsd,
-    bidUsd: row.bid ? row.bid / cnyPerUsd : null,
-    count: row.sellCount,
-    updatedAt: at,
-  });
+  return {
+    ...buildRef({
+      askUsd: row.sell / cnyPerUsd,
+      bidUsd: row.bid ? row.bid / cnyPerUsd : null,
+      count: row.sellCount,
+      updatedAt: at,
+    }),
+    bidCount: row.bidCount ?? null,
+  };
 }
 
 // ── csgotrader.app (free Buff163 fallback) ─────────────────────────────────
