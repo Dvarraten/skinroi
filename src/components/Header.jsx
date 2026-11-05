@@ -198,7 +198,6 @@ export default function Header({
                   usdAmount={usdAmount}
                   rmbAmount={rmbAmount}
                   sidebarRate={sidebarRate}
-                  lastUpdated={lastUpdated}
                   handleUsdChange={handleUsdChange}
                   handleRmbChange={handleRmbChange}
                   theme={theme}

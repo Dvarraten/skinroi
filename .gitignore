@@ -23,12 +23,6 @@ yarn-error.log*
 
 .vercel
 
-# Steam sync backend — never commit secrets or local state
-/server/node_modules
-/server/.env
-/server/.env.*
-!/server/.env.example
-/server/data/
 .env*.local
 
 # Claude Code local settings (may contain command history with secrets)

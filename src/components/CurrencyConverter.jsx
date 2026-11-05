@@ -91,7 +91,7 @@ function symbolPad(symbol) {
 
 export default function CurrencyConverter({
   usdAmount, rmbAmount,
-  sidebarRate, lastUpdated,
+  sidebarRate,
   handleUsdChange, handleRmbChange, theme,
   currency1, setCurrency1, currency1Symbol,
   displayCurrency, setDisplayCurrency, currencySymbol,

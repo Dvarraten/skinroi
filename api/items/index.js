@@ -1,6 +1,6 @@
 // GET /api/items  — load items for the authenticated user
 // POST /api/items — save (replace) items for the authenticated user
-// /api/items?sellPrices=1 — Buff163/CSFloat sell prices for owned items
+// /api/items?sellPrices=1 — YouPin/CSFloat sell prices for owned items
 //                           (see _lib/sell-prices.js)
 import { getSessionSteamId } from '../_lib/auth.js';
 import { handleSellPrices } from '../_lib/sell-prices.js';

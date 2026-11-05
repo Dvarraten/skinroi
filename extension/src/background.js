@@ -132,7 +132,7 @@ async function runSnipes() {
   }
 }
 
-// ── Sell prices for Home: Buff163 + CSFloat lowest listing per owned item ──
+// ── Sell prices for Home: CSFloat lowest listing per owned item ──
 let sellPricesInFlight = false;
 
 async function runSellPricesSafe() {
