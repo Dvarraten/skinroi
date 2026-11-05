@@ -1,6 +1,6 @@
 // The main item list — renders cards for Active, Pending, and Sold tabs.
 // Sell form collapses to a single button by default; click to expand.
-// Trash icon revealed on card hover. Wear on second line. Notes chip top-left.
+// Trash icon revealed on card hover. Wear chip top-left, notes chip top-right on the image.
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, CheckCircle, ChevronDown, PackageCheck, ChevronRight, X, Lock, Unlock, ArrowDownUp, MoreHorizontal, Layers } from "lucide-react";
@@ -73,10 +73,11 @@ function HoldChip({ countdown }) {
   );
 }
 
-// Image area shared by ItemCard and StackedCard: wear chip top-left,
-// trade-hold chip bottom-left, stack count bottom-right (top-right is kept
-// free for the action menu / close buttons).
-function CardMedia({ item, wear, countdown, count, hideWear, theme }) {
+// Image area shared by ItemCard and StackedCard: wear chip top-left, notes
+// chip top-right, trade-hold chip bottom-left, stack count bottom-right.
+// The action menu / close buttons also sit top-right, so the notes chip fades
+// out on hover when there is a menu (keepNotesOnHover=false) and hides with hideNotes.
+function CardMedia({ item, wear, countdown, count, hideWear, hideNotes, keepNotesOnHover = true, theme }) {
   const wearShort = wear ? WEAR_SHORT[wear] : null;
   return (
     <div className="relative h-28 px-4 flex justify-center items-center bg-gradient-to-b from-white/[0.06] to-black/25">
@@ -84,6 +85,16 @@ function CardMedia({ item, wear, countdown, count, hideWear, theme }) {
       {wearShort && !hideWear && (
         <span title={wear} className="absolute top-2 left-2 text-[10px] font-semibold tracking-wide px-1.5 py-0.5 rounded-md bg-black/50 text-slate-200">
           {wearShort}
+        </span>
+      )}
+      {item.notes && !hideNotes && (
+        <span
+          title={item.notes}
+          className={`absolute top-2 right-2 max-w-[60%] truncate text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/50 text-warn transition-opacity ${
+            keepNotesOnHover ? '' : 'group-hover:opacity-0 group-focus-within:opacity-0'
+          }`}
+        >
+          {item.notes}
         </span>
       )}
       {count > 1 && (
@@ -100,28 +111,17 @@ function CardMedia({ item, wear, countdown, count, hideWear, theme }) {
   );
 }
 
-// Name (up to two lines), float, and notes. The wear is shown as a badge on the
-// image, so it is only repeated here when that badge is hidden (select mode).
+// Name (up to two lines) and float. Wear and notes are badges on the image, so
+// the wear is only repeated here when that badge is hidden (select mode).
 function CardTitle({ item, baseName, wear, showWear, theme }) {
   const sub = [showWear ? wear : null, typeof item.floatValue === 'number' ? `Float ${item.floatValue.toFixed(4)}` : null]
     .filter(Boolean).join(' · ');
   return (
     <div className="min-w-0">
-      {/* Fixed height for name + float + one notes line so cost rows line up across a grid row */}
-      <div className="min-h-[4.625rem]">
-        <h3 title={item.itemName} className={`text-[13px] font-semibold ${theme.text} leading-snug line-clamp-2`}>
-          {baseName}
-        </h3>
-        <p className={`text-[11px] ${theme.subtext} truncate leading-tight mt-0.5`}>{sub || '\u00a0'}</p>
-        {/* Notes get exactly one line, reserved even when empty; long notes are cut with … (full text on hover) */}
-        <div className="h-[18px] mt-1 flex items-center">
-          {item.notes && (
-            <p title={item.notes} className="text-[10px] leading-[14px] font-medium text-warn bg-warn/10 px-1.5 py-0.5 rounded-md truncate w-fit max-w-full">
-              {item.notes}
-            </p>
-          )}
-        </div>
-      </div>
+      <h3 title={item.itemName} className={`text-[13px] font-semibold ${theme.text} leading-snug line-clamp-2`}>
+        {baseName}
+      </h3>
+      <p className={`text-[11px] ${theme.subtext} truncate leading-tight mt-0.5`}>{sub || '\u00a0'}</p>
     </div>
   );
 }
@@ -607,7 +607,11 @@ function ItemCard({
         </div>
       )}
 
-      <CardMedia item={item} wear={wear} countdown={countdown} hideWear={selectMode} theme={theme} />
+      <CardMedia
+        item={item} wear={wear} countdown={countdown} hideWear={selectMode} theme={theme}
+        hideNotes={sellOpen || selectMode}
+        keepNotesOnHover={!(menuActions && menuItems.length > 0)}
+      />
 
       {/* Accent bar — profit/loss colour once sold (also shows the sell animation) */}
       <div
@@ -618,9 +622,15 @@ function ItemCard({
       <div className="flex-1 p-3 min-w-0 flex flex-col gap-3">
         <CardTitle item={item} baseName={baseName} wear={wear} showWear={selectMode} theme={theme} />
 
-        {/* Cost row — active/pending only, hidden when sell is open */}
-        {!item.sold && !sellOpen && <CostRow item={item} theme={theme} />}
-        {!item.sold && !sellOpen && sellPrices && <SellPriceRow item={item} sellPrices={sellPrices} theme={theme} />}
+        {/* Cost row — active/pending only, hidden when sell is open. Directly under
+            the name; on Home (no action zone) it sits at the bottom instead, so cost
+            rows line up when a neighbour's name wraps to two lines. */}
+        {!item.sold && !sellOpen && (
+          <div className={`flex flex-col gap-3 ${menuActions ? 'mt-auto' : ''}`}>
+            <CostRow item={item} theme={theme} />
+            {sellPrices && <SellPriceRow item={item} sellPrices={sellPrices} theme={theme} />}
+          </div>
+        )}
 
         {/* Action zone — on Home it only appears once Sell is picked from the menu */}
         {(!menuActions || sellOpen) && (
@@ -796,11 +806,12 @@ function StackedCard({ items, theme, onExpand, menuActions = false, sellPrices =
           className="!absolute top-1.5 right-1.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
         />
       )}
-      <CardMedia item={rep} wear={wear} countdown={countdown} count={items.length} theme={theme} />
+      <CardMedia item={rep} wear={wear} countdown={countdown} count={items.length} keepNotesOnHover={!menuActions} theme={theme} />
       {/* Spacer matching ItemCard's accent bar so rows line up */}
       <div className="h-[3px]" />
       <div className="flex-1 p-3 flex flex-col gap-3">
         <CardTitle item={rep} baseName={baseName} theme={theme} />
+        <div className={`flex flex-col gap-3 ${menuActions ? 'mt-auto' : ''}`}>
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">
             <p className={`text-[11px] font-medium ${theme.subtext}`}>Cost each</p>
@@ -812,6 +823,7 @@ function StackedCard({ items, theme, onExpand, menuActions = false, sellPrices =
           </div>
         </div>
         {sellPrices && <SellPriceRow item={rep} sellPrices={sellPrices} theme={theme} />}
+        </div>
         {!menuActions && (
         <div className="mt-auto">
           <button
