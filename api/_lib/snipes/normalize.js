@@ -29,14 +29,6 @@ export function itemKey(name, phase) {
   return phase ? `${name}|${phase}` : name;
 }
 
-export function isStatTrak(name) {
-  return /StatTrak™/.test(name || '');
-}
-
-export function isSouvenir(name) {
-  return /^Souvenir /.test(name || '');
-}
-
 export function toNumber(v) {
   const n = typeof v === 'string' ? parseFloat(v) : v;
   return Number.isFinite(n) ? n : null;

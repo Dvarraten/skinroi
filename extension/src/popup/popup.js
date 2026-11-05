@@ -69,8 +69,6 @@ async function renderActivity() {
       const t = entry.total ?? entry.accepted ?? 0;
       const a = entry.accepted ?? 0;
       text = `Detected ${a} new trade${a === 1 ? '' : 's'}${t !== a ? ` (${t} seen)` : ''}`;
-    } else if (entry.kind === 'baseline') {
-      text = entry.message || 'Historical trades seeded';
     } else if (entry.kind === 'info') {
       text = entry.message || '';
     } else if (entry.kind === 'error') {

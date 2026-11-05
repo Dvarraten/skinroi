@@ -972,7 +972,7 @@ export default function HandleItemsPage({
                     <th className="w-8"></th>
                   </tr>
                 </>}>
-                  {visibleIncomingGroups.map((group, i) => (
+                  {visibleIncomingGroups.map((group) => (
                     <IncomingRow
                       key={`in-${group[0].assetid}`}
                       entries={group}

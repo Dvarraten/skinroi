@@ -228,7 +228,6 @@ export default function CS2TradingTracker() {
               usdAmount={usdAmount}
               rmbAmount={rmbAmount}
               sidebarRate={sidebarRate}
-              lastUpdated={lastUpdated}
               handleUsdChange={handleUsdChange}
               handleRmbChange={handleRmbChange}
               theme={themeStyles}

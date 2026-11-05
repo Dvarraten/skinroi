@@ -1,6 +1,6 @@
-// Buff163 / CSFloat sell prices for the items the user owns, shown on Home.
-// The SkinROI extension fetches them from the user's browser and stores them
-// on the server; this only reads them back. Polls while enabled and the tab
+// YouPin / CSFloat sell prices for the items the user owns, shown on Home.
+// CSFloat comes from the SkinROI extension, YouPin from SteamDT on the
+// server; this only reads them back. Polls while enabled and the tab
 // is visible. Logged-in users only (guests have no extension pairing).
 import { useCallback, useEffect, useState } from "react";
 

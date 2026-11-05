@@ -18,7 +18,6 @@ const FRONTEND_POLL_MS = 30 * 1000;
 const DISMISS_TOMBSTONE_MS = 5 * 60 * 1000;
 
 const EMPTY_STATE = {
-  lastSync: null,
   lastSyncOk: null,
   lastError: null,
   pending: [],
@@ -137,9 +136,6 @@ export function useSteamSync() {
   return {
     pending: state.pending,
     pendingCount: state.pending.length,
-    incoming: state.pending.filter((p) => p.type === 'incoming'),
-    outgoing: state.pending.filter((p) => p.type === 'outgoing'),
-    lastSync: state.lastSync,
     lastSyncOk: state.lastSyncOk,
     lastError: state.lastError,
     extension: state.extension,

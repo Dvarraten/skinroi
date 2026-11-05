@@ -75,7 +75,7 @@ export async function getSellPriceState() {
   return request('/api/items?sellPrices=1', { auth: true });
 }
 
-// Push freshly fetched Buff163 / CSFloat sell prices for Home.
+// Push freshly fetched CSFloat sell prices for Home.
 export async function pushSellPrices({ results, status }) {
   return request('/api/items?sellPrices=1', {
     method: 'POST',

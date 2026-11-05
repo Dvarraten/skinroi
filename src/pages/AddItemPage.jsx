@@ -12,7 +12,7 @@ function HistoryThumb({ item }) {
   );
 }
 
-function StatusPill({ item, theme }) {
+function StatusPill({ item }) {
   if (item.sold) {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold rounded-md px-1.5 py-0.5 bg-loss/10 text-loss">
@@ -155,7 +155,7 @@ export default function AddItemPage({
                           {item.platform && <PlatformBadge platform={item.platform} size="xs" />}
                         </td>
                         <td className="px-3 py-2">
-                          <StatusPill item={item} theme={theme} />
+                          <StatusPill item={item} />
                         </td>
                         <td className={`px-4 py-2 text-right text-xs font-mono ${theme.subtext} whitespace-nowrap`}>
                           {item.datePurchased

@@ -48,6 +48,8 @@ skinroi/
 │           └── steam.js   Session token + GetTradeOffers + normalizer
 ├── src/                  React CRA frontend
 │   ├── App.js            Root component
+│   ├── pages/            Pages: AddItem, HandleItems, Analytics, Snipes,
+│   │                     Transactions, About
 │   ├── components/       UI components
 │   │   └── ExtensionPairPanel.jsx  Pairing / connection status UI
 │   ├── hooks/            Custom React hooks
@@ -79,15 +81,18 @@ skinroi/
   `steamcommunity.com/pointssummary/ajaxgetasyncconfig` (falls back to the
   `data-loyalty_webapi_token` embedded in `/my/home/` HTML)
 - Every 2 minutes calls `IEconService/GetTradeOffers/v1/` across three filter
-  modes to catch all state 3 (Accepted) trades — merged and deduped by
-  `tradeofferid`
-- Offers with `time_created < pairedAt` are filtered client-side; `time_updated`
-  is unreliable because Steam bumps it when trade holds expire
+  modes to catch all state 3 (Accepted) trades, plus
+  `IEconService/GetTradeHistory/v1/` — merged and deduped by `tradeofferid`
+- The extension sends every accepted trade; the backend applies the cutoff:
+  trades accepted before `pairedAt` (minus 60 s grace) are only recorded in
+  `processedTradeIds` and never surface in Handle Items. `time_updated` is
+  unreliable because Steam bumps it when trade holds expire
 - Item descriptions are sparse in offer responses, so the worker also pulls
   the user's inventory (ctx 2 + ctx 16) and keeps a persistent
   `classid_instanceid → { market_hash_name, icon_url }` cache in
-  `chrome.storage.local`
-- Pushes `{ offers: [{tradeofferid, items[]}], baseline }` to
+  `chrome.storage.local`; still-missing ones fall back to
+  `GetAssetClassInfo` / `GetTradeStatus`
+- Pushes `{ offers: [{tradeofferid, items[]}], extVersion }` to
   `POST /api/extension/trades` authenticated by `Authorization: Bearer {secret}`
 - Backend dedupes by `tradeofferid` in `processedTradeIds`; respects
   `dismissedAssetIds` tombstones for user-dismissed items
@@ -217,6 +222,10 @@ npm run items:update
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |
 | `skinroi:snipes:lock`            | Scan lock (25s TTL)                               |
 | `skinroi:snipes:ref:{name}`      | Cached CSPriceAPI row per item (5 min TTL)        |
+| `skinroi:snipes:sdt:{name}`      | Cached SteamDT YouPin/Buff163 row (30 min TTL)    |
+| `skinroi:snipes:steamdt:gate`    | SteamDT 1-call-a-minute gate (60s TTL)            |
+| `skinroi:snipes:csfl:{key}`      | Cheapest CSFloat listings per item (30 min TTL)   |
+| `skinroi:snipes:csfwant`         | Items waiting for an extension CSFloat lookup     |
 
 ## Hard Project Rules
 
@@ -240,22 +249,7 @@ from `src/themes/themes.js` instead:
 
 ## Known Caveats & Gotchas
 
-### 1. CRLF line endings in HandleItemsModal.jsx
-`src/components/HandleItemsModal.jsx` has Windows CRLF line endings. The Edit
-tool fails silently or produces broken diffs on this file. Always use a Bash
-Python one-liner instead:
-
-```bash
-python -c "
-import re, pathlib
-p = pathlib.Path('src/components/HandleItemsModal.jsx')
-src = p.read_text(encoding='utf-8')
-src = src.replace('OLD', 'NEW')
-p.write_text(src, encoding='utf-8')
-"
-```
-
-### 2. Tailwind JIT — never use dynamic theme class strings for colors
+### 1. Tailwind JIT — never use dynamic theme class strings for colors
 Dynamic template literals like `` className={`${theme.dot}`} `` are not reliably
 picked up by the Tailwind JIT compiler; the CSS class may never be generated.
 
@@ -272,7 +266,7 @@ picked up by the Tailwind JIT compiler; the CSS class may never be generated.
 This applies to any color-bearing theme token used dynamically (backgrounds,
 borders, text). Static strings like `className="bg-blue-500"` are fine.
 
-### 3. Theme system — two color fields per theme
+### 2. Theme system — two color fields per theme
 Every theme in `src/themes/themes.js` has two representations of its accent color:
 
 - `dot` — a Tailwind bg-class string (e.g. `"bg-amber-500"`). Only safe to use
@@ -282,7 +276,7 @@ Every theme in `src/themes/themes.js` has two representations of its accent colo
 
 When adding a new theme, always set both fields.
 
-### 4. Deployment
+### 3. Deployment
 The Vercel Hobby plan allows at most 12 serverless functions (every file under
 `api/` outside `_lib/`). A 13th fails the deploy, so add new routes as methods
 on an existing function instead of new files.
@@ -297,18 +291,15 @@ vercel --prod
 Environment variables (Redis, session secret) live in the Vercel project
 settings and are never committed. Pull them locally with `vercel env pull`.
 
-### 5. Extension trade detection is inventory-diff based
-The extension does not read Steam's trade offer history (which has an 8-day
-cutoff and requires an API key). It compares full-inventory snapshots stored
-in `chrome.storage.local` — new assetids become `incoming`, missing assetids
-become `outgoing`. The first sync after install seeds the baseline silently
-(no items emitted) so the user's existing inventory doesn't flood pending.
+### 4. Extension trade detection reads Steam's trade offers
+The extension reads accepted trades from `GetTradeOffers` and `GetTradeHistory`
+with the session-derived token (no API key). There is no inventory diff or
+baseline seed: the backend uses `pairedAt` to keep trades from before pairing
+out of Handle Items, and `processedTradeIds` so a trade is only added once.
+Re-installing or re-pairing the extension therefore doesn't lose or duplicate
+trades.
 
-If a user re-installs the extension the baseline resets — the next Steam trade
-will surface correctly, but any items received between install runs are lost
-until they touch the inventory again.
-
-### 6. Steam ID mismatch guard
+### 5. Steam ID mismatch guard
 The extension refuses to push if the Steam ID in the current browser session
 (`steamLoginSecure` cookie) doesn't match the SkinROI-paired Steam ID. This
 prevents pushing another user's inventory into the account if the user is
