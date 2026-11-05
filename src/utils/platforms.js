@@ -1,4 +1,4 @@
-// Shared platform list used by AddItemForm, ItemGrid, and HandleItemsModal.
+// Shared platform list used by AddItemForm, HandleItemsPage, TransactionPage and AboutPage.
 import buff163Icon  from "../assets/platforms/buff163.webp";
 import csfloatIcon  from "../assets/platforms/csfloat.webp";
 import csmoneyIcon  from "../assets/platforms/csmoney.webp";
