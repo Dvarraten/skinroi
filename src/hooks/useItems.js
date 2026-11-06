@@ -1,10 +1,24 @@
 // Central portfolio state — loads items from the API (logged in) or
 // localStorage (guest), auto-saves on change with a debounce, and exposes
 // add / sell / delete / promote-pending mutations plus the add-item form state.
+//
+// Demo mode (logged-out visitor trying the app) loads an example portfolio
+// and never saves anything: not to localStorage and never to /api/items.
 import { useState, useEffect, useRef } from 'react';
 import { getPlatformFee } from '../utils/platformFees';
+import { buildDemoPortfolio } from '../utils/demoPortfolio';
 
-export const useItems = (steamId) => {
+// Unique, increasing ids for items added in quick succession (a Steam import
+// adds hundreds in one go; Date.now() + random could collide).
+let lastDirectId = 0;
+const nextDirectId = () => {
+  lastDirectId = Math.max(Date.now(), lastDirectId + 1);
+  return lastDirectId;
+};
+
+export const useItems = (steamId, { demo = false } = {}) => {
+  // Where the list comes from. A signed-in user always wins over demo mode.
+  const source = steamId || (demo ? 'demo' : 'guest');
   const [items, setItems] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
   // steamId whose portfolio was loaded successfully from the API. Unlike
@@ -57,6 +71,10 @@ export const useItems = (steamId) => {
           setSettledFor(steamId);
         })
         .catch(() => { setIsLoaded(true); setSettledFor(steamId); });
+    } else if (source === 'demo') {
+      setItems(buildDemoPortfolio());
+      setIsLoaded(true);
+      setSettledFor('demo');
     } else {
       try {
         const saved = localStorage.getItem('cs2-trading-items');
@@ -65,12 +83,18 @@ export const useItems = (steamId) => {
       setIsLoaded(true);
       setSettledFor('guest');
     }
-  }, [steamId]);
+  }, [steamId, source]);
 
-  // Save items — API (debounced) when logged in, localStorage otherwise
+  // Save items — API (debounced) when logged in, localStorage otherwise.
+  // Only once the list on screen belongs to the current source: right after a
+  // switch (e.g. demo → guest) the old list is still in state for one render
+  // and must not be written over the new source's data. A signed-in list is
+  // only saved after it loaded from the API (a failed load never overwrites
+  // the stored portfolio). Demo never saves.
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || settledFor !== source || source === 'demo') return;
     if (steamId) {
+      if (loadedFor !== steamId) return;
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         fetch('/api/items', {
@@ -85,7 +109,7 @@ export const useItems = (steamId) => {
         localStorage.setItem('cs2-trading-items', JSON.stringify(items));
       } catch {}
     }
-  }, [items, isLoaded, steamId]);
+  }, [items, isLoaded, steamId, settledFor, source, loadedFor]);
 
   const handleAddItem = () => {
     if (!formData.itemName || !formData.purchasePrice) return;
@@ -179,7 +203,7 @@ export const useItems = (steamId) => {
   }) => {
     if (!itemName || !purchasePrice) return null;
     const newItem = {
-      id: Date.now() + Math.floor(Math.random() * 1000),
+      id: nextDirectId(),
       itemName,
       purchasePrice: parseFloat(purchasePrice),
       notes,
@@ -308,7 +332,7 @@ export const useItems = (steamId) => {
     // True once the logged-in user's portfolio has loaded from the API.
     portfolioReady: !!steamId && loadedFor === steamId,
     // True until the list for the current user (or guest) has been loaded.
-    itemsLoading: settledFor !== (steamId || 'guest'),
+    itemsLoading: settledFor !== source,
     formData,
     setFormData,
     sellData,

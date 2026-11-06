@@ -24,6 +24,10 @@ export const PROFIT_COLOR = '#22c55e';
 export const LOSS_COLOR   = '#ef4444';
 export const WARN_COLOR   = '#f59e0b';
 
+// Steam's own button colours for "Sign in with Steam" (same in every theme).
+// Static class string so Tailwind's JIT picks it up.
+export const STEAM_BUTTON_CLASS = 'bg-[#1b2838] hover:bg-[#2a475e]';
+
 export const themes = {
   // ── 1. Original (finance terminal, amber accent) ──────────────
   bloomberg: {

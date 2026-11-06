@@ -16,7 +16,12 @@ const STORAGE_KEY = "skinroi-snipes-filters";
 const CURRENCY_KEY = "skinroi-snipes-currency";
 const MARKET_LABELS = { csfloat: "CSFloat", dmarket: "DMarket", youpin: "YouPin", buff163: "Buff163" };
 
-function loadFilters() {
+// The demo preview only has deals 15+ minutes old and no saved filters, so
+// it starts from looser defaults to have something to show.
+const DEMO_FILTERS = { ...DEFAULT_SNIPE_FILTERS, sellMarkets: SELL_MARKETS, minLiquidity: 30, maxAgeMin: 60 };
+
+function loadFilters(demo) {
+  if (demo) return DEMO_FILTERS;
   try {
     const saved = migrateFilters(JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"));
     return saved ? { ...DEFAULT_SNIPE_FILTERS, ...saved } : DEFAULT_SNIPE_FILTERS;
@@ -33,9 +38,9 @@ function ago(ms, now) {
   return `${Math.round(s / 3600)}h ago`;
 }
 
-export default function SnipesPage({ theme, rates }) {
-  const { deals, meta, error, loading, refresh } = useSnipes();
-  const [filters, setFilters] = useState(loadFilters);
+export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
+  const { deals, meta, error, loading, refresh } = useSnipes({ demo });
+  const [filters, setFilters] = useState(() => loadFilters(demo));
   const [currency, setCurrency] = useState(() => {
     try { return localStorage.getItem(CURRENCY_KEY) || "USD"; } catch { return "USD"; }
   });
@@ -44,8 +49,9 @@ export default function SnipesPage({ theme, rates }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
+    if (demo) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(filters)); } catch { /* ignore */ }
-  }, [filters]);
+  }, [filters, demo]);
 
   useEffect(() => {
     try { localStorage.setItem(CURRENCY_KEY, currency); } catch { /* ignore */ }
@@ -78,7 +84,7 @@ export default function SnipesPage({ theme, rates }) {
         filters={filters}
         set={set}
         symbol={symbol}
-        onReset={() => setFilters(DEFAULT_SNIPE_FILTERS)}
+        onReset={() => setFilters(demo ? DEMO_FILTERS : DEFAULT_SNIPE_FILTERS)}
       />
 
       <div className={`md:flex-1 min-w-0 flex flex-col ${theme.panel} border ${theme.panelBorder} rounded-2xl md:overflow-hidden`}>
@@ -87,7 +93,11 @@ export default function SnipesPage({ theme, rates }) {
           <span className={`text-xs ${theme.subtext}`}>
             {visible.length} of {deals.length} shown
           </span>
-          <ScanStatus meta={meta} now={now} theme={theme} />
+          {demo ? (
+            <span className="text-[11px] text-warn">Delayed 15+ min preview</span>
+          ) : (
+            <ScanStatus meta={meta} now={now} theme={theme} />
+          )}
           <button
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
@@ -115,7 +125,21 @@ export default function SnipesPage({ theme, rates }) {
           </button>
         </div>
 
-        {meta?.refProvider === "csgotrader" && (
+        {demo && (
+          <div className={`px-4 md:px-5 py-2.5 text-xs border-b ${theme.panelBorder} flex flex-wrap items-center gap-x-3 gap-y-1.5 ${theme.textSecondary}`}>
+            <span>
+              These deals were found 15 minutes or more ago and are probably gone. Signed-in users see new ones within a minute, with buy links.
+            </span>
+            <button
+              onClick={onLogin}
+              className={`ml-auto shrink-0 px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97]`}
+            >
+              Sign in for real time
+            </button>
+          </div>
+        )}
+
+        {!demo && meta?.refProvider === "csgotrader" && (
           <div className="px-5 py-2 text-xs text-warn border-b border-white/5 flex items-center gap-2">
             <AlertTriangle size={13} />
             Using free Buff163 prices (no listing counts). Set STEAMDT_API_KEY for YouPin prices and listing counts.
@@ -127,11 +151,13 @@ export default function SnipesPage({ theme, rates }) {
           {!error && loading && <p className={`p-6 text-sm ${theme.subtext}`}>Scanning markets…</p>}
           {!error && !loading && visible.length === 0 && (
             <p className={`p-6 text-sm ${theme.subtext}`}>
-              No deals match your filters right now. New listings are checked about every 45 seconds.
+              {demo
+                ? "No delayed deals match these filters right now. Try a lower min ROI or liquidity."
+                : "No deals match your filters right now. New listings are checked about every 45 seconds."}
             </p>
           )}
           {visible.map((d) => (
-            <SnipeRow key={d.id} deal={d} theme={theme} money={money} now={now} />
+            <SnipeRow key={d.id} deal={d} theme={theme} money={money} now={now} onLogin={demo ? onLogin : null} />
           ))}
         </div>
       </div>
@@ -199,7 +225,9 @@ function SnipeImage({ image, name }) {
   );
 }
 
-function SnipeRow({ deal: d, theme, money, now }) {
+// onLogin is set in the demo: deals come without links, so the button asks
+// the visitor to sign in instead.
+function SnipeRow({ deal: d, theme, money, now, onLogin }) {
   const liq = d.liquidity;
   const liquidityText = liq.score != null ? `Liquidity ${liq.score}` : "Liquidity unknown";
   const liquidityDetail = [
@@ -251,14 +279,25 @@ function SnipeRow({ deal: d, theme, money, now }) {
         <p className={`text-xs font-mono ${theme.subtext}`}>{(d.roi * 100).toFixed(1)}%</p>
       </div>
 
-      <a
-        href={d.url}
-        target="_blank"
-        rel="noreferrer"
-        className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97]`}
-      >
-        Buy <ExternalLink size={12} />
-      </a>
+      {onLogin || !d.url ? (
+        <button
+          onClick={onLogin || undefined}
+          disabled={!onLogin}
+          title="Sign in with Steam to get buy links"
+          className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.subtext} hover:bg-white/5 active:scale-[0.97] disabled:opacity-40`}
+        >
+          <Lock size={12} /> Buy
+        </button>
+      ) : (
+        <a
+          href={d.url}
+          target="_blank"
+          rel="noreferrer"
+          className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97]`}
+        >
+          Buy <ExternalLink size={12} />
+        </a>
+      )}
     </div>
   );
 }
