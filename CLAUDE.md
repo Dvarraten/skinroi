@@ -155,7 +155,25 @@ phase is unknown (or CSFloat has nothing for it), and always for YouPin
 flagged `anyPhase` and shown with a `*`; no "best" dot then.
 
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
-Guest users → `localStorage` key `cs2-trading-items`.
+Guest users → `localStorage` key `cs2-trading-items`. Demo mode → nothing is
+saved anywhere (see below).
+
+**Landing, demo and guest**: logged-out visitors get `LandingPage` (screenshots
+in `public/landing/`). "Try the demo" sets `sessionStorage['skinroi-demo']`;
+`useItems(steamId, { demo })` then loads `utils/demoPortfolio.js` and never
+writes to localStorage or `/api/items` (production Redis is shared with local
+dev). Logged-out Snipes reads `GET /api/snipes?demo=1`: deals first seen 15+
+min ago, without buy links, CDN-cached 60 s, never rescans
+(`api/_lib/snipes/demo.js`). "Continue without an account" is guest mode
+(`localStorage['cs2-auth-dismissed']`).
+
+**Onboarding + Steam import**: `OnboardingChecklist` on Home (install, pair,
+first item) for signed-in users until done or closed
+(`skinroi-onboarding-done-{steamId}`). Set `REACT_APP_EXTENSION_URL` to the
+Chrome Web Store link once published. "Import from Steam" (Add item page and
+checklist) reads `GET /api/inventory/state?steamInventory=1`: Steam's public
+inventory endpoint (inventory must be public), marketable items only, cached
+10 min per user (`api/_lib/steam-inventory.js`).
 
 ## Development
 
@@ -218,6 +236,7 @@ npm run items:update
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
 | `skinroi:sellprices:{steamId}`   | CSFloat sell prices for owned items (from extension) |
 | `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (2 min TTL) |
+| `skinroi:steaminv:{steamId}`     | Public Steam inventory for import (10 min TTL)   |
 | `skinroi:snipes:deals`           | Current snipe candidates (30 min window)          |
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |
 | `skinroi:snipes:lock`            | Scan lock (25s TTL)                               |

@@ -4,6 +4,9 @@
 //        sources lazily (see _lib/snipes/scan.js) and returns every deal the
 //        server kept; ROI, fees and liquidity filters run in the browser.
 //        Requires a SkinROI session so anonymous traffic can't burn API quota.
+// GET ?demo=1 — public, delayed preview for the logged-out demo: only deals
+//        first seen at least 15 min ago, at most 40 (see _lib/snipes/demo.js), without
+//        buy links. Never rescans, only reads Redis, and is CDN-cached.
 // POST — the browser extension pushes raw CSFloat listings it fetched from
 //        the user's own IP (see _lib/snipes/csfloat.js for why the server
 //        can't). Authenticated via Authorization: Bearer {ext-secret}.
@@ -21,6 +24,7 @@ import { normalizeCsfloatListings } from '../_lib/snipes/csfloat.js';
 import {
   ensureFresh, ingestCsfloatLowest, ingestListings, loadSnipes, minPriceCents,
 } from '../_lib/snipes/scan.js';
+import { DEMO_DELAY_MS, demoDeals } from '../_lib/snipes/demo.js';
 
 const MAX_LISTINGS = 200;
 const MAX_LOOKUPS = 10;
@@ -34,6 +38,7 @@ export default async function handler(req, res) {
 }
 
 async function handleGet(req, res) {
+  if (req.query?.demo) return handleDemo(req, res);
   if (!getSessionSteamId(req)) return res.status(401).json({ error: 'not authenticated' });
 
   res.setHeader('Cache-Control', 'no-store');
@@ -48,6 +53,22 @@ async function handleGet(req, res) {
   } catch (e) {
     console.error('[snipes] load failed:', e);
     return res.status(500).json({ error: e.message });
+  }
+}
+
+async function handleDemo(req, res) {
+  try {
+    const { deals, meta } = await loadSnipes();
+    // One Redis read per minute at most, however many visitors there are.
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+    return res.json({
+      deals: demoDeals(deals),
+      meta: meta ? { lastScan: meta.lastScan, delayedMinutes: DEMO_DELAY_MS / 60000 } : null,
+      demo: true,
+    });
+  } catch (e) {
+    console.error('[snipes] demo load failed:', e);
+    return res.status(500).json({ error: 'Snipes preview unavailable' });
   }
 }
 

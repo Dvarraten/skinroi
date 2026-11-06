@@ -6,11 +6,16 @@
 // Pending items that came from a CSFloat trade are enriched with
 // `csfloatPrice` (USD) so Handle Items can prefill the buy/sell price. The
 // enrichment is response-only and never written back to the stored state.
+//
+// GET ?steamInventory=1 — the signed-in user's public CS2 inventory for the
+// one-click import on Add item (see _lib/steam-inventory.js). Lives here
+// because the Vercel Hobby plan allows 12 functions.
 
 import { loadState, publicState } from '../_lib/state.js';
 import { getSessionSteamId } from '../_lib/auth.js';
 import { loadExtensionInfo } from '../_lib/extension-store.js';
 import { loadCsfloatTrades, attachCsfloatPrices } from '../_lib/csfloat-trades.js';
+import { loadSteamInventory } from '../_lib/steam-inventory.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -19,6 +24,17 @@ export default async function handler(req, res) {
   }
 
   const steamId = getSessionSteamId(req) || null;
+
+  if (req.query?.steamInventory) {
+    if (!steamId) return res.status(401).json({ error: 'not authenticated' });
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      return res.json(await loadSteamInventory(steamId, { fresh: req.query.fresh === '1' }));
+    } catch (err) {
+      console.error('[inventory] steam inventory failed:', err.message);
+      return res.status(err.status || 500).json({ error: err.message, code: err.code || 'error' });
+    }
+  }
 
   try {
     const [state, extInfo, csfloatTrades] = await Promise.all([

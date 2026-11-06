@@ -4,7 +4,6 @@ import { themes } from './themes/themes';
 import './index.css';
 
 import { useAuth } from './hooks/useAuth';
-import WelcomeModal from './components/WelcomeModal';
 import { useItems } from './hooks/useItems';
 import { useExchangeRate } from './hooks/useExchangeRate';
 import { useChartData } from './hooks/useChartData';
@@ -30,19 +29,44 @@ import TransactionPage from './pages/TransactionPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import AddItemPage from './pages/AddItemPage';
 import SnipesPage from './pages/SnipesPage';
+import LandingPage from './pages/LandingPage';
+import DemoBanner from './components/DemoBanner';
+import OnboardingChecklist from './components/OnboardingChecklist';
+import SteamImportModal from './components/SteamImportModal';
+
+// Demo mode lasts for the browser tab, so a reload keeps the visitor in it.
+const DEMO_KEY = 'skinroi-demo';
+const readDemo = () => { try { return sessionStorage.getItem(DEMO_KEY) === '1'; } catch { return false; } };
 
 export default function CS2TradingTracker() {
   const { user, loading: authLoading, login, logout } = useAuth();
+  // Guest mode: the visitor chose to use the app without an account (data in
+  // localStorage). Kept from the old welcome modal's key.
   const [authDismissed, setAuthDismissed] = useState(
     () => !!localStorage.getItem('cs2-auth-dismissed')
   );
-  const showWelcome = !authLoading && !user && !authDismissed;
+  const [demoState, setDemoState] = useState(readDemo);
+  // A signed-in user is never in demo mode, whatever the tab remembers.
+  const demo = demoState && !user;
+  const showLanding = !authLoading && !user && !authDismissed && !demo;
+  const setDemo = (on) => {
+    try { on ? sessionStorage.setItem(DEMO_KEY, '1') : sessionStorage.removeItem(DEMO_KEY); } catch { /* ignore */ }
+    setDemoState(on);
+  };
+  // Leaving for Steam ends the demo, so the user doesn't come back to it.
+  const signIn = () => { setDemo(false); login(); };
+  const continueAsGuest = () => {
+    localStorage.setItem('cs2-auth-dismissed', '1');
+    setAuthDismissed(true);
+    setDemo(false);
+  };
+  const [importOpen, setImportOpen] = useState(false);
 
   const {
     items, setItems, portfolioReady, itemsLoading, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
     addItemDirect, sellItemDirect, promotePendingItem, handleAddTransaction,
-  } = useItems(user?.steamId);
+  } = useItems(user?.steamId, { demo });
 
   const handleImportCSV = (file) => {
     if (!file) return;
@@ -146,17 +170,16 @@ export default function CS2TradingTracker() {
     >
       <div className={`fixed inset-0 -z-10 pointer-events-none ${themeStyles.bg}`} />
 
-      {showWelcome && (
-        <WelcomeModal
-          onLogin={login}
-          onContinue={() => {
-            localStorage.setItem('cs2-auth-dismissed', '1');
-            setAuthDismissed(true);
-          }}
+      {showLanding && (
+        <LandingPage
           theme={themeStyles}
+          onLogin={signIn}
+          onDemo={() => { setDemo(true); setActivePage(null); }}
+          onGuest={continueAsGuest}
         />
       )}
 
+      {!showLanding && (<>
       {/* ── Top header ────────────────────────────────────────────────────── */}
       <Header
         theme={themeStyles}
@@ -170,7 +193,7 @@ export default function CS2TradingTracker() {
         onHomeClick={closePage}
         pendingCount={steamSync.pendingCount}
         user={user}
-        onLogin={login}
+        onLogin={signIn}
         onLogout={logout}
         onExportCSV={() => exportToCSV(items)}
         onImportCSV={handleImportCSV}
@@ -208,9 +231,31 @@ export default function CS2TradingTracker() {
         </div>
       </Header>
 
+      {demo && (
+        <DemoBanner
+          theme={themeStyles}
+          onLogin={signIn}
+          onExit={() => { setDemo(false); setActivePage(null); }}
+        />
+      )}
+
       {/* ── Home view ─────────────────────────────────────────────────────── */}
       {isHome && (
       <div className="flex flex-1 min-h-0 flex-col gap-4 px-4 md:px-6 pt-3 pb-4 overflow-hidden">
+
+        {user && !homeLoading && steamSync.extension && (
+          <div className="shrink-0">
+            <OnboardingChecklist
+              theme={themeStyles}
+              steamId={user.steamId}
+              extension={steamSync.extension}
+              items={items}
+              onExtensionChange={steamSync.refreshState}
+              onImportSteam={() => setImportOpen(true)}
+              onAddManually={() => openPage('addItem')}
+            />
+          </div>
+        )}
 
         {/* Row 1 — hero (centered) + currency converter (right, same height) */}
         <div className="shrink-0 flex items-stretch gap-6">
@@ -319,6 +364,10 @@ export default function CS2TradingTracker() {
           handleAddItem={handleAddItem} theme={themeStyles}
           exchangeRate={exchangeRate} currencySymbol={currencySymbol} displayCurrency={displayCurrency}
           items={items}
+          canImport={!!user}
+          onImportSteam={() => setImportOpen(true)}
+          onLogin={signIn}
+          demo={demo}
         />
       )}
 
@@ -336,7 +385,7 @@ export default function CS2TradingTracker() {
 
       {/* ── Snipes page ──────────────────────────────────────────────────── */}
       {isSnipesPage && (
-        <SnipesPage theme={themeStyles} rates={allRates} />
+        <SnipesPage key={user ? 'live' : 'demo'} theme={themeStyles} rates={allRates} demo={!user} onLogin={signIn} />
       )}
 
       {/* ── Analytics page ───────────────────────────────────────────────── */}
@@ -368,6 +417,16 @@ export default function CS2TradingTracker() {
           handleRmbChange={handleRmbChange}
           {...steamSync}
           onDismiss={steamSync.dismiss}
+        />
+      )}
+      </>)}
+
+      {importOpen && user && (
+        <SteamImportModal
+          theme={themeStyles}
+          items={items}
+          addItemDirect={addItemDirect}
+          onClose={() => setImportOpen(false)}
         />
       )}
     </div>
