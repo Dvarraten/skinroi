@@ -36,6 +36,7 @@ import { enrichOffersWithInspect } from './lib/inspect.js';
 import { runSellPrices } from './lib/sellprices.js';
 import { pushOffers, pushSnipeListings } from './lib/skinroi.js';
 import { runSnipeLookups } from './lib/snipelookups.js';
+import { csfloatFetch, csfloatPausedUntil } from './lib/csfloat.js';
 
 const ALARM_NAME = 'skinroi-poll';
 
@@ -107,9 +108,11 @@ async function runSnipes() {
   try {
     const { secret } = await getPairing();
     if (!secret) return;
+    // Rate limited earlier: stay quiet until the pause is over.
+    if (await csfloatPausedUntil()) return;
     let rows;
     try {
-      const res = await fetch(CSFLOAT_LISTINGS_URL, { credentials: 'include' });
+      const res = await csfloatFetch(CSFLOAT_LISTINGS_URL);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       rows = Array.isArray(json) ? json : json?.data || [];
@@ -141,6 +144,7 @@ async function runSellPricesSafe() {
   try {
     const { secret } = await getPairing();
     if (!secret) return;
+    if (await csfloatPausedUntil()) return;
     const result = await runSellPrices();
     for (const [market, err] of Object.entries(result?.status || {})) {
       if (err) await safeLogError(`Sell prices (${market}): ${err}`);
@@ -353,6 +357,7 @@ async function runPoll({ manual = false } = {}) {
           descByKey: raw.descByKey,
           ownerSteamId: cookieSteamId,
           cache: inspectCache,
+          since: (await getPairing()).pairedAt,
         });
         await saveInspectCache(inspectCache);
       } catch (err) {

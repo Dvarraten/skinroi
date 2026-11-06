@@ -24,25 +24,38 @@ export const STEAM_GET_TRADE_STATUS = 'https://api.steampowered.com/IEconService
 
 // CSFloat's public inspect endpoint — takes a Steam inspect_link, returns
 // float value, paint seed / index, stickers, keychains. Same API their own
-// browser extension uses. Rate limits are lenient for a personal trader
-// (a few trades per day), but we still throttle to be a good citizen.
+// browser extension uses. Only items from trades since pairing are inspected,
+// at most INSPECT_MAX_PER_RUN new ones per poll, 2 s apart; a failed lookup
+// is not retried for INSPECT_RETRY_FAILED_MS (traded-away items always fail).
 export const CSFLOAT_INSPECT_API = 'https://api.csfloat.com/';
-export const INSPECT_MIN_DELAY_MS = 250;
+export const INSPECT_MIN_DELAY_MS = 2000;
+export const INSPECT_MAX_PER_RUN = 5;
+export const INSPECT_RETRY_FAILED_MS = 24 * 60 * 60 * 1000;
 
 // Newest CSFloat buy-now listings for the Snipes tab. Fetched here rather than
 // on the server because CSFloat rate-limits requests coming from many IPs
 // (Vercel functions); the extension runs on the user's single IP.
 export const CSFLOAT_LISTINGS_URL =
   'https://csfloat.com/api/v1/listings?sort_by=most_recent&type=buy_now&limit=50';
-// Gap between the per-item lookups of an item's cheapest CSFloat listing
-// (lib/snipelookups.js); the backend asks for at most 6 per push.
-export const SNIPE_LOOKUP_GAP_MS = 3000;
+// Per-item lookups of an item's cheapest CSFloat listing (lib/snipelookups.js)
+// per poll; the backend asks for at most this many per push.
+export const SNIPE_LOOKUPS_PER_RUN = 3;
 
-// CSFloat sell prices for Home (see lib/sellprices.js): up to
-// SELL_PRICES_PER_RUN items each poll; a price is refreshed once it is 30 min
+// Every csfloat.com/api/v1/listings call goes through lib/csfloat.js, which
+// spaces them CSFLOAT_MIN_GAP_MS apart (4 a minute; CSFloat allows about 5)
+// and pauses all of them after a 429: until Retry-After / X-RateLimit-Reset,
+// else 10 min, doubling for each 429 in a row, at most 60 min.
+// Per 2-minute poll: 1 Snipes feed + 3 lookups + 4 sell-price calls = 8.
+export const CSFLOAT_MIN_GAP_MS = 15 * 1000;
+export const CSFLOAT_PAUSE_MIN_MS = 10 * 60 * 1000;
+export const CSFLOAT_PAUSE_MAX_MS = 60 * 60 * 1000;
+
+// CSFloat sell prices for Home (see lib/sellprices.js): at most
+// SELL_PRICES_CALLS_PER_RUN CSFloat calls each poll (a Doppler can need more
+// than one); a price is refreshed once it is 30 min
 // old so the site (which hides prices older than 1 hour) always has a fresh one.
 export const CSFLOAT_LISTINGS_API = 'https://csfloat.com/api/v1/listings';
-export const SELL_PRICES_PER_RUN = 10;
+export const SELL_PRICES_CALLS_PER_RUN = 4;
 export const SELL_PRICES_REFRESH_AFTER_MS = 30 * 60 * 1000;
 export const SELL_PRICES_RETRY_ERROR_MS = 10 * 60 * 1000;
 

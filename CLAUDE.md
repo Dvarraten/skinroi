@@ -99,7 +99,7 @@ skinroi/
 
 **CSFloat prices (server → CSFloat)**: `GET /api/inventory/state` fetches the
 user's CSFloat trades (undocumented `GET csfloat.com/api/v1/me/trades`, auth with
-`CSFLOAT_API_KEY`, cached 2 min in Redis) and adds `csfloatPrice` (USD) to pending
+`CSFLOAT_API_KEY`, cached 5 min in Redis; a failed fetch pauses it 5 min, a 429 15 min) and adds `csfloatPrice` (USD) to pending
 items whose `tradeid` equals the trade's `steam_offer.id`. Handle Items prefills
 the buy/sell price from it. See `api/_lib/csfloat-trades.js`.
 `useCsfloatAutoSync` (wired in `App.js`, runs once the portfolio has loaded from
@@ -119,10 +119,9 @@ IPs. Both paths price listings against YouPin, Buff163 and CSFloat and store
 every listing at least 2% under the best of them for 30 min. CSFloat's price is
 its cheapest listing of the same item (never CSFloat's appraisal), excluding
 the listing being priced (`snipes/csfloat-lowest.js`). The server can't look
-it up, so each listings push answers with up to 6 `csfloatLookups` (items with
+it up, so each listings push answers with up to 3 `csfloatLookups` (items with
 no known price, ranked by appraisal or YouPin/Buff price over the buy price);
-the extension (`lib/snipelookups.js`) fetches each one's 3 cheapest listings,
-3 s apart, and POSTs `{ market: 'csfloat', lowest: [{ name, rows }] }`. Results
+the extension (`lib/snipelookups.js`) fetches each one's 3 cheapest listings and POSTs `{ market: 'csfloat', lowest: [{ name, rows }] }`. Results
 are cached 30 min, the listings that waited on them are priced again, and a
 cheaper listing in the feed updates the cache straight away. "Item deals" add an
 item's lowest YouPin / Buff163 ask when another market pays more; the page
@@ -139,14 +138,24 @@ with neither, the free csgotrader.app Buff163 dump is used) and
 `SNIPES_MIN_PRICE_CENTS` (default 200). A source that answers 429 pauses 15 min. Dopplers without a known phase
 are skipped so phases never get mixed.
 
+**CSFloat rate limit**: CSFloat publishes no numbers; community notes put
+`/v1/listings` at about 5 requests a minute (it sends `X-RateLimit-*`
+headers). Every extension call to it goes through `extension/src/lib/csfloat.js`:
+one queue, 15 s apart (4 a minute), and after a 429 every CSFloat call pauses
+until `Retry-After`/`X-RateLimit-Reset`, else 10 min doubling to 60 min. Per
+2-min poll that is at most 1 feed + 3 lookups + 4 sell-price calls. CSFloat
+inspect (`api.csfloat.com`, `lib/inspect.js`) only looks at items from trades
+since pairing, at most 5 per poll, and caches failures for 24 h. Never add a
+CSFloat call that bypasses `csfloatFetch`.
+
 **Sell prices on Home**: each unsold item shows the lowest YouPin and
 CSFloat listing, at most 1 hour old, with a dot on the one that pays more after
 fees. YouPin comes from SteamDT on the server (`loadSteamDtRows` in
 `snipes/reference.js`, same 30 min cache and 1-call-a-minute gate as Snipes),
 added on each site `GET /api/items?sellPrices=1`; never use the user's own
 YouPin session. CSFloat is fetched by the extension (`lib/sellprices.js`):
-`api/v1/listings?market_hash_name=…&sort_by=lowest_price`, up to 10 names per
-poll that are 30+ min old, POSTed to the same URL. The site hides prices older
+`api/v1/listings?market_hash_name=…&sort_by=lowest_price`, at most 4 calls per
+poll for names that are 30+ min old, POSTed to the same URL. The site hides prices older
 than 1 hour. Prices are keyed per Doppler phase (`api/_lib/doppler-phase.js`,
 mirrored in `src/utils/sellPrices.js`): phase from the item name ("Doppler
 Phase 2") or its paint index; CSFloat filters by `paint_index`. When the
@@ -235,7 +244,8 @@ npm run items:update
 | `skinroi:ext-secret:{secret}`    | Reverse lookup: Bearer secret → steamId           |
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
 | `skinroi:sellprices:{steamId}`   | CSFloat sell prices for owned items (from extension) |
-| `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (2 min TTL) |
+| `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (5 min TTL) |
+| `skinroi:csfloat:trades-fail:{steamId}` | /me/trades failed: don't retry (5 min, 15 after 429) |
 | `skinroi:steaminv:{steamId}`     | Public Steam inventory for import (10 min TTL)   |
 | `skinroi:snipes:deals`           | Current snipe candidates (30 min window)          |
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |
