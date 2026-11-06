@@ -14,7 +14,12 @@
 //   4. Attach { floatValue, paintSeed, paintIndex, defIndex, stickers,
 //      keychains } to the item; save to cache
 
-import { CSFLOAT_INSPECT_API, INSPECT_MIN_DELAY_MS } from './config.js';
+import {
+  CSFLOAT_INSPECT_API,
+  INSPECT_MIN_DELAY_MS,
+  INSPECT_MAX_PER_RUN,
+  INSPECT_RETRY_FAILED_MS,
+} from './config.js';
 
 // Extract the inspect_link template from a description's actions and
 // materialise it for a specific owner + asset. Returns null if the item
@@ -126,28 +131,39 @@ function normalizeKeychains(raw) {
 // inspect metadata for each item. Uses (and updates) a persistent cache
 // map keyed by assetid — pass the map in and it's mutated in place.
 //
-// Rate limits: CSFloat's public API is used by their own extension for
-// bulk market scans; a personal trader hitting it a few times a day is
-// well within polite usage. We still throttle to INSPECT_MIN_DELAY_MS
-// between calls and skip enrichment for items already in cache.
+// Every poll sees the whole trade history, so without limits this would
+// call CSFloat for every old item each time. Instead:
+//   - only trades accepted since `since` (pairing time) are inspected; older
+//     ones never reach Handle Items anyway;
+//   - a failed lookup is cached as { failedAt } and not retried for
+//     INSPECT_RETRY_FAILED_MS (items already traded away always fail);
+//   - at most INSPECT_MAX_PER_RUN calls per poll, INSPECT_MIN_DELAY_MS apart.
 export async function enrichOffersWithInspect({
   offers,
   descByKey,
   ownerSteamId,
   cache,
+  since = null,
 }) {
   if (!Array.isArray(offers) || offers.length === 0) return;
   if (!ownerSteamId) return;
+  // A day of slack, like the backend's cutoff but generous.
+  const sinceAt = typeof since === 'number' ? since : Date.parse(since);
+  const sinceMs = Number.isFinite(sinceAt) ? sinceAt - 24 * 60 * 60 * 1000 : null;
+  const now = Date.now();
 
+  let calls = 0;
   let lastCallAt = 0;
   for (const offer of offers) {
     for (const item of offer.items) {
-      // Cache hit — attach and skip network call.
       const cached = cache[item.assetid];
-      if (cached) {
+      if (cached && !cached.failedAt) {
         attachInspect(item, cached);
         continue;
       }
+      if (cached?.failedAt && now - cached.failedAt < INSPECT_RETRY_FAILED_MS) continue;
+      if (sinceMs != null && !(Date.parse(offer.acceptedAt) >= sinceMs)) continue;
+      if (calls >= INSPECT_MAX_PER_RUN) return;
 
       // Only enrich if we can find the description (needed for the inspect
       // action template). "Unknown CS2 Item" fallbacks won't have one.
@@ -158,9 +174,13 @@ export async function enrichOffersWithInspect({
       const wait = INSPECT_MIN_DELAY_MS - (Date.now() - lastCallAt);
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       lastCallAt = Date.now();
+      calls++;
 
       const meta = await fetchInspectMetadata(inspectLink);
-      if (!meta) continue;
+      if (!meta) {
+        cache[item.assetid] = { failedAt: Date.now() };
+        continue;
+      }
 
       cache[item.assetid] = meta;
       attachInspect(item, meta);

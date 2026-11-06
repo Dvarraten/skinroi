@@ -8,22 +8,24 @@
 
 import {
   CSFLOAT_LISTINGS_API,
-  SELL_PRICES_PER_RUN,
+  SELL_PRICES_CALLS_PER_RUN,
   SELL_PRICES_REFRESH_AFTER_MS,
   SELL_PRICES_RETRY_ERROR_MS,
 } from './config.js';
+import { csfloatFetch, CsfloatPausedError } from './csfloat.js';
 import { getSellPriceState, pushSellPrices } from './skinroi.js';
 
-// Markets priced one item per request.
+// Markets priced one item per request (spacing comes from lib/csfloat.js).
 const PER_ITEM_MARKETS = {
-  csfloat: { fetch: fetchCsfloatPrice, gapMs: 2000 },
+  csfloat: { fetch: fetchCsfloatPrice, callsPerRun: SELL_PRICES_CALLS_PER_RUN },
 };
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // A failure that applies to the whole market (not logged in, rate limited),
 // so there is no point trying the next item this run.
 class MarketError extends Error {}
+
+// This run's calls are used up; the item is simply priced next poll.
+class BudgetSpent extends Error {}
 
 // Picks the names whose price for `market` is missing or getting old.
 export function dueNames(names, prices, market, now) {
@@ -36,7 +38,7 @@ export function dueNames(names, prices, market, now) {
     if (p.error && sinceCheck < SELL_PRICES_RETRY_ERROR_MS) continue;
     if (age >= SELL_PRICES_REFRESH_AFTER_MS) due.push({ name, age });
   }
-  return due.sort((a, b) => b.age - a.age).slice(0, SELL_PRICES_PER_RUN).map((d) => d.name);
+  return due.sort((a, b) => b.age - a.age).slice(0, SELL_PRICES_CALLS_PER_RUN).map((d) => d.name);
 }
 
 export async function runSellPrices() {
@@ -50,24 +52,26 @@ export async function runSellPrices() {
   const status = {};
 
   await Promise.all([
-    ...Object.entries(PER_ITEM_MARKETS).map(async ([market, { fetch: fetchPrice, gapMs }]) => {
+    ...Object.entries(PER_ITEM_MARKETS).map(async ([market, { fetch: fetchPrice, callsPerRun }]) => {
       const due = dueNames(names, state.prices, market, now);
       if (!due.length) return;
+      const budget = { left: callsPerRun };
       let ok = 0;
-      for (let i = 0; i < due.length; i++) {
-        if (i > 0) await sleep(gapMs);
+      for (const name of due) {
+        if (budget.left <= 0) break;
         try {
-          results.push({ name: due[i], market, ...(await fetchPrice(targets.get(due[i]))) });
+          results.push({ name, market, ...(await fetchPrice(targets.get(name), budget)) });
           ok++;
         } catch (err) {
+          if (err instanceof BudgetSpent) break;
           if (err instanceof MarketError) {
             status[market] = err.message;
-            return;
+            break;
           }
-          results.push({ name: due[i], market, error: err.message || String(err) });
+          results.push({ name, market, error: err.message || String(err) });
         }
       }
-      if (ok > 0) status[market] = null;
+      if (ok > 0 && status[market] === undefined) status[market] = null;
     }),
   ]);
 
@@ -92,8 +96,9 @@ const PHASE_PAINT_INDEXES = {
   },
 };
 
-async function fetchCsfloatPrice(target) {
+async function fetchCsfloatPrice(target, budget) {
   const { name, phase, paintIndex } = target;
+  const cheapestCsfloat = (n, idx) => cheapestCsfloatListing(n, idx, budget);
   const isDoppler = /\bDoppler\b/.test(name);
   if (!isDoppler) return cheapestCsfloat(name, null);
   // Phase unknown: lowest listing of any phase, flagged so the site says so.
@@ -109,7 +114,9 @@ async function fetchCsfloatPrice(target) {
   return { ...(await cheapestCsfloat(name, null)), anyPhase: true };
 }
 
-async function cheapestCsfloat(name, paintIndex) {
+async function cheapestCsfloatListing(name, paintIndex, budget) {
+  if (budget.left <= 0) throw new BudgetSpent();
+  budget.left--;
   const params = new URLSearchParams({
     market_hash_name: name,
     sort_by: 'lowest_price',
@@ -117,8 +124,13 @@ async function cheapestCsfloat(name, paintIndex) {
     limit: '1',
   });
   if (paintIndex != null) params.set('paint_index', String(paintIndex));
-  const res = await fetch(`${CSFLOAT_LISTINGS_API}?${params}`, { credentials: 'include' });
-  if (res.status === 429) throw new MarketError('CSFloat rate limited, retrying later');
+  let res;
+  try {
+    res = await csfloatFetch(`${CSFLOAT_LISTINGS_API}?${params}`);
+  } catch (err) {
+    if (err instanceof CsfloatPausedError) throw new MarketError(err.message);
+    throw err;
+  }
   if (res.status === 401 || res.status === 403) {
     throw new MarketError(`CSFloat HTTP ${res.status} (signed in to csfloat.com?)`);
   }

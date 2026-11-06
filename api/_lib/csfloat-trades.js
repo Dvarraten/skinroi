@@ -18,15 +18,24 @@ const MAX_PAGES = 3;
 // Accepted trades sit in `pending` while Steam's trade protection window runs,
 // and move to `verified` once CSFloat confirms them.
 const STATES = ['pending', 'verified'];
-const CACHE_TTL_S = 120;
+const CACHE_TTL_S = 300;
 const CACHE_KEY = (steamId) => `skinroi:csfloat:trades:${steamId}`;
+// After a failed fetch nothing is cached, so without this every open tab's
+// 30 s poll of /api/inventory/state would call CSFloat again. 429 waits longer.
+const FAIL_KEY = (steamId) => `skinroi:csfloat:trades-fail:${steamId}`;
+const FAIL_TTL_S = 5 * 60;
+const RATE_LIMITED_TTL_S = 15 * 60;
 
 async function fetchTradesPage(apiKey, state, page) {
   const url = `${API_BASE}?state=${state}&limit=${PAGE_LIMIT}&page=${page}`;
   const resp = await fetch(url, {
     headers: { Authorization: apiKey, Accept: 'application/json' },
   });
-  if (!resp.ok) throw new Error(`CSFloat /me/trades ${state} p${page}: HTTP ${resp.status}`);
+  if (!resp.ok) {
+    const err = new Error(`CSFloat /me/trades ${state} p${page}: HTTP ${resp.status}`);
+    err.status = resp.status;
+    throw err;
+  }
   const json = await resp.json();
   return Array.isArray(json?.trades) ? json.trades : [];
 }
@@ -84,11 +93,24 @@ export async function loadCsfloatTrades(steamId) {
   }
 
   try {
+    if (await redis.get(FAIL_KEY(steamId))) return [];
+  } catch {
+    // Treat as no recent failure.
+  }
+
+  try {
     const trades = await fetchAllTrades(apiKey, steamId);
     await redis.set(CACHE_KEY(steamId), trades, { ex: CACHE_TTL_S });
     return trades;
   } catch (err) {
     console.warn('[csfloat-trades] fetch failed:', err.message || err);
+    try {
+      await redis.set(FAIL_KEY(steamId), 1, {
+        ex: err.status === 429 ? RATE_LIMITED_TTL_S : FAIL_TTL_S,
+      });
+    } catch {
+      // Best effort.
+    }
     return [];
   }
 }
