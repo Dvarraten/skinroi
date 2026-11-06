@@ -136,6 +136,9 @@ export function useSteamSync() {
   return {
     pending: state.pending,
     pendingCount: state.pending.length,
+    // Handle Items reads these two lists.
+    incoming: state.pending.filter((p) => p.type === 'incoming'),
+    outgoing: state.pending.filter((p) => p.type === 'outgoing'),
     lastSyncOk: state.lastSyncOk,
     lastError: state.lastError,
     extension: state.extension,
