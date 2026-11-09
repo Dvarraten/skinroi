@@ -4,7 +4,7 @@
 // CSFloat documents no numbers, only that 429 means "too many requests".
 // Community notes (BetterFloat's API wiki) put /v1/listings at 5 requests a
 // minute, and CSFloat answers with X-RateLimit-* headers per endpoint. So:
-//   - calls are queued and spaced CSFLOAT_MIN_GAP_MS apart (4 a minute), no
+//   - calls are queued and spaced CSFLOAT_MIN_GAP_MS apart (3 a minute), no
 //     matter which feature makes them or how many run at once;
 //   - a 429 (or Remaining: 0) pauses every CSFloat call until Retry-After /
 //     X-RateLimit-Reset, or for a growing pause when neither is sent;
@@ -90,7 +90,7 @@ async function gatedFetch(url) {
   if (state.pausedUntil > Date.now()) throw new CsfloatPausedError(state.pausedUntil);
 
   const wait = (state.lastCallAt || 0) + CSFLOAT_MIN_GAP_MS - Date.now();
-  // Waits stay under the service worker's 30 s idle limit (the gap is 15 s).
+  // Waits stay under the service worker's 30 s idle limit (the gap is 18 s).
   if (wait > 0) await sleep(Math.min(wait, CSFLOAT_MIN_GAP_MS));
 
   state = await writeState({ lastCallAt: Date.now() });
