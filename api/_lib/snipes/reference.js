@@ -21,7 +21,16 @@ const CSPRICEAPI_URL = 'https://api.cspriceapi.com/v1/prices/latest?markets=youp
 const CSGOTRADER_BUFF_URL = 'https://prices.csgotrader.app/latest/buff163.json';
 const STEAMDT_BATCH_URL = 'https://open.steamdt.com/open/cs2/v1/price/batch';
 const STEAMDT_TTL_S = 30 * 60;
+// Names SteamDT has no price for on either market: asked again after 6 h.
+const STEAMDT_EMPTY_TTL_S = 6 * 60 * 60;
 const STEAMDT_GATE_KEY = 'skinroi:snipes:steamdt:gate';
+const STEAMDT_STRIKES_KEY = 'skinroi:snipes:steamdt:strikes';
+// SteamDT allows one batch call a minute. 75 s leaves room for a slow call
+// and clock skew, so two calls never land inside the same minute.
+const STEAMDT_GAP_S = 75;
+// After "limit reached" / "quota" answers: 5 min, 10, 20, 40, then 60 at most.
+const STEAMDT_PAUSE_MIN_S = 5 * 60;
+const STEAMDT_PAUSE_MAX_S = 60 * 60;
 const STEAMDT_PLATFORMS = { YOUPIN: 'youpin', BUFF: 'buff163' };
 const REF_TTL_S = 5 * 60;
 const CSGOTRADER_TTL_MS = 30 * 60 * 1000;
@@ -159,9 +168,10 @@ export async function loadSteamDtRows(redis, names) {
   });
 
   let warning = null;
-  // One batch call a minute across all scans and extension pushes. A failure
-  // is kept on the gate key so scans in between keep showing it.
-  const gotGate = missing.length && (await redis.set(STEAMDT_GATE_KEY, { at: Date.now() }, { nx: true, ex: 60 }));
+  // One batch call per STEAMDT_GAP_S across all scans and extension pushes. A
+  // failure is kept on the gate key so scans in between keep showing it; a
+  // rate-limit answer keeps the gate shut for a growing pause.
+  const gotGate = missing.length && (await redis.set(STEAMDT_GATE_KEY, { at: Date.now() }, { nx: true, ex: STEAMDT_GAP_S }));
   if (missing.length && !gotGate) warning = (await redis.get(STEAMDT_GATE_KEY))?.error || null;
   if (gotGate) {
     try {
@@ -169,16 +179,35 @@ export async function loadSteamDtRows(redis, names) {
       const pipe = redis.pipeline();
       for (const [name, entry] of fetched) {
         raw.set(name, entry);
-        pipe.set(steamDtCacheKey(name), entry, { ex: STEAMDT_TTL_S });
+        const empty = !entry.youpin && !entry.buff163;
+        pipe.set(steamDtCacheKey(name), entry, { ex: empty ? STEAMDT_EMPTY_TTL_S : STEAMDT_TTL_S });
       }
-      if (fetched.size) await pipe.exec();
+      pipe.del(STEAMDT_STRIKES_KEY);
+      await pipe.exec();
     } catch (e) {
-      warning = `SteamDT: ${e.message}`;
       console.warn('[snipes] SteamDT failed:', e.message);
-      await redis.set(STEAMDT_GATE_KEY, { at: Date.now(), error: warning }, { ex: 60 });
+      let pause = STEAMDT_GAP_S;
+      if (e.rateLimited) {
+        const strikes = (Number(await redis.get(STEAMDT_STRIKES_KEY)) || 0) + 1;
+        await redis.set(STEAMDT_STRIKES_KEY, strikes, { ex: 6 * 60 * 60 });
+        pause = steamDtPauseS(strikes);
+      }
+      warning = `SteamDT: ${e.message}${pause > STEAMDT_GAP_S ? `, paused ${Math.round(pause / 60)} min` : ''}`;
+      await redis.set(STEAMDT_GATE_KEY, { at: Date.now(), error: warning }, { ex: pause });
     }
   }
   return { raw, warning };
+}
+
+// The pause after the n-th rate-limit answer in a row, in seconds.
+export function steamDtPauseS(strikes) {
+  return Math.min(STEAMDT_PAUSE_MIN_S * 2 ** Math.max(0, strikes - 1), STEAMDT_PAUSE_MAX_S);
+}
+
+// True for SteamDT's "too many requests" answers: 当前接口请求已达到上限
+// ("this endpoint's request limit is reached"), 配额 (quota), 频繁 (too often).
+export function isSteamDtRateLimit(reason) {
+  return /上限|配额|频繁|限流/.test(String(reason || ''));
 }
 
 // → Map(name → { youpin, buff163, at }) with raw CNY rows. Names SteamDT
@@ -191,11 +220,18 @@ async function fetchSteamDtBatch(names) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ marketHashNames: names }),
-  }, 20000);
+  }, 20000).catch((e) => {
+    if (e.status === 429) e.rateLimited = true;
+    throw e;
+  });
   if (json?.success === false || !Array.isArray(json?.data)) {
     const reason = String(json?.errorMsg || json?.errorCodeStr || json?.errorCode || '');
     if (reason.includes('凭证')) throw new Error(`key rejected, check STEAMDT_API_KEY (${reason})`);
-    if (reason.includes('配额')) throw new Error(`quota used up, waiting for the next window (${reason})`);
+    if (isSteamDtRateLimit(reason)) {
+      const err = new Error(`request limit reached (${reason})`);
+      err.rateLimited = true;
+      throw err;
+    }
     throw new Error(reason || `unexpected answer, keys: ${Object.keys(json || {}).join(',')}`);
   }
 

@@ -119,7 +119,7 @@ IPs. Both paths price listings against YouPin, Buff163 and CSFloat and store
 every listing at least 2% under the best of them for 30 min. CSFloat's price is
 its cheapest listing of the same item (never CSFloat's appraisal), excluding
 the listing being priced (`snipes/csfloat-lowest.js`). The server can't look
-it up, so each listings push answers with up to 3 `csfloatLookups` (items with
+it up, so each listings push answers with up to 2 `csfloatLookups` (items with
 no known price, ranked by appraisal or YouPin/Buff price over the buy price);
 the extension (`lib/snipelookups.js`) fetches each one's 3 cheapest listings and POSTs `{ market: 'csfloat', lowest: [{ name, rows }] }`. Results
 are cached 30 min, the listings that waited on them are priced again, and a
@@ -138,12 +138,24 @@ with neither, the free csgotrader.app Buff163 dump is used) and
 `SNIPES_MIN_PRICE_CENTS` (default 200). A source that answers 429 pauses 15 min. Dopplers without a known phase
 are skipped so phases never get mixed.
 
+**Liquidity prefilter** (`snipes/liquidity.js`): before any listing is priced,
+Souvenir, Well-Worn and Battle-Scarred skins, stickers/graffiti/patches/music
+kits/charms, and items with a Steam daily volume under 3 (from CSFloat's feed)
+are dropped, so they never cost a SteamDT batch slot or a CSFloat lookup.
+CSFloat lookups also skip items with under 20 YouPin/Buff163 listings and items
+that can't sell above their buy price. Tune with `SNIPES_SKIP_WEARS`
+(comma list), `SNIPES_KEEP_SOUVENIRS=1` and `SNIPES_MIN_STEAM_VOLUME`.
+SteamDT batch calls are 75 s apart; an answer like 当前接口请求已达到上限
+(limit reached) or 429 pauses SteamDT 5 min, doubling to 60 min; names SteamDT
+has no price for are cached 6 h.
+
 **CSFloat rate limit**: CSFloat publishes no numbers; community notes put
 `/v1/listings` at about 5 requests a minute (it sends `X-RateLimit-*`
 headers). Every extension call to it goes through `extension/src/lib/csfloat.js`:
-one queue, 15 s apart (4 a minute), and after a 429 every CSFloat call pauses
+one queue, 18 s apart (at most 3 a minute, leaving room for the user's own
+csfloat.com browsing), and after a 429 every CSFloat call pauses
 until `Retry-After`/`X-RateLimit-Reset`, else 10 min doubling to 60 min. Per
-2-min poll that is at most 1 feed + 3 lookups + 4 sell-price calls. CSFloat
+2-min poll that is at most 1 feed + 2 lookups + 3 sell-price calls. CSFloat
 inspect (`api.csfloat.com`, `lib/inspect.js`) only looks at items from trades
 since pairing, at most 5 per poll, and caches failures for 24 h. Never add a
 CSFloat call that bypasses `csfloatFetch`.
@@ -252,7 +264,8 @@ npm run items:update
 | `skinroi:snipes:lock`            | Scan lock (25s TTL)                               |
 | `skinroi:snipes:ref:{name}`      | Cached CSPriceAPI row per item (5 min TTL)        |
 | `skinroi:snipes:sdt:{name}`      | Cached SteamDT YouPin/Buff163 row (30 min TTL)    |
-| `skinroi:snipes:steamdt:gate`    | SteamDT 1-call-a-minute gate (60s TTL)            |
+| `skinroi:snipes:steamdt:gate`    | SteamDT call gate (75s, longer after a limit answer) |
+| `skinroi:snipes:steamdt:strikes` | SteamDT limit answers in a row (backoff)          |
 | `skinroi:snipes:csfl:{key}`      | Cheapest CSFloat listings per item (30 min TTL)   |
 | `skinroi:snipes:csfwant`         | Items waiting for an extension CSFloat lookup     |
 

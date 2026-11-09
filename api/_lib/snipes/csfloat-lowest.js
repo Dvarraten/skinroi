@@ -9,7 +9,7 @@ import { itemKey, needsPhase } from './normalize.js';
 import { normalizeCsfloatListings } from './csfloat.js';
 
 // Matches SNIPE_LOOKUPS_PER_RUN in the extension (it can only do a few per poll).
-export const LOOKUPS_PER_PUSH = 3;
+export const LOOKUPS_PER_PUSH = 2;
 const LOWEST_TTL_S = 30 * 60;
 const KEEP_LISTINGS = 3;
 const WANT_KEY = 'skinroi:snipes:csfwant';

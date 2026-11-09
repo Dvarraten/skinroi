@@ -39,14 +39,15 @@ export const CSFLOAT_LISTINGS_URL =
   'https://csfloat.com/api/v1/listings?sort_by=most_recent&type=buy_now&limit=50';
 // Per-item lookups of an item's cheapest CSFloat listing (lib/snipelookups.js)
 // per poll; the backend asks for at most this many per push.
-export const SNIPE_LOOKUPS_PER_RUN = 3;
+export const SNIPE_LOOKUPS_PER_RUN = 2;
 
 // Every csfloat.com/api/v1/listings call goes through lib/csfloat.js, which
-// spaces them CSFLOAT_MIN_GAP_MS apart (4 a minute; CSFloat allows about 5)
+// spaces them CSFLOAT_MIN_GAP_MS apart (at most 3 a minute; CSFloat allows
+// about 5, and the user's own browsing on csfloat.com shares that budget)
 // and pauses all of them after a 429: until Retry-After / X-RateLimit-Reset,
 // else 10 min, doubling for each 429 in a row, at most 60 min.
-// Per 2-minute poll: 1 Snipes feed + 3 lookups + 4 sell-price calls = 8.
-export const CSFLOAT_MIN_GAP_MS = 15 * 1000;
+// Per 2-minute poll: 1 Snipes feed + 2 lookups + 3 sell-price calls = 6.
+export const CSFLOAT_MIN_GAP_MS = 18 * 1000;
 export const CSFLOAT_PAUSE_MIN_MS = 10 * 60 * 1000;
 export const CSFLOAT_PAUSE_MAX_MS = 60 * 60 * 1000;
 
@@ -55,7 +56,7 @@ export const CSFLOAT_PAUSE_MAX_MS = 60 * 60 * 1000;
 // than one); a price is refreshed once it is 30 min
 // old so the site (which hides prices older than 1 hour) always has a fresh one.
 export const CSFLOAT_LISTINGS_API = 'https://csfloat.com/api/v1/listings';
-export const SELL_PRICES_CALLS_PER_RUN = 4;
+export const SELL_PRICES_CALLS_PER_RUN = 3;
 export const SELL_PRICES_REFRESH_AFTER_MS = 30 * 60 * 1000;
 export const SELL_PRICES_RETRY_ERROR_MS = 10 * 60 * 1000;
 

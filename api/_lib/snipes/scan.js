@@ -14,6 +14,7 @@ import { getRedis } from '../redis.js';
 import { fetchDmarketListings } from './dmarket.js';
 import { getReferencePrices, referenceProvider } from './reference.js';
 import { itemKey, needsPhase } from './normalize.js';
+import { filterLiquid, isThinMarket } from './liquidity.js';
 import {
   csfloatRef, loadLowest, mergeFeedListings, queueLookups, storeLookups, takeLookups,
 } from './csfloat-lowest.js';
@@ -142,8 +143,11 @@ async function scan(redis) {
 // fromFeed: the listings are fresh from a market feed (not re-priced ones
 // waiting on a CSFloat lookup), so CSFloat ones can lower the known cheapest.
 async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, { fromFeed = false } = {}) {
-  // Dopplers without a known phase can't be priced safely — drop them.
-  const priceable = listings.filter((l) => !needsPhase(l.name) || l.phase);
+  // Dopplers without a known phase can't be priced safely — drop them. Items
+  // that rarely sell are dropped too, before they cost a SteamDT batch slot
+  // or a CSFloat lookup (see liquidity.js).
+  const { kept: liquid, skipped } = filterLiquid(listings);
+  const priceable = liquid.filter((l) => !needsPhase(l.name) || l.phase);
   const wanted = priceable.map((l) => ({ name: l.name, phase: l.phase, key: itemKey(l.name, l.phase) }));
 
   let refError = null;
@@ -181,7 +185,7 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
     if (!items.has(key)) {
       items.set(key, { name: l.name, refs: { ...base, csfloat: csfloatRef(lowest.get(key)) }, image: l.image });
     }
-    if (!lowest.has(key) && !needsPhase(l.name)) addLookup(lookups, key, l, base);
+    if (!lowest.has(key) && !needsPhase(l.name) && !isThinMarket(base)) addLookup(lookups, key, l, base);
     const ref = { ...base, csfloat: csfloatRef(lowest.get(key), l.market === 'csfloat' ? l.listingId : null) };
     const best = bestSellPrice(ref);
     if (!best || l.priceUsd > best * (1 - MIN_DISCOUNT)) continue;
@@ -189,7 +193,9 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
   }
   const { deals: found, checkedIds } = itemDeals(items, now);
   fresh.push(...found);
-  await queueLookups(redis, [...lookups.values()].map(lookupCandidate), now);
+  // Only items that could sell above what they cost are worth a lookup.
+  const candidates = [...lookups.values()].map(lookupCandidate).filter((c) => c.priority > 1 + MIN_DISCOUNT);
+  await queueLookups(redis, candidates, now);
 
   // Kept deals get the current CSFloat price for their item, or none once
   // the last lookup has expired.
@@ -212,9 +218,11 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
     sources: { ...keptSources(prevMeta?.sources), ...sourcePatch },
     refProvider: referenceProvider(),
     refError,
+    // Listings dropped as illiquid in the latest feed batch, per reason.
+    ...(fromFeed ? { skipped } : {}),
   };
   await redis.mset({ [DEALS_KEY]: deals, [META_KEY]: meta });
-  return { checked: listings.length, matched: fresh.length };
+  return { checked: listings.length, priced: priceable.length, matched: fresh.length };
 }
 
 function bestSellPrice(refs, except) {
