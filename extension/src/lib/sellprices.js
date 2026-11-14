@@ -4,7 +4,7 @@
 // Fetched here, from the user's own browser, because CSFloat rate-limits
 // Vercel's many IPs. Each poll asks the backend which names it owns and how
 // old each price is, refreshes the stalest few (gently spaced), and pushes
-// the results. The site hides anything older than an hour.
+// the results. Each price is kept 48 h before it is fetched again.
 
 import {
   CSFLOAT_LISTINGS_API,
