@@ -1267,7 +1267,7 @@ export default function ItemGrid({
               <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`}>Item</th>
               <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`}>Cost</th>
               {sellPrices && (
-                <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`} title="Lowest listing, max 1 hour old">Sell at</th>
+                <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`} title="Lowest listing (YouPin max 1 hour old, CSFloat max 2 days)">Sell at</th>
               )}
               <th className={`text-left px-3 py-2 text-xs font-medium ${theme.subtext}`}>
                 {activeTab === 'sold' ? 'Dates' : 'Acquired'}

@@ -161,14 +161,16 @@ since pairing, at most 5 per poll, and caches failures for 24 h. Never add a
 CSFloat call that bypasses `csfloatFetch`.
 
 **Sell prices on Home**: each unsold item shows the lowest YouPin and
-CSFloat listing, at most 1 hour old, with a dot on the one that pays more after
+CSFloat listing (YouPin at most 1 hour old, CSFloat at most 50 h), with a dot on the one that pays more after
 fees. YouPin comes from SteamDT on the server (`loadSteamDtRows` in
 `snipes/reference.js`, same 30 min cache and 1-call-a-minute gate as Snipes),
 added on each site `GET /api/items?sellPrices=1`; never use the user's own
 YouPin session. CSFloat is fetched by the extension (`lib/sellprices.js`):
-`api/v1/listings?market_hash_name=…&sort_by=lowest_price`, at most 4 calls per
-poll for names that are 30+ min old, POSTed to the same URL. The site hides prices older
-than 1 hour. Prices are keyed per Doppler phase (`api/_lib/doppler-phase.js`,
+`api/v1/listings?market_hash_name=…&sort_by=lowest_price`, at most 3 calls per
+poll, POSTed to the same URL. Each CSFloat price is cached 48 h
+(`SELL_PRICES_REFRESH_AFTER_MS`); new items have no price and go first. The
+site hides YouPin prices older than 1 hour and CSFloat prices older than 50 h
+(`maxAgeMs` in `SELL_PRICE_MARKETS`). Prices are keyed per Doppler phase (`api/_lib/doppler-phase.js`,
 mirrored in `src/utils/sellPrices.js`): phase from the item name ("Doppler
 Phase 2") or its paint index; CSFloat filters by `paint_index`. When the
 phase is unknown (or CSFloat has nothing for it), and always for YouPin
