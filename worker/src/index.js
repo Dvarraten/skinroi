@@ -35,7 +35,7 @@ const csfetch = (path) => gate.fetch(path);
 
 async function round() {
   if (config.skipWhenChromeOpen && (await isChromeOpen())) {
-    log('Chrome is open, the extension handles this round.');
+    log('Chrome is open, the extension handles this round. (SKIP_WHEN_CHROME_OPEN=0 in .env runs anyway.)');
     // Free the memory while we wait; the tab is reopened when needed.
     if (csf.isOpen()) await csf.close();
     return;
