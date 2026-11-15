@@ -91,6 +91,9 @@ Exempel på utskrift:
 15:21:53 sell prices: pushed 3
 ```
 
+Om `npm run login` kraschar med `spawn UNKNOWN` blockerar Windows Playwrights
+Chromium. Sätt `BROWSER_CHANNEL=msedge` i `.env` så används Edge i stället.
+
 Om CSFloat svarar med en Cloudflare-sida i stället för data: kör
 `npm run login` igen, eller sätt `HEADLESS=false` i `.env` (då syns ett fönster,
 minimera det). Hjälper inte det, prova `BROWSER_CHANNEL=chrome` för att
@@ -123,7 +126,7 @@ använder datorn, eller acceptera att listningar skickas två gånger då.
 | `SKINROI_URL` | `https://www.skinroi.com` | `http://localhost:3000` mot `vercel dev` |
 | `POLL_MINUTES` | `5` | Minuter mellan rundor (minst 5) |
 | `HEADLESS` | `true` | `false` = synligt fönster |
-| `BROWSER_CHANNEL` | | `chrome` = din installerade Chrome |
+| `BROWSER_CHANNEL` | | `msedge` = Microsoft Edge, `chrome` = din installerade Chrome |
 | `SKIP_WHEN_CHROME_OPEN` | `1` | Windows: hoppa över rundan när Chrome är öppen |
 | `RUN_SNIPES` / `RUN_SELL_PRICES` | `1` | `0` stänger av den delen |
 
