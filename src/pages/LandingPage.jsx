@@ -1,35 +1,31 @@
 // Landing page for logged-out visitors: what SkinROI does, three features
 // with screenshots, pricing, and the ways in (Steam sign-in, demo, guest).
 import React from "react";
-import { Crosshair, LineChart, RefreshCw, Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight } from "lucide-react";
 import steamLogo from "../assets/platforms/steam.png";
 import logoSrc from "../utils/skinroi-logo.svg";
 import logoLightSrc from "../utils/skinroi-logo-light.svg";
-import { STEAM_BUTTON_CLASS } from "../themes/themes";
 
 const SHOTS = `${process.env.PUBLIC_URL || ""}/landing`;
 
 const FEATURES = [
   {
-    icon: Crosshair,
     title: "Snipes under market price",
     text: "New CSFloat and DMarket listings are checked against YouPin, Buff163 and CSFloat within a minute. You see the profit after fees and how fast the item sells again.",
     image: `${SHOTS}/snipes.webp`,
     alt: "Snipes page listing deals with buy price, sell market and profit",
   },
   {
-    icon: LineChart,
     title: "Your real profit, after fees",
     text: "Track every skin you hold and sell. SkinROI takes each market's fee into account and shows the live lowest price on YouPin and CSFloat next to what you paid.",
     image: `${SHOTS}/portfolio.webp`,
-    alt: "Profit analytics with a 30-day profit chart, invested amount and total profit",
+    alt: "Analytics page with a profit curve, return and latest sales",
   },
   {
-    icon: RefreshCw,
     title: "Trades show up by themselves",
-    text: "The SkinROI Sync extension notices accepted Steam trades and puts them in Handle items with float, pattern and stickers. Import your current inventory in one click.",
+    text: "The SkinROI Sync extension notices accepted Steam trades and lists them under Trades with float, pattern and stickers. Import your current inventory in one click.",
     image: `${SHOTS}/handle.webp`,
-    alt: "Handle items page with incoming trades ready to add",
+    alt: "Trades page with incoming Steam trades ready to add",
   },
 ];
 
@@ -41,31 +37,30 @@ const PLAN_POINTS = [
   "One-click Steam inventory import",
 ];
 
-function Shot({ src, alt, theme }) {
+function Shot({ src, alt, theme, eager = false }) {
   return (
-    <div className={`rounded-2xl border ${theme.panelBorder} ${theme.panel} overflow-hidden shadow-2xl`}>
-      <img src={src} alt={alt} loading="lazy" className="w-full h-auto block" />
+    <div className={`rounded-xl border ${theme.panelBorder} overflow-hidden`}>
+      <img src={src} alt={alt} loading={eager ? "eager" : "lazy"} className="w-full h-auto block" />
     </div>
   );
 }
 
-export default function LandingPage({ theme, onLogin, onDemo, onGuest }) {
-  const logo = theme?.name === "Light" ? logoLightSrc : logoSrc;
-  const primary = `inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl text-sm font-medium ${STEAM_BUTTON_CLASS} border border-white/10 text-white transition-colors active:scale-[0.97]`;
-  const secondary = `inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-medium border ${theme.cardBorder} ${theme.text} hover:bg-white/5 transition-colors active:scale-[0.97]`;
+export default function LandingPage({ theme, isDark = true, onLogin, onDemo, onGuest }) {
+  const primary = `inline-flex items-center justify-center gap-2.5 h-11 px-5 rounded-lg text-sm font-medium transition-colors ${theme.primary}`;
+  const secondary = `inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg text-sm font-medium border ${theme.cardBorder} ${theme.text} ${theme.itemHoverBg} transition-colors`;
+  const steam = (size) => <img src={steamLogo} alt="" className={`${size} ${theme.iconOnPrimary}`} />;
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
-      {/* Top bar */}
-      <header className="px-4 pt-3">
-        <div className={`max-w-6xl mx-auto px-4 md:px-5 h-14 flex items-center rounded-2xl shadow-lg ${theme.header}`}>
-          <img src={logo} alt="SkinROI" style={{ height: "52px", width: "auto" }} />
-          <div className="ml-auto flex items-center gap-4">
+      <header className={`border-b ${theme.panelBorder}`}>
+        <div className="max-w-6xl mx-auto px-4 md:px-6 h-14 flex items-center">
+          <img src={isDark ? logoSrc : logoLightSrc} alt="SkinROI" className="h-11 w-auto" />
+          <div className="ml-auto flex items-center gap-5">
             <button onClick={onDemo} className={`text-[13px] font-medium ${theme.subtext} ${theme.textHover} transition-colors`}>
-              Try the demo
+              Demo
             </button>
-            <button onClick={onLogin} className={`flex items-center gap-1.5 text-[13px] font-medium ${theme.text}`}>
-              <img src={steamLogo} alt="" className="h-3.5 w-3.5" /> Sign in
+            <button onClick={onLogin} className={`flex items-center gap-1.5 text-[13px] font-medium ${theme.text} hover:opacity-80 transition-opacity`}>
+              <img src={steamLogo} alt="" className={`h-3.5 w-3.5 ${theme.iconOnSurface}`} /> Sign in
             </button>
           </div>
         </div>
@@ -73,43 +68,40 @@ export default function LandingPage({ theme, onLogin, onDemo, onGuest }) {
 
       <main className="px-4 md:px-6">
         {/* Hero */}
-        <section className="max-w-6xl mx-auto pt-14 md:pt-20 pb-12 grid md:grid-cols-[1fr_1.15fr] gap-10 items-center">
-          <div>
-            <p className={`text-xs font-mono ${theme.accent} mb-4`}>CS2 skin trading, measured</p>
-            <h1 className={`text-4xl md:text-5xl font-semibold tracking-tight leading-[1.08] ${theme.text}`}>
-              Find CS2 skins below market price, in real time.
-            </h1>
-            <p className={`mt-5 text-base leading-relaxed max-w-lg ${theme.textSecondary}`}>
-              SkinROI compares new listings across CSFloat, DMarket, YouPin and Buff163 as they appear, and tracks what your skins really earn after fees.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <button onClick={onLogin} className={primary}>
-                <img src={steamLogo} alt="" className="h-5 w-5" /> Sign in with Steam
-              </button>
-              <button onClick={onDemo} className={secondary}>
-                Try the demo <ArrowRight size={15} />
-              </button>
-            </div>
-            <p className={`mt-4 text-xs ${theme.subtext}`}>
-              Free during the beta. Steam sign-in only shares your public profile; we never see your password.{" "}
-              <button onClick={onGuest} className={`underline underline-offset-2 ${theme.textHover}`}>
-                Or continue without an account
-              </button>
-            </p>
+        <section className="max-w-6xl mx-auto pt-16 md:pt-24 text-center">
+          <h1 className={`mx-auto max-w-3xl text-4xl md:text-6xl font-semibold tracking-tight leading-[1.05] ${theme.text}`}>
+            Find CS2 skins below market price, in real time.
+          </h1>
+          <p className={`mx-auto mt-6 max-w-xl text-base leading-relaxed ${theme.subtext}`}>
+            SkinROI compares new listings across CSFloat, DMarket, YouPin and Buff163 as they appear, and tracks what your skins really earn after fees.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <button onClick={onLogin} className={primary}>
+              {steam("h-5 w-5")} Sign in with Steam
+            </button>
+            <button onClick={onDemo} className={secondary}>
+              Try the demo <ArrowRight size={15} />
+            </button>
           </div>
-          <Shot src={`${SHOTS}/overview.webp`} alt="SkinROI home with portfolio value, profit chart and item cards" theme={theme} />
+          <p className={`mt-5 text-xs ${theme.subtext}`}>
+            Free during the beta. Steam sign-in only shares your public profile; we never see your password.{" "}
+            <button onClick={onGuest} className={`underline underline-offset-2 ${theme.textHover}`}>
+              Or continue without an account
+            </button>
+          </p>
+          <div className="mt-14 md:mt-16">
+            <Shot src={`${SHOTS}/overview.webp`} alt="SkinROI portfolio with holding value, profit curve and item cards" theme={theme} eager />
+          </div>
         </section>
 
         {/* Features */}
-        <section className="max-w-6xl mx-auto py-12 space-y-16 md:space-y-24" aria-label="Features">
-          {FEATURES.map(({ icon: Icon, title, text, image, alt }, i) => (
-            <div key={title} className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+        <section className="max-w-6xl mx-auto py-20 md:py-28 space-y-20 md:space-y-28" aria-label="Features">
+          {FEATURES.map(({ title, text, image, alt }, i) => (
+            <div key={title} className="grid md:grid-cols-[1fr_1.5fr] gap-8 md:gap-14 items-center">
               <div className={i % 2 ? "md:order-2" : ""}>
-                <div className={`w-9 h-9 rounded-lg border ${theme.cardBorder} flex items-center justify-center mb-4`}>
-                  <Icon size={17} className={theme.accent} />
-                </div>
-                <h2 className={`text-2xl font-semibold tracking-tight ${theme.text}`}>{title}</h2>
-                <p className={`mt-3 text-sm leading-relaxed max-w-md ${theme.textSecondary}`}>{text}</p>
+                <p className={`text-xs font-mono ${theme.subtext}`}>{String(i + 1).padStart(2, "0")}</p>
+                <h2 className={`mt-3 text-2xl md:text-3xl font-semibold tracking-tight ${theme.text}`}>{title}</h2>
+                <p className={`mt-4 text-sm leading-relaxed max-w-md ${theme.subtext}`}>{text}</p>
               </div>
               <div className={i % 2 ? "md:order-1" : ""}>
                 <Shot src={image} alt={alt} theme={theme} />
@@ -119,27 +111,24 @@ export default function LandingPage({ theme, onLogin, onDemo, onGuest }) {
         </section>
 
         {/* Pricing */}
-        <section className="max-w-6xl mx-auto py-16" aria-label="Pricing">
-          <h2 className={`text-2xl font-semibold tracking-tight text-center ${theme.text}`}>Pricing</h2>
-          <div className={`mt-8 mx-auto max-w-md rounded-2xl border ${theme.panelBorder} ${theme.panel} p-6`}>
-            <div className="flex items-baseline gap-2">
-              <p className={`text-sm font-medium ${theme.text}`}>Beta</p>
-              <span className={`text-xs ${theme.subtext}`}>all features</span>
-            </div>
-            <p className={`mt-3 text-4xl font-semibold font-mono ${theme.text}`}>
-              $0 <span className={`text-sm font-sans font-normal ${theme.subtext}`}>while in beta</span>
-            </p>
-            <ul className="mt-5 space-y-2">
+        <section className={`max-w-6xl mx-auto py-16 md:py-20 border-t ${theme.panelBorder} grid md:grid-cols-2 gap-10 items-start`} aria-label="Pricing">
+          <div>
+            <h2 className={`text-2xl md:text-3xl font-semibold tracking-tight ${theme.text}`}>Pricing</h2>
+            <p className={`mt-6 font-mono font-medium leading-none text-6xl ${theme.text}`}>$0</p>
+            <p className={`mt-3 text-sm ${theme.subtext}`}>Every feature, while SkinROI is in beta.</p>
+          </div>
+          <div>
+            <ul className={`border-t ${theme.panelBorder}`}>
               {PLAN_POINTS.map((p) => (
-                <li key={p} className={`flex items-start gap-2 text-sm ${theme.textSecondary}`}>
-                  <Check size={15} className="text-profit shrink-0 mt-0.5" /> {p}
+                <li key={p} className={`flex items-center gap-3 py-3 border-b text-sm ${theme.panelBorder} ${theme.textSecondary}`}>
+                  <Check size={15} className="text-profit shrink-0" /> {p}
                 </li>
               ))}
             </ul>
-            <button onClick={onLogin} className={`${primary} w-full mt-6`}>
-              <img src={steamLogo} alt="" className="h-5 w-5" /> Sign in with Steam
+            <button onClick={onLogin} className={`${primary} mt-6`}>
+              {steam("h-5 w-5")} Sign in with Steam
             </button>
-            <p className={`mt-3 text-[11px] text-center ${theme.subtext}`}>
+            <p className={`mt-4 text-xs max-w-sm ${theme.subtext}`}>
               Paid plans may come after the beta. Beta users hear about it first, and nothing is charged without asking.
             </p>
           </div>

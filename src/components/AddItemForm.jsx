@@ -194,19 +194,18 @@ export default function AddItemForm({
       >
         <button
           onClick={onAdd}
-          className={`relative group flex items-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition duration-200
-            ${theme.card} ${theme.cardBorder} ${success ? "text-profit" : theme.text}`}
+          className={`flex items-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition-colors
+            ${success ? `${theme.card} ${theme.cardBorder} text-profit` : `border-transparent ${theme.primary}`}`}
         >
           {success ? (
             <><CheckCircle size={15} /> Added!</>
           ) : formData.pending ? (
-            <><Clock size={15} />{formData.quantity > 1 ? `Add ${formData.quantity} Pending` : "Add Pending"}</>
+            <><Clock size={15} />{formData.quantity > 1 ? `Add ${formData.quantity} on hold` : "Add on hold"}</>
           ) : formData.quantity > 1 ? (
-            `Add ${formData.quantity} Items`
+            `Add ${formData.quantity} items`
           ) : (
-            "Add Item"
+            "Add item"
           )}
-          <span className={`absolute bottom-0 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-200 ${success ? `scale-x-100 bg-profit` : `scale-x-0 group-hover:scale-x-100 ${theme.dot}`}`} />
         </button>
 
         <button
@@ -222,13 +221,12 @@ export default function AddItemForm({
             });
           }}
           title="Item is Steam trade-protected (not yet received)"
-          className={`relative group flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium border transition
-            ${theme.card} ${theme.cardBorder}
-            ${formData.pending ? "text-warn" : `${theme.subtext} ${theme.textHover}`}`}
+          aria-pressed={!!formData.pending}
+          className={`flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium border transition-colors
+            ${formData.pending ? "text-warn border-warn/40 bg-warn/5" : `${theme.cardBorder} ${theme.subtext} ${theme.textHover}`}`}
         >
           <Clock size={15} />
-          Protected
-          <span className={`absolute bottom-0 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-200 bg-warn ${formData.pending ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
+          On trade hold
         </button>
 
         {formData.pending && (

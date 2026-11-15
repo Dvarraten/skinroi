@@ -1,21 +1,22 @@
-// Sidebar panel listing the most-recently sold items with purchase→sale
+// Ruled list of the most-recently sold items with purchase→sale
 // price and profit/loss indicator.
-import React from "react";
+import React, { useState } from "react";
 import { ArrowDownUp } from "lucide-react";
 import { useItemImage } from "../utils/itemImages";
 
 function SaleRow({ item, theme }) {
   const imgUrl = useItemImage({ directIconUrl: item.iconUrl, name: item.itemName });
+  const [imgFailed, setImgFailed] = useState(false);
   const profit = item.profit ?? 0;
   const isGain = profit >= 0;
   return (
-    <div className={`flex items-center gap-3 px-3 py-2.5 border-b last:border-b-0 ${theme.cardBorder}`}>
+    <div className={`flex items-center gap-3 py-2.5 border-b ${theme.cardBorder}`}>
       {item.isTransaction ? (
         <div className="w-8 h-8 rounded shrink-0 bg-white/5 flex items-center justify-center">
           <ArrowDownUp size={14} className={item.transactionType === 'deposit' ? 'text-profit/60' : 'text-loss/60'} />
         </div>
-      ) : imgUrl ? (
-        <img src={imgUrl} alt={item.itemName} className="w-8 h-8 object-contain shrink-0" />
+      ) : imgUrl && !imgFailed ? (
+        <img src={imgUrl} alt="" onError={() => setImgFailed(true)} className="w-8 h-8 object-contain shrink-0" />
       ) : (
         <div className="w-8 h-8 rounded shrink-0 bg-white/5" />
       )}
@@ -62,7 +63,7 @@ export default function RecentSales({ items, theme }) {
   }
 
   return (
-    <div className={`rounded-xl border ${theme.cardBorder} ${theme.card}`}>
+    <div className={`border-t ${theme.cardBorder}`}>
       {sold.map(item => <SaleRow key={item.id} item={item} theme={theme} />)}
     </div>
   );

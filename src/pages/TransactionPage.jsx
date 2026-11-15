@@ -1,5 +1,7 @@
+// Deposits and withdrawals: the form and its history. Rendered as a tab of
+// the Add page.
 import React, { useState, useMemo } from "react";
-import { ArrowDownUp, CheckCircle, ArrowDown, ArrowUp, Bitcoin, Landmark } from "lucide-react";
+import { CheckCircle, ArrowDown, ArrowUp, Bitcoin, Landmark } from "lucide-react";
 import PlatformPicker from "../components/PlatformPicker";
 import { PlatformBadge } from "../components/PlatformBadge";
 import { PLATFORMS } from "../utils/platforms";
@@ -52,51 +54,10 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
   const inputCls = `w-full h-9 ${theme.input} rounded-lg px-3 text-sm font-mono ${theme.text} focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-      <div className="max-w-5xl mx-auto space-y-4">
-
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <ArrowDown size={12} className="text-profit" />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Deposits</p>
-            </div>
-            <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
-              ${stats.depositTotal.toFixed(2)}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>{stats.depositCount} recorded</p>
-          </div>
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <ArrowUp size={12} className="text-loss" />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Withdrawals</p>
-            </div>
-            <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
-              ${stats.withdrawalTotal.toFixed(2)}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>{stats.withdrawalCount} recorded</p>
-          </div>
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <ArrowDownUp size={12} className="text-loss" />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Total fees paid</p>
-            </div>
-            <p className="text-lg font-mono font-semibold text-loss tabular-nums">
-              −${stats.totalFees.toFixed(2)}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>across all transactions</p>
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
           {/* Form card */}
-          <div className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
-            <div className={`flex items-center gap-2 px-5 py-4 border-b ${theme.panelBorder}`}>
-              <ArrowDownUp size={15} className="text-slate-400" />
-              <h2 className={`font-semibold ${theme.text}`}>Record transaction</h2>
-            </div>
+          <div className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden`}>
 
             <div className="p-5 space-y-4">
               {/* Type toggle */}
@@ -201,28 +162,28 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
                   ${(!amt || amt <= 0) ? 'opacity-40 cursor-not-allowed' : ''}
                   ${success
                     ? 'text-profit border-profit/30 bg-profit/10'
-                    : `${theme.card} ${theme.cardBorder} ${theme.text}`
+                    : `border-transparent ${theme.primary}`
                   }`}
               >
                 {success
                   ? <><CheckCircle size={14} /> Recorded!</>
-                  : `Record ${type === 'withdrawal' ? 'Withdrawal' : 'Deposit'}`
+                  : `Record ${type}`
                 }
-                {!success && amt > 0 && (
-                  <span
-                    className="absolute bottom-0 left-0 h-[2px] w-0 rounded-full transition duration-200 group-hover:w-full"
-                    style={{ backgroundColor: theme.accentColor }}
-                  />
-                )}
               </button>
             </div>
           </div>
 
           {/* History */}
-          <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden flex flex-col`}>
+          <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden flex flex-col`}>
             <div className={`flex items-center justify-between px-5 py-4 border-b ${theme.panelBorder}`}>
-              <h2 className={`font-semibold ${theme.text}`}>History</h2>
-              <span className={`text-xs ${theme.subtext}`}>{transactions.length} entries</span>
+              <h2 className={`text-sm font-semibold ${theme.text}`}>History</h2>
+              <span className={`text-xs font-mono ${theme.subtext}`}>
+                in ${stats.depositTotal.toFixed(2)}
+                <span className="mx-1.5 opacity-40">·</span>
+                out ${stats.withdrawalTotal.toFixed(2)}
+                <span className="mx-1.5 opacity-40">·</span>
+                <span className={stats.totalFees > 0 ? 'text-loss' : ''}>fees −${stats.totalFees.toFixed(2)}</span>
+              </span>
             </div>
 
             {transactions.length === 0 ? (
@@ -283,7 +244,5 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
             )}
           </div>
         </div>
-      </div>
-    </div>
   );
 }

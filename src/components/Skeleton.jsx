@@ -55,20 +55,3 @@ export function ItemGridSkeleton({ theme, viewMode = 'grid', count = 8 }) {
     </div>
   );
 }
-
-export function RecentSalesSkeleton({ theme, count = 4 }) {
-  return (
-    <div role="status" aria-label="Loading sales" className={`motion-safe:animate-pulse rounded-xl border ${theme.cardBorder} ${theme.card}`}>
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} className={`flex items-center gap-3 px-3 py-2.5 border-b last:border-b-0 ${theme.cardBorder}`}>
-          <Bone theme={theme} className="h-8 w-8 shrink-0" />
-          <div className="flex-1 min-w-0 space-y-1.5">
-            <Bone theme={theme} className="h-3 w-3/4" />
-            <Bone theme={theme} className="h-2.5 w-1/2" />
-          </div>
-          <Bone theme={theme} className="h-3 w-10 shrink-0" />
-        </div>
-      ))}
-    </div>
-  );
-}

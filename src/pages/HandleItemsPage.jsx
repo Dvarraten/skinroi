@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Clock, CheckCircle, Search, LayoutGrid, List } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
 import PlatformPicker from '../components/PlatformPicker';
 import { TabButton } from '../components/TabsAndSearchbar';
-import RecentSales from '../components/RecentSales';
+import PageHeader, { Page } from '../components/PageHeader';
 import { PLATFORMS } from '../utils/platforms';
-import { SAP_CHART_COLORS } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
 import { useLocalPriceSync } from '../hooks/useLocalPriceSync';
 import { nameMatchScore } from '../utils/nameMatch';
@@ -561,147 +559,6 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
 
 // ─── Analytics ──────────────────────────────────────────────────────────────
 const fmtUsd = (v) => `$${Math.abs(v).toFixed(2)}`;
-const fmtSigned = (v) => `${v >= 0 ? '+' : '−'}${fmtUsd(v)}`;
-
-function HandleStats({ items, incoming, outgoing, theme }) {
-  const tooltipStyle = { background: theme.chartTooltipBg, border: `1px solid ${theme.chartTooltipBorder}`, borderRadius: 6, fontSize: 11, padding: '4px 8px' };
-
-  // Value of everything waiting to be handled, at the CSFloat trade price.
-  // Trades that did not go through CSFloat have no price and are left out.
-  const pending = useMemo(() => {
-    const all = [...incoming, ...outgoing];
-    const priced = all.filter(e => typeof e.csfloatPrice === 'number');
-    const value = priced.reduce((s, e) => s + e.csfloatPrice, 0);
-    return { value, priced: priced.length, total: all.length };
-  }, [incoming, outgoing]);
-
-  // Cumulative profit/loss per day for sales made this calendar month.
-  const month = useMemo(() => {
-    const now = new Date();
-    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const byDay = new Map();
-    for (const it of items) {
-      if (!it.sold || it.isTransaction || !it.dateSold) continue;
-      const d = (it.dateSold + '').slice(0, 10);
-      if (d.slice(0, 7) !== key) continue;
-      byDay.set(d, (byDay.get(d) ?? 0) + (Number(it.profit) || 0));
-    }
-    let running = 0;
-    const series = [...byDay.keys()].sort().map(d => {
-      running += byDay.get(d);
-      return {
-        date: new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        cumulative: Math.round(running * 100) / 100,
-      };
-    });
-    // Start the month at zero so a single sale still draws a line.
-    if (series.length > 0) {
-      series.unshift({ date: `${now.toLocaleDateString('en-US', { month: 'short' })} 1`, cumulative: 0 });
-    }
-    return { series, total: running, label: now.toLocaleDateString('en-US', { month: 'long' }) };
-  }, [items]);
-
-  const activity = useMemo(() => {
-    const months = [];
-    const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = d.toLocaleDateString('en-US', { month: 'short' });
-      months.push({ key, label, bought: 0, sold: 0 });
-    }
-    for (const it of items) {
-      if (it.isTransaction) continue;
-      if (it.datePurchased) {
-        const m = (it.datePurchased + '').slice(0, 7);
-        const found = months.find(x => x.key === m);
-        if (found) found.bought += 1;
-      }
-      if (it.sold && it.dateSold) {
-        const m = (it.dateSold + '').slice(0, 7);
-        const found = months.find(x => x.key === m);
-        if (found) found.sold += 1;
-      }
-    }
-    return months;
-  }, [items]);
-
-  const cardCls = `${theme.card} border ${theme.cardBorder} rounded-xl px-3 py-2.5 flex flex-col`;
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <div className={cardCls}>
-        <p className={`text-xs font-medium ${theme.subtext} mb-1`}>Pending value</p>
-        <p className={`text-lg font-mono font-semibold tabular-nums ${theme.text}`}>
-          {pending.priced > 0 ? `≈ ${fmtUsd(pending.value)}` : '—'}
-        </p>
-        <p className={`text-xs ${theme.subtext}`}>
-          {pending.total === 0
-            ? 'nothing waiting'
-            : pending.priced === pending.total
-              ? `${pending.total} waiting · CSFloat price`
-              : `${pending.priced} of ${pending.total} priced · CSFloat`}
-        </p>
-      </div>
-
-      <div className={`col-span-2 order-last md:order-none ${cardCls}`}>
-        <div className={`flex items-center justify-between gap-2 text-xs ${theme.subtext} mb-1`}>
-          <p className="font-medium">Profit · {month.label}</p>
-          {month.series.length > 0 && (
-            <span className={`font-mono font-semibold tabular-nums ${month.total >= 0 ? 'text-profit' : 'text-loss'}`}>
-              {fmtSigned(month.total)}
-            </span>
-          )}
-        </div>
-        <div className="flex-1 min-h-[60px]">
-          {month.series.length === 0 ? (
-            <div className={`h-[62px] flex items-center justify-center text-xs ${theme.subtext}`}>
-              No sales this month yet
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={62}>
-              <LineChart data={month.series} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-                <CartesianGrid stroke={theme.chartGrid} vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 9, fill: theme.chartAxis }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelStyle={{ color: theme.chartAxis, fontSize: 10 }}
-                  formatter={(v) => [fmtSigned(Number(v)), 'Profit']}
-                />
-                <Line type="monotone" dataKey="cumulative" stroke={theme.chartLine} strokeWidth={2} dot={false} activeDot={{ r: 3, fill: theme.chartLine }} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      <div className={cardCls}>
-        <div className={`flex items-center justify-between gap-2 text-xs ${theme.subtext} mb-1`}>
-          <p className="font-medium">Activity · 6 mo</p>
-          <span className="flex items-center gap-2 text-[11px]">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: theme.chartLine }} />Bought</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: SAP_CHART_COLORS.neutral }} />Sold</span>
-          </span>
-        </div>
-        <div className="flex-1 min-h-[60px]">
-          <ResponsiveContainer width="100%" height={62}>
-            <BarChart data={activity} margin={{ top: 4, right: 0, bottom: 0, left: 0 }} barCategoryGap={2}>
-              <CartesianGrid stroke={theme.chartGrid} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 9, fill: theme.chartAxis }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                labelStyle={{ color: '#94a3b8', fontSize: 10 }}
-                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-              />
-              <Bar dataKey="bought" fill={theme.chartLine} radius={[2, 2, 0, 0]} maxBarSize={10} />
-              <Bar dataKey="sold" fill={SAP_CHART_COLORS.neutral} radius={[2, 2, 0, 0]} maxBarSize={10} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function EmptyState({ theme, text }) {
   return (
@@ -859,16 +716,33 @@ export default function HandleItemsPage({
     }
   }, [outgoing, searchTerm, sortBy]);
 
+  // Value of everything waiting to be handled, at the CSFloat trade price.
+  // Trades that did not go through CSFloat have no price and are left out.
+  const pendingValue = useMemo(() => {
+    const all = [...incoming, ...outgoing];
+    const priced = all.filter(e => typeof e.csfloatPrice === 'number');
+    return { value: priced.reduce((sum, e) => sum + e.csfloatPrice, 0), priced: priced.length, total: all.length };
+  }, [incoming, outgoing]);
+
   const tableHeaderCls = `text-xs font-medium ${theme.subtext}`;
   const grid = viewMode === 'grid';
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-4">
-      <div className="flex gap-6 items-start">
-        <div className="flex-1 min-w-0 md:min-w-[600px] space-y-4">
-
-        {/* Analytics */}
-        <HandleStats items={items} incoming={incoming} outgoing={outgoing} theme={theme} />
+    <Page>
+      <PageHeader
+        theme={theme}
+        title="Trades"
+        hint="Steam trades found by the extension. Confirm what you paid or got, and they join your portfolio."
+      >
+        {pendingValue.priced > 0 && (
+          <p className={`text-[13px] ${theme.subtext}`}>
+            Waiting{' '}
+            <span className={`font-mono font-medium ${theme.text}`}>≈ {fmtUsd(pendingValue.value)}</span>
+            {pendingValue.priced < pendingValue.total && ` · ${pendingValue.priced} of ${pendingValue.total} priced`}
+          </p>
+        )}
+      </PageHeader>
+        <div className="space-y-4">
 
         {/* Tabs */}
         <div className={`flex items-center gap-6 border-b ${theme.cardBorder}`}>
@@ -879,11 +753,7 @@ export default function HandleItemsPage({
             onClick={() => switchTab('incoming')}
             theme={theme}
             accentColor={theme.accentColor}
-            badgeClass={
-              incomingCount > 0
-                ? `bg-white/10 ${theme.text}`
-                : tab === 'incoming' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
-            }
+            badgeClass={theme.subtext}
           />
           <TabButton
             label="Outgoing"
@@ -892,11 +762,7 @@ export default function HandleItemsPage({
             onClick={() => switchTab('outgoing')}
             theme={theme}
             accentColor={theme.accentColor}
-            badgeClass={
-              outgoingCount > 0
-                ? `bg-white/10 ${theme.text}`
-                : tab === 'outgoing' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
-            }
+            badgeClass={theme.subtext}
           />
         </div>
 
@@ -1034,11 +900,6 @@ export default function HandleItemsPage({
           )}
         </div>
         </div>
-        <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 sticky top-0">
-          <p className={`text-xs font-medium ${theme.subtext} mb-2 px-1`}>Recent sales</p>
-          <RecentSales items={items} theme={theme} />
-        </div>
-      </div>
-    </div>
+    </Page>
   );
 }

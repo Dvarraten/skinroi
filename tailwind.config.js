@@ -1,3 +1,5 @@
+const colors = require('tailwindcss/colors');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
@@ -20,15 +22,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // The UI is neutral grey: every `slate-*` class resolves to zinc, so
+        // older components match the monochrome themes without edits.
+        slate: colors.zinc,
         bg: {
-          base: '#0a0b0f',
-          card: '#111318',
-          panel: '#161b26',
-          input: '#1a1f2e',
-          hover: '#1e2330',
+          base: '#09090b',
+          card: '#111113',
+          panel: '#0d0d0f',
+          input: '#151518',
+          hover: '#1b1b1f',
         },
-        border: { DEFAULT: '#1e2028', subtle: '#161a22' },
-        accent: '#3b82f6',
+        border: { DEFAULT: '#1f1f23', subtle: '#17171a' },
+        accent: '#fafafa',
         profit: '#22c55e',
         loss: '#ef4444',
         warn: '#f59e0b',
