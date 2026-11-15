@@ -22,7 +22,7 @@ const PAIR_TTL_S = 10 * 60;
 // keep working on a warm instance for at most this long.
 const SECRET_CACHE_MS = 5 * 60 * 1000;
 // lastSeen is only rewritten after this long (it's shown as "last push 3 min
-// ago"), so a push every 2 min doesn't rewrite ext-info every time.
+// ago"), so a push every 5 min doesn't rewrite ext-info every time.
 const LAST_SEEN_WRITE_MS = 10 * 60 * 1000;
 const secretCache = new Map();
 

@@ -179,7 +179,8 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
 
 // CSFloat listings arrive from the browser extension; if none came in for
 // this long, the extension is probably not running (Chrome closed, not paired).
-const EXTENSION_STALE_MS = 10 * 60 * 1000;
+// The extension pushes every 5 min; two missed pushes means it has stopped.
+const EXTENSION_STALE_MS = 15 * 60 * 1000;
 
 function sourceText(name, s, now) {
   if (!s || (s.via === "extension" && now - s.lastRun > EXTENSION_STALE_MS)) {

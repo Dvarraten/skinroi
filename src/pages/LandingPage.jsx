@@ -3,8 +3,7 @@
 import React from "react";
 import { Check, ArrowRight } from "lucide-react";
 import steamLogo from "../assets/platforms/steam.png";
-import logoSrc from "../utils/skinroi-logo.svg";
-import logoLightSrc from "../utils/skinroi-logo-light.svg";
+import Logo from "../components/Logo";
 
 const SHOTS = `${process.env.PUBLIC_URL || ""}/landing`;
 
@@ -54,7 +53,7 @@ export default function LandingPage({ theme, isDark = true, onLogin, onDemo, onG
     <div className="flex-1 min-h-0 overflow-y-auto">
       <header className={`border-b ${theme.panelBorder}`}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 h-14 flex items-center">
-          <img src={isDark ? logoSrc : logoLightSrc} alt="SkinROI" className="h-11 w-auto" />
+          <Logo theme={theme} />
           <div className="ml-auto flex items-center gap-5">
             <button onClick={onDemo} className={`text-[13px] font-medium ${theme.subtext} ${theme.textHover} transition-colors`}>
               Demo

@@ -25,7 +25,7 @@ const LOCK_KEY = 'skinroi:snipes:lock';
 
 // Each scan reads and rewrites the whole deal list (several hundred KB), so
 // this is the main lever on Redis bandwidth. DMarket is the only source the
-// server fetches itself; CSFloat arrives from the extension every 2 min.
+// server fetches itself; CSFloat arrives from the extension every 5 min.
 const SCAN_INTERVAL_MS = 90 * 1000;
 const DEAL_TTL_MS = 30 * 60 * 1000;
 // Every write of the deal list costs its full size in Upstash bandwidth (the

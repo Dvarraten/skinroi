@@ -22,6 +22,7 @@ import SellPriceStatus from './components/SellPriceStatus';
 import { ItemGridSkeleton } from './components/Skeleton';
 import HandleItemsPage from './pages/HandleItemsPage';
 import AboutPage from './pages/AboutPage';
+import ConnectionsPage from './pages/ConnectionsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import AddPage from './pages/AddPage';
 import SnipesPage from './pages/SnipesPage';
@@ -97,7 +98,7 @@ export default function CS2TradingTracker() {
   // sit in the ⋯ menu on each card.
   const [portfolioTab, setPortfolioTab] = useState('active'); // 'active' | 'sold'
   const { searchTerm, setSearchTerm, sortBy, setSortBy, sortedItems } = usePortfolioView(items, portfolioTab);
-  const [activePage, setActivePage] = useState(null); // null = Portfolio | 'add' | 'handleItems' | 'snipes' | 'analytics' | 'about'
+  const [activePage, setActivePage] = useState(null); // null = Portfolio | 'add' | 'handleItems' | 'snipes' | 'analytics' | 'about' | 'connections'
   const [chartPeriod, setChartPeriod] = useState('30d');
   // Dark is the default; a theme the user picked is kept in localStorage.
   // (Older saved themes that no longer exist fall back to Dark.)
@@ -115,6 +116,7 @@ export default function CS2TradingTracker() {
   const isAddPage          = activePage === 'add';
   const isHandleItemsPage  = activePage === 'handleItems';
   const isAboutPage        = activePage === 'about';
+  const isConnectionsPage  = activePage === 'connections';
   const isSnipesPage       = activePage === 'snipes';
   const openPage = (name) => setActivePage(name || null);
 
@@ -297,6 +299,8 @@ export default function CS2TradingTracker() {
       )}
 
       {isAboutPage && <AboutPage theme={themeStyles} />}
+
+      {isConnectionsPage && <ConnectionsPage theme={themeStyles} signedIn={!!user} onLogin={signIn} />}
 
       {isSnipesPage && (
         <SnipesPage key={user ? 'live' : 'demo'} theme={themeStyles} rates={allRates} demo={!user} onLogin={signIn} />

@@ -16,6 +16,8 @@ skinroi/
 │   │   ├── redis.js            Shared Upstash Redis client factory
 │   │   ├── state.js            Read/write per-user pending list + tombstones
 │   │   ├── extension-store.js  Pairing codes + long-lived extension secrets
+│   │   ├── connections.js      Per-user marketplace API keys (Connections page)
+│   │   ├── secret-box.js       AES-256-GCM sealing for stored keys
 │   │   └── snipes/             Snipes scanner: csfloat.js, dmarket.js (listings),
 │   │                           reference.js (YouPin/Buff163 prices), scan.js
 │   ├── auth/             Steam OpenID login + session
@@ -39,7 +41,7 @@ skinroi/
 ├── extension/            Chrome extension (Manifest V3, load unpacked)
 │   ├── manifest.json
 │   └── src/
-│       ├── background.js  Service worker — polls GetTradeOffers every 2 min
+│       ├── background.js  Service worker — polls GetTradeOffers every 5 min
 │       ├── popup/         Popup UI: connect steps, status, recent trades, settings
 │       └── lib/
 │           ├── config.js  Endpoints, storage keys
@@ -50,7 +52,8 @@ skinroi/
 │   ├── App.js            Root component
 │   ├── pages/            Pages: Add (AddItemPage + TransactionPage as tabs),
 │   │                     HandleItems ("Trades" in the UI), Analytics, Snipes,
-│   │                     About, Landing. Portfolio (start page) lives in App.js
+│   │                     About, Connections, Landing. Portfolio (start page)
+│   │                     lives in App.js
 │   ├── components/Sidebar.jsx  Navigation: left sidebar on desktop, top bar +
 │   │                     bottom tab bar (MobileTabBar) on phones; account menu
 │   │                     with pairing, currency converter, Dark/Light toggle
@@ -74,7 +77,8 @@ Four pages in the navigation plus Add: **Portfolio** (start page: holding
 value, profit curve, Holding / Sold tabs), **Trades** (`HandleItemsPage`,
 called "Handle Items" in the data-flow notes below), **Snipes**, **Analytics**
 (profit curve, figures, heatmap, activity, latest sales) and **Add** (item or
-deposit / withdrawal). About opens from the ⓘ button. Pages use `Page` and
+deposit / withdrawal). About opens from the ⓘ button, Connections from the
+account menu ("Marketplace connections"). Pages use `Page` and
 `PageHeader` from `components/PageHeader.jsx` for the same gutters and title row.
 
 The look is monochrome: neutral greys, white (Dark) or near-black (Light) for
@@ -99,7 +103,7 @@ data (profit, loss, warnings) and the skins. `tailwind.config.js` maps every
 - Extension pulls a session-derived WebAPI token from
   `steamcommunity.com/pointssummary/ajaxgetasyncconfig` (falls back to the
   `data-loyalty_webapi_token` embedded in `/my/home/` HTML)
-- Every 2 minutes calls `IEconService/GetTradeOffers/v1/` across three filter
+- Every 5 minutes calls `IEconService/GetTradeOffers/v1/` across three filter
   modes to catch all state 3 (Accepted) trades, plus
   `IEconService/GetTradeHistory/v1/` — merged and deduped by `tradeofferid`
 - The extension sends every accepted trade; the backend applies the cutoff:
@@ -116,9 +120,25 @@ data (profit, loss, warnings) and the skins. `tailwind.config.js` maps every
 - Backend dedupes by `tradeofferid` in `processedTradeIds`; respects
   `dismissedAssetIds` tombstones for user-dismissed items
 
+**Marketplace connections**: users link marketplace API keys on the
+Connections page (`src/pages/ConnectionsPage.jsx`, providers and step texts in
+`src/utils/connections.js`, step screenshots in `public/connections/{id}-{n}.png`,
+hidden until the file exists). `GET/POST/DELETE /api/items?connections=1`
+(`api/_lib/connections.js`) checks a key against the marketplace before saving
+(CSFloat: `/api/v1/me` must return the signed-in Steam ID; Skinport:
+`/v1/account/transactions?limit=1`), seals it with `secret-box.js` (AES-256-GCM,
+key from `CONNECTIONS_SECRET`, else derived from `SESSION_SECRET`; the Steam ID
+is bound in so a blob can't move between users) and stores it in
+`skinroi:conn:{steamId}`. Keys never go back to the browser, only status and a
+`…abcd` hint. Changing the secret makes saved keys unreadable; users then
+reconnect. The owner of the server's `CSFLOAT_API_KEY` sees CSFloat as
+connected ("Set on the server"). Skinport can be connected but its trades are
+not imported yet; DMarket, Waxpeer and BitSkins are listed as coming soon.
+
 **CSFloat prices (server → CSFloat)**: `GET /api/inventory/state` fetches the
 user's CSFloat trades (undocumented `GET csfloat.com/api/v1/me/trades`, auth with
-`CSFLOAT_API_KEY`, cached 5 min in Redis; a failed fetch pauses it 5 min, a 429 15 min) and adds `csfloatPrice` (USD) to pending
+the user's linked key, else `CSFLOAT_API_KEY`; a 401/403 on a linked key marks
+the connection "Needs attention"; cached 5 min in Redis; a failed fetch pauses it 5 min, a 429 15 min) and adds `csfloatPrice` (USD) to pending
 items whose `tradeid` equals the trade's `steam_offer.id`. Handle Items prefills
 the buy/sell price from it. See `api/_lib/csfloat-trades.js`.
 `useCsfloatAutoSync` (wired in `App.js`, runs once the portfolio has loaded from
@@ -132,7 +152,7 @@ Items added via Handle Items store the Steam `assetid` for this matching.
 (DMarket) when the last scan is older than 90s, guarded by a Redis lock. The page polls with
 `?since=<meta.updatedAt>` and gets `{ unchanged: true }` without the deal list
 when nothing changed (the deal list is several hundred KB; see Redis budget).
-CSFloat listings come from the extension instead: every poll (2 min) it fetches
+CSFloat listings come from the extension instead: every poll (5 min) it fetches
 `csfloat.com/api/v1/listings?sort_by=most_recent` with the browser session (no
 API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
 "too many IPs" when Vercel fetches them, because functions call out from many
@@ -184,7 +204,7 @@ headers). Every extension call to it goes through `extension/src/lib/csfloat.js`
 one queue, 18 s apart (at most 3 a minute, leaving room for the user's own
 csfloat.com browsing), and after a 429 every CSFloat call pauses
 until `Retry-After`/`X-RateLimit-Reset`, else 10 min doubling to 60 min. Per
-2-min poll that is at most 1 feed + 2 lookups + 3 sell-price calls. CSFloat
+5-min poll that is at most 1 feed + 2 lookups + 3 sell-price calls. CSFloat
 inspect (`api.csfloat.com`, `lib/inspect.js`) only looks at items from trades
 since pairing, at most 5 per poll, and caches failures for 24 h. Never add a
 CSFloat call that bypasses `csfloatFetch`.
@@ -289,6 +309,8 @@ npm run items:update
 | `skinroi:sellprices:{steamId}`   | CSFloat sell prices for owned items (from extension) |
 | `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (5 min TTL) |
 | `skinroi:csfloat:trades-fail:{steamId}` | /me/trades failed: don't retry (5 min, 15 after 429) |
+| `skinroi:conn:{steamId}`         | Sealed marketplace API keys + status per provider |
+| `skinroi:conn:csfloat-env-owner` | Steam ID behind the server's CSFLOAT_API_KEY (24h TTL) |
 | `skinroi:steaminv:{steamId}`     | Public Steam inventory for import (10 min TTL)   |
 | `skinroi:snipes:deals`           | Current snipe candidates (30 min window, max 250) |
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |
@@ -312,7 +334,8 @@ value: every read or write of it costs several hundred KB of bandwidth. The
 free plan's 10 GB/month bandwidth (not commands or storage) is what ran out in
 Nov 2026. So it is capped at 250 deals, null ref fields are dropped before
 storing, and `readDeals` in `scan.js` reads the small meta key first and reuses
-the warm instance's copy when `meta.updatedAt` matches.
+the warm instance's copy when `meta.updatedAt` matches. The extension polls every
+5 min (`POLL_INTERVAL_MIN`, was 2) because each poll makes several pushes.
 
 ## Hard Project Rules
 
