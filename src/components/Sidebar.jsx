@@ -5,7 +5,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import {
   BarChart3, LogOut, ExternalLink, Download, Upload, User, Plus, Inbox, Info,
-  AlertTriangle, ArrowLeftRight, Wallet, Crosshair, Sun, Moon,
+  AlertTriangle, ArrowLeftRight, Wallet, Crosshair, Sun, Moon, KeyRound,
 } from "lucide-react";
 import steamLogo from "../assets/platforms/steam.png";
 import logoSrc from "../utils/skinroi-logo.svg";
@@ -222,6 +222,9 @@ export default function Sidebar({
                 <ExtensionPairPanel theme={theme} extension={extension} onChange={onExtensionChange} />
               </div>
               <div className="py-1">
+                <button onClick={() => { onNavigate("connections"); setAccountOpen(false); }} className={menuRow}>
+                  <KeyRound size={14} /> Marketplace connections
+                </button>
                 <a
                   href={`https://steamcommunity.com/profiles/${user.steamId}`}
                   target="_blank" rel="noreferrer"
