@@ -19,7 +19,9 @@ const nextDirectId = () => {
 export const useItems = (steamId, { demo = false } = {}) => {
   // Where the list comes from. A signed-in user always wins over demo mode.
   const source = steamId || (demo ? 'demo' : 'guest');
-  const [items, setItems] = useState([]);
+  // The demo portfolio is built locally, so it is there on the first render
+  // (no skeleton) when the page opens straight into the demo.
+  const [items, setItems] = useState(() => (source === 'demo' ? buildDemoPortfolio() : []));
   const [isLoaded, setIsLoaded] = useState(false);
   // steamId whose portfolio was loaded successfully from the API. Unlike
   // isLoaded it is never set after a failed load, and is cleared the moment
@@ -29,7 +31,7 @@ export const useItems = (steamId, { demo = false } = {}) => {
   // load finishes (also after a failed one). While it doesn't match the
   // current source the portfolio is still loading, so Home shows skeletons
   // instead of an empty state.
-  const [settledFor, setSettledFor] = useState(null);
+  const [settledFor, setSettledFor] = useState(source === 'demo' ? 'demo' : null);
   const saveTimerRef = useRef(null);
   const [formData, setFormData] = useState({
     itemName: '',

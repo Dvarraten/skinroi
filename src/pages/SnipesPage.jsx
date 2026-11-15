@@ -42,7 +42,7 @@ function ago(ms, now) {
 }
 
 export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
-  const { deals, meta, error, loading, refresh } = useSnipes({ demo });
+  const { deals, meta, error, loading, refresh, example } = useSnipes({ demo });
   const [filters, setFilters] = useState(() => loadFilters(demo));
   const [currency, setCurrency] = useState(() => {
     try { return localStorage.getItem(CURRENCY_KEY) || "USD"; } catch { return "USD"; }
@@ -100,7 +100,7 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
             {visible.length} of {deals.length}
           </span>
           {demo ? (
-            <span className="text-[11px] text-warn">Delayed 15+ min preview</span>
+            <span className="text-[11px] text-warn">{example ? "Example deals" : "Delayed 15+ min preview"}</span>
           ) : (
             <ScanStatus meta={meta} now={now} theme={theme} />
           )}
@@ -134,7 +134,9 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
         {demo && (
           <div className={`px-4 md:px-8 py-2.5 text-xs border-y ${theme.panelBorder} flex flex-wrap items-center gap-x-3 gap-y-1.5 ${theme.textSecondary}`}>
             <span>
-              These deals were found 15 minutes or more ago and are probably gone. Signed-in users see new ones within a minute, with buy links.
+              {example
+                ? "These are example deals to show how Snipes works. Signed-in users see real ones within a minute, with buy links."
+                : "These deals were found 15 minutes or more ago and are probably gone. Signed-in users see new ones within a minute, with buy links."}
             </span>
             <button
               onClick={onLogin}
