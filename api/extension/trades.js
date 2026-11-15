@@ -74,6 +74,8 @@ const PAIR_GRACE_MS = 60_000;
 // safe because old trades that fall off have been in pending long enough to
 // have been handled (or dismissed and tombstoned in dismissedAssetIds).
 const PROCESSED_TRADE_IDS_CAP = 50_000;
+// A push that changes nothing still rewrites the state this often (lastSync).
+const STATE_REFRESH_MS = 10 * 60 * 1000;
 
 function isTombstoned(dismissed, item) {
   const assetid = String(item.assetid);
@@ -315,8 +317,17 @@ export default async function handler(req, res) {
       lastSyncOk: true,
       lastError: null,
     };
-    await saveState(next, steamId);
-    await touchLastSeen(steamId, extVersion);
+    // Most pushes change nothing; rewriting the whole state every 5 min only
+    // burns Redis quota. lastSync is refreshed at most every STATE_REFRESH_MS.
+    const changed =
+      newOfferIds.length > 0 ||
+      next.pending.length !== state.pending.length ||
+      next.pending.some((p, i) => p !== state.pending[i]) ||
+      state.lastSyncOk !== true ||
+      !state.lastSync ||
+      Date.now() - new Date(state.lastSync).getTime() > STATE_REFRESH_MS;
+    if (changed) await saveState(next, steamId);
+    await touchLastSeen(steamId, extVersion, extInfo);
 
     return res.status(200).json({
       ok: true,

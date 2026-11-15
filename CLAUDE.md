@@ -36,12 +36,12 @@ skinroi/
 │   ├── items/
 │   │   └── index.js       GET/POST — load and save the tracked item portfolio
 │   └── snipes/
-│       └── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~45s);
+│       └── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~90s);
 │                          POST — extension pushes raw CSFloat listings (Bearer secret)
 ├── extension/            Chrome extension (Manifest V3, load unpacked)
 │   ├── manifest.json
 │   └── src/
-│       ├── background.js  Service worker — polls GetTradeOffers every 2 min
+│       ├── background.js  Service worker — polls GetTradeOffers every 5 min
 │       ├── popup/         Popup UI: connect steps, status, recent trades, settings
 │       └── lib/
 │           ├── config.js  Endpoints, storage keys
@@ -103,7 +103,7 @@ data (profit, loss, warnings) and the skins. `tailwind.config.js` maps every
 - Extension pulls a session-derived WebAPI token from
   `steamcommunity.com/pointssummary/ajaxgetasyncconfig` (falls back to the
   `data-loyalty_webapi_token` embedded in `/my/home/` HTML)
-- Every 2 minutes calls `IEconService/GetTradeOffers/v1/` across three filter
+- Every 5 minutes calls `IEconService/GetTradeOffers/v1/` across three filter
   modes to catch all state 3 (Accepted) trades, plus
   `IEconService/GetTradeHistory/v1/` — merged and deduped by `tradeofferid`
 - The extension sends every accepted trade; the backend applies the cutoff:
@@ -149,8 +149,10 @@ float and paint seed). Everything else stays in Handle Items for the user.
 Items added via Handle Items store the Steam `assetid` for this matching.
 
 **Snipes**: `GET /api/snipes` (logged-in only) rescans server-fetched sources
-(DMarket) when the last scan is older than 45s, guarded by a Redis lock.
-CSFloat listings come from the extension instead: every poll (2 min) it fetches
+(DMarket) when the last scan is older than 90s, guarded by a Redis lock. The page polls with
+`?since=<meta.updatedAt>` and gets `{ unchanged: true }` without the deal list
+when nothing changed (the deal list is several hundred KB; see Redis budget).
+CSFloat listings come from the extension instead: every poll (5 min) it fetches
 `csfloat.com/api/v1/listings?sort_by=most_recent` with the browser session (no
 API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
 "too many IPs" when Vercel fetches them, because functions call out from many
@@ -194,7 +196,7 @@ headers). Every extension call to it goes through `extension/src/lib/csfloat.js`
 one queue, 18 s apart (at most 3 a minute, leaving room for the user's own
 csfloat.com browsing), and after a 429 every CSFloat call pauses
 until `Retry-After`/`X-RateLimit-Reset`, else 10 min doubling to 60 min. Per
-2-min poll that is at most 1 feed + 2 lookups + 3 sell-price calls. CSFloat
+5-min poll that is at most 1 feed + 2 lookups + 3 sell-price calls. CSFloat
 inspect (`api.csfloat.com`, `lib/inspect.js`) only looks at items from trades
 since pairing, at most 5 per poll, and caches failures for 24 h. Never add a
 CSFloat call that bypasses `csfloatFetch`.
@@ -302,7 +304,7 @@ npm run items:update
 | `skinroi:conn:{steamId}`         | Sealed marketplace API keys + status per provider |
 | `skinroi:conn:csfloat-env-owner` | Steam ID behind the server's CSFLOAT_API_KEY (24h TTL) |
 | `skinroi:steaminv:{steamId}`     | Public Steam inventory for import (10 min TTL)   |
-| `skinroi:snipes:deals`           | Current snipe candidates (30 min window)          |
+| `skinroi:snipes:deals`           | Current snipe candidates (30 min window, max 250) |
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |
 | `skinroi:snipes:lock`            | Scan lock (25s TTL)                               |
 | `skinroi:snipes:ref:{name}`      | Cached CSPriceAPI row per item (5 min TTL)        |
@@ -311,6 +313,21 @@ npm run items:update
 | `skinroi:snipes:steamdt:strikes` | SteamDT limit answers in a row (backoff)          |
 | `skinroi:snipes:csfl:{key}`      | Cheapest CSFloat listings per item (30 min TTL)   |
 | `skinroi:snipes:csfwant`         | Items waiting for an extension CSFloat lookup     |
+
+## Redis budget
+
+Production Redis is Upstash's free plan, which caps commands and bandwidth.
+Rules that keep us under it: poll only while the tab is visible (Snipes 30 s
+with `?since=`, pending list 60 s, sell prices 5 min); never rewrite a key when
+nothing changed (the trades push skips the state write, `touchLastSeen` writes
+at most every 10 min); reuse values already read in the same request instead of
+reading again; give every cache key a TTL. The Snipes deal list is the biggest
+value: every read or write of it costs several hundred KB of bandwidth. The
+free plan's 10 GB/month bandwidth (not commands or storage) is what ran out in
+Nov 2026. So it is capped at 250 deals, null ref fields are dropped before
+storing, and `readDeals` in `scan.js` reads the small meta key first and reuses
+the warm instance's copy when `meta.updatedAt` matches. The extension polls every
+5 min (`POLL_INTERVAL_MIN`, was 2) because each poll makes several pushes.
 
 ## Hard Project Rules
 

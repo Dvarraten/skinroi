@@ -8,7 +8,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // extension pushes whenever it detects changes.
 
 const BASE = process.env.REACT_APP_STEAM_SYNC_URL || '';
-const FRONTEND_POLL_MS = 30 * 1000;
+// Only while the tab is visible; a hidden tab refreshes when it's shown again.
+const FRONTEND_POLL_MS = 60 * 1000;
 
 // How long a locally-dismissed item stays in the client-side tombstone map.
 // Long enough that any in-flight state poll can't race and revive it, and
@@ -126,10 +127,17 @@ export function useSteamSync() {
   useEffect(() => {
     aliveRef.current = true;
     fetchState();
-    const id = setInterval(fetchState, FRONTEND_POLL_MS);
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchState();
+    }, FRONTEND_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchState();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       aliveRef.current = false;
       clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [fetchState]);
 

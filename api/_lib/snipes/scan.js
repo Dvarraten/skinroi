@@ -23,9 +23,14 @@ const DEALS_KEY = 'skinroi:snipes:deals';
 const META_KEY = 'skinroi:snipes:meta';
 const LOCK_KEY = 'skinroi:snipes:lock';
 
-const SCAN_INTERVAL_MS = 45 * 1000;
+// Each scan reads and rewrites the whole deal list (several hundred KB), so
+// this is the main lever on Redis bandwidth. DMarket is the only source the
+// server fetches itself; CSFloat arrives from the extension every 5 min.
+const SCAN_INTERVAL_MS = 90 * 1000;
 const DEAL_TTL_MS = 30 * 60 * 1000;
-const MAX_DEALS = 500;
+// Every write of the deal list costs its full size in Upstash bandwidth (the
+// free plan's 10 GB/month ran out at 500), so keep it short.
+const MAX_DEALS = 250;
 // Server keeps anything at least this far under reference; fees, ROI and
 // liquidity are filtered in the browser so the user can tune them live.
 const MIN_DISCOUNT = 0.02;
@@ -50,33 +55,56 @@ export function minPriceCents() {
   return parseInt(process.env.SNIPES_MIN_PRICE_CENTS || '200', 10);
 }
 
-export async function loadSnipes() {
-  const redis = getRedis();
-  const [deals, meta] = await redis.mget(DEALS_KEY, META_KEY);
-  return { deals: Array.isArray(deals) ? deals : [], meta: meta || null };
+// The last deal list this warm instance read or wrote, tagged with the
+// meta.updatedAt it belongs to. Reading the small meta key first and reusing
+// this when it matches saves re-downloading the whole list on most pushes.
+let dealsCache = { updatedAt: null, deals: [] };
+
+async function readDeals(redis) {
+  const meta = (await redis.get(META_KEY)) || null;
+  if (meta?.updatedAt && dealsCache.updatedAt === meta.updatedAt) {
+    return { deals: dealsCache.deals, meta };
+  }
+  const raw = await redis.get(DEALS_KEY);
+  const deals = Array.isArray(raw) ? raw : [];
+  if (meta?.updatedAt) dealsCache = { updatedAt: meta.updatedAt, deals };
+  return { deals, meta };
 }
 
+export async function loadSnipes() {
+  return readDeals(getRedis());
+}
+
+// Meta only (small): the page polls with ?since=<meta.updatedAt> and the big
+// deal list is only read when it changed since.
+export async function loadSnipesMeta() {
+  return (await getRedis().get(META_KEY)) || null;
+}
+
+// Rescans when the last scan is old. Returns true when it scanned (the deal
+// list changed), false when the meta read showed it was still fresh.
 export async function ensureFresh() {
   const redis = getRedis();
   const meta = await redis.get(META_KEY);
-  if (meta?.lastScan && Date.now() - meta.lastScan < SCAN_INTERVAL_MS) return;
+  if (meta?.lastScan && Date.now() - meta.lastScan < SCAN_INTERVAL_MS) return false;
   const gotLock = await redis.set(LOCK_KEY, Date.now(), { nx: true, ex: 25 });
-  if (!gotLock) return;
+  if (!gotLock) return false;
   try {
     await scan(redis);
   } finally {
     await redis.del(LOCK_KEY);
   }
+  return true;
 }
 
 // Listings pushed by the extension. The answer also names items whose
 // cheapest CSFloat listing the extension should look up next.
 export async function ingestListings(source, listings) {
   return withLock(async (redis, now) => {
-    const result = await priceAndStore(redis, listings, now, {
+    const { want, ...result } = await priceAndStore(redis, listings, now, {
       [source]: { ok: true, count: listings.length, lastRun: now, via: 'extension' },
     }, {}, { fromFeed: true });
-    return { ...result, csfloatLookups: await takeLookups(redis, now) };
+    return { ...result, csfloatLookups: await takeLookups(redis, now, want) };
   });
 }
 
@@ -85,6 +113,9 @@ export async function ingestListings(source, listings) {
 export async function ingestCsfloatLowest(entries) {
   return withLock(async (redis, now) => {
     const { names, pending } = await storeLookups(redis, entries, now);
+    // Nothing was waiting on these items: the deal list doesn't change, so
+    // skip reading and rewriting it.
+    if (!pending.length) return { stored: names.length, matched: 0 };
     const result = await priceAndStore(redis, pending, now, {});
     return { stored: names.length, matched: result.matched };
   });
@@ -162,7 +193,7 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
     }
   }
 
-  const [previous, prevMeta] = await redis.mget(DEALS_KEY, META_KEY);
+  const { deals: previous, meta: prevMeta } = await readDeals(redis);
   const byId = new Map(
     (Array.isArray(previous) ? previous : [])
       .filter((d) => now - d.seenAt < DEAL_TTL_MS)
@@ -195,7 +226,7 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
   fresh.push(...found);
   // Only items that could sell above what they cost are worth a lookup.
   const candidates = [...lookups.values()].map(lookupCandidate).filter((c) => c.priority > 1 + MIN_DISCOUNT);
-  await queueLookups(redis, candidates, now);
+  const want = await queueLookups(redis, candidates, now);
 
   // Kept deals get the current CSFloat price for their item, or none once
   // the last lookup has expired.
@@ -210,7 +241,10 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
     const old = byId.get(d.id);
     byId.set(d.id, old ? { ...d, seenAt: old.seenAt } : d);
   }
-  const deals = [...byId.values()].sort((a, b) => b.seenAt - a.seenAt).slice(0, MAX_DEALS);
+  const deals = [...byId.values()]
+    .sort((a, b) => b.seenAt - a.seenAt)
+    .slice(0, MAX_DEALS)
+    .map(slimDeal);
 
   const meta = {
     ...(prevMeta || {}),
@@ -218,11 +252,25 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
     sources: { ...keptSources(prevMeta?.sources), ...sourcePatch },
     refProvider: referenceProvider(),
     refError,
+    // Lets GET /api/snipes?since= skip re-reading an unchanged deal list.
+    updatedAt: now,
     // Listings dropped as illiquid in the latest feed batch, per reason.
     ...(fromFeed ? { skipped } : {}),
   };
   await redis.mset({ [DEALS_KEY]: deals, [META_KEY]: meta });
-  return { checked: listings.length, priced: priceable.length, matched: fresh.length };
+  dealsCache = { updatedAt: now, deals };
+  return { checked: listings.length, priced: priceable.length, matched: fresh.length, want };
+}
+
+// Null fields in the per-market refs (avg7dUsd, bidUsd, change7d, ...) are
+// dropped before storing; the page reads them with ?? / && so missing = null.
+function slimDeal(d) {
+  if (!d.refs) return d;
+  const refs = {};
+  for (const [m, r] of Object.entries(d.refs)) {
+    refs[m] = r ? Object.fromEntries(Object.entries(r).filter(([, v]) => v != null)) : null;
+  }
+  return { ...d, refs };
 }
 
 function bestSellPrice(refs, except) {

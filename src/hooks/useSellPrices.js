@@ -5,7 +5,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 const BASE = process.env.REACT_APP_STEAM_SYNC_URL || "";
-const POLL_MS = 60 * 1000;
+// CSFloat prices refresh every 48 h and YouPin is cached 30 min on the server,
+// so a faster poll only costs Redis reads.
+const POLL_MS = 5 * 60 * 1000;
 
 export function useSellPrices(enabled) {
   // null until the first answer, so Home doesn't warn "none yet" before it has asked.

@@ -17,6 +17,14 @@ const SECRET_KEY = (secret) => `skinroi:ext-secret:${secret}`;
 const INFO_KEY = (steamId) => `skinroi:ext-info:${steamId}`;
 
 const PAIR_TTL_S = 10 * 60;
+// Warm instances remember a resolved secret this long, so the extension's
+// several pushes per poll don't each cost a Redis read. A revoked secret can
+// keep working on a warm instance for at most this long.
+const SECRET_CACHE_MS = 5 * 60 * 1000;
+// lastSeen is only rewritten after this long (it's shown as "last push 3 min
+// ago"), so a push every 5 min doesn't rewrite ext-info every time.
+const LAST_SEEN_WRITE_MS = 10 * 60 * 1000;
+const secretCache = new Map();
 
 // Ambiguous chars (0, O, 1, I, L) are excluded so hand-typed codes are hard
 // to misread. Split "ABCDEFGH" → "ABCD-EFGH" for extra readability.
@@ -90,14 +98,23 @@ export async function loadExtensionInfo(steamId) {
 // extension-originated API calls (trades push, heartbeat).
 export async function resolveSecret(secret) {
   if (!secret || typeof secret !== 'string') return null;
+  const hit = secretCache.get(secret);
+  if (hit && Date.now() - hit.at < SECRET_CACHE_MS) return hit.steamId;
   const client = getRedis();
   const raw = await client.get(SECRET_KEY(secret));
-  return raw ? String(raw) : null;
+  const steamId = raw ? String(raw) : null;
+  if (steamId) secretCache.set(secret, { steamId, at: Date.now() });
+  else secretCache.delete(secret);
+  return steamId;
 }
 
-export async function touchLastSeen(steamId, extVersion = null) {
-  const info = await loadExtensionInfo(steamId);
+// info: the ext-info the caller already loaded (saves a read). Skips the
+// write when lastSeen is recent and the version is unchanged.
+export async function touchLastSeen(steamId, extVersion = null, info = undefined) {
+  if (info === undefined) info = await loadExtensionInfo(steamId);
   if (!info) return;
+  const version = extVersion || info.extVersion || null;
+  if (info.lastSeen && Date.now() - info.lastSeen < LAST_SEEN_WRITE_MS && version === info.extVersion) return;
   const client = getRedis();
   await client.set(INFO_KEY(steamId), {
     ...info,
@@ -112,6 +129,7 @@ export async function touchLastSeen(steamId, extVersion = null) {
 export async function revokeExtension(steamId) {
   const info = await loadExtensionInfo(steamId);
   if (!info) return { revoked: false };
+  secretCache.delete(info.secret);
   const client = getRedis();
   await Promise.all([
     client.del(SECRET_KEY(info.secret)),

@@ -4,6 +4,8 @@
 //        sources lazily (see _lib/snipes/scan.js) and returns every deal the
 //        server kept; ROI, fees and liquidity filters run in the browser.
 //        Requires a SkinROI session so anonymous traffic can't burn API quota.
+// GET ?since=<meta.updatedAt> — { unchanged: true, meta } when the deals
+//        haven't changed since, so polling doesn't re-read the whole list.
 // GET ?demo=1 — public, delayed preview for the logged-out demo: only deals
 //        first seen at least 15 min ago, at most 40 (see _lib/snipes/demo.js), without
 //        buy links. Never rescans, only reads Redis, and is CDN-cached.
@@ -22,7 +24,7 @@ import { getSessionSteamId } from '../_lib/auth.js';
 import { extractBearer, resolveSecret } from '../_lib/extension-store.js';
 import { normalizeCsfloatListings } from '../_lib/snipes/csfloat.js';
 import {
-  ensureFresh, ingestCsfloatLowest, ingestListings, loadSnipes, minPriceCents,
+  ensureFresh, ingestCsfloatLowest, ingestListings, loadSnipes, loadSnipesMeta, minPriceCents,
 } from '../_lib/snipes/scan.js';
 import { DEMO_DELAY_MS, demoDeals } from '../_lib/snipes/demo.js';
 
@@ -42,13 +44,21 @@ async function handleGet(req, res) {
   if (!getSessionSteamId(req)) return res.status(401).json({ error: 'not authenticated' });
 
   res.setHeader('Cache-Control', 'no-store');
+  let scanned = false;
   try {
-    await ensureFresh();
+    scanned = await ensureFresh();
   } catch (e) {
     // A failed scan shouldn't hide the deals we already have.
     console.error('[snipes] scan failed:', e);
   }
   try {
+    // ?since=<meta.updatedAt from the last answer>: when nothing changed,
+    // answer from the small meta key instead of re-reading every deal.
+    const since = Number(req.query?.since) || 0;
+    if (since && !scanned) {
+      const meta = await loadSnipesMeta();
+      if (meta?.updatedAt && meta.updatedAt <= since) return res.json({ unchanged: true, meta });
+    }
     return res.json(await loadSnipes());
   } catch (e) {
     console.error('[snipes] load failed:', e);

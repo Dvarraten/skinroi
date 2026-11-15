@@ -15,6 +15,8 @@ const KEEP_LISTINGS = 3;
 const WANT_KEY = 'skinroi:snipes:csfwant';
 const WANT_MAX = 100;
 const WANT_TTL_MS = 30 * 60 * 1000;
+// The whole list expires if no push touches it for this long.
+const WANT_KEY_TTL_S = 60 * 60;
 const ASK_AGAIN_MS = 10 * 60 * 1000;
 // Listings kept per item while it waits, priced again once the lookup is in.
 const PENDING_PER_ITEM = 2;
@@ -100,15 +102,16 @@ export async function storeLookups(redis, entries, now) {
   const want = (await redis.get(WANT_KEY)) || [];
   const done = new Set(names);
   const pending = want.filter((w) => done.has(w.name)).flatMap((w) => w.listings || []);
-  await redis.set(WANT_KEY, want.filter((w) => !done.has(w.name)));
+  await redis.set(WANT_KEY, want.filter((w) => !done.has(w.name)), { ex: WANT_KEY_TTL_S });
   return { names, pending };
 }
 
 // candidates: [{ name, priority, listings }] for items without a known
 // CSFloat price. Kept in one small list, most promising first, for the
 // extension to work through; `listings` are priced again after the lookup.
+// Returns the list as stored, or undefined when there was nothing to add.
 export async function queueLookups(redis, candidates, now) {
-  if (!candidates.length) return;
+  if (!candidates.length) return undefined;
   const byName = new Map(
     ((await redis.get(WANT_KEY)) || [])
       .filter((w) => now - w.at < WANT_TTL_MS)
@@ -126,17 +129,19 @@ export async function queueLookups(redis, candidates, now) {
     });
   }
   const want = [...byName.values()].sort((a, b) => b.priority - a.priority).slice(0, WANT_MAX);
-  await redis.set(WANT_KEY, want);
+  await redis.set(WANT_KEY, want, { ex: WANT_KEY_TTL_S });
+  return want;
 }
 
 // The next names for the extension, skipping ones it was asked about lately.
-export async function takeLookups(redis, now) {
-  const want = ((await redis.get(WANT_KEY)) || []).filter((w) => now - w.at < WANT_TTL_MS);
+// known: the list queueLookups just wrote in this request (saves a read).
+export async function takeLookups(redis, now, known = undefined) {
+  const want = (known || (await redis.get(WANT_KEY)) || []).filter((w) => now - w.at < WANT_TTL_MS);
   const picked = want
     .filter((w) => !w.askedAt || now - w.askedAt > ASK_AGAIN_MS)
     .slice(0, LOOKUPS_PER_PUSH);
   if (!picked.length) return [];
   for (const w of picked) w.askedAt = now;
-  await redis.set(WANT_KEY, want);
+  await redis.set(WANT_KEY, want, { ex: WANT_KEY_TTL_S });
   return picked.map((w) => w.name);
 }
