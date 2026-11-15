@@ -40,7 +40,7 @@ skinroi/
 │   ├── manifest.json
 │   └── src/
 │       ├── background.js  Service worker — polls GetTradeOffers every 2 min
-│       ├── popup/         Popup UI: pairing, connection status, activity log
+│       ├── popup/         Popup UI: connect steps, status, recent trades, settings
 │       └── lib/
 │           ├── config.js  Endpoints, storage keys
 │           ├── storage.js chrome.storage.local wrapper (pairing, desc cache)
@@ -237,7 +237,7 @@ npm run items:update        # refresh public/items.json from ByMykel/CSGO-API
 
 Load the extension: open `chrome://extensions`, enable Developer mode, click
 **Load unpacked**, and select the `extension/` directory. Open the popup and
-use the Advanced section to set the base URL to `http://localhost:3000` during
+use its settings (gear icon, For developers) to set the SkinROI address to `http://localhost:3000` during
 development.
 
 ## Common Operations
@@ -246,7 +246,7 @@ development.
 
 1. Sign in on the site via Steam
 2. Open the account menu (your avatar) → **Generate pairing code**
-3. Click the extension icon → paste the code → **Pair**
+3. Click the extension icon → paste the code (it connects by itself)
 
 **Reset the pending list** (wipes tombstones + processed-trade dedup):
 

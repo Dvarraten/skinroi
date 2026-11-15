@@ -13,6 +13,7 @@ import { POLL_INTERVAL_MIN, CSFLOAT_LISTINGS_URL } from './lib/config.js';
 import {
   getPairing,
   pushActivity,
+  saveLastPoll,
   getDescCache,
   saveDescCache,
   getInspectCache,
@@ -60,7 +61,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
-    runPoll({ manual: false }).catch((err) => console.error('[skinroi] poll failed', err));
+    pollAndRecord({ manual: false }).catch((err) => console.error('[skinroi] poll failed', err));
     runSnipes().catch((err) => console.error('[skinroi] snipes failed', err));
     runSellPricesSafe();
   }
@@ -72,7 +73,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === 'runPollNow') {
     runSnipes().catch((err) => console.error('[skinroi] snipes failed', err));
     runSellPricesSafe();
-    runPoll({ manual: true }).then(
+    pollAndRecord({ manual: true }).then(
       (result) => sendResponse({ ok: true, result }),
       (err) => sendResponse({ ok: false, error: String(err) })
     );
@@ -154,6 +155,17 @@ async function runSellPricesSafe() {
   } finally {
     sellPricesInFlight = false;
   }
+}
+
+// Runs a poll and remembers how it went, so the popup can say "checked 2 min
+// ago" or name what is wrong. A poll skipped because one is already running
+// (or because nothing is paired) says nothing new and is not recorded.
+async function pollAndRecord(opts) {
+  const result = await runPoll(opts);
+  if (result?.skipped !== 'in_flight' && result?.skipped !== 'not_paired') {
+    try { await saveLastPoll(result); } catch { /* status line only */ }
+  }
+  return result;
 }
 
 async function runPoll({ manual = false } = {}) {

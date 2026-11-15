@@ -8,56 +8,109 @@
   </head>
   <body>
     <header>
-      <div class="brand">
-        <span class="dot"></span>
-        <h1>SkinROI Sync</h1>
-      </div>
-      <span id="version" class="version"></span>
+      <img src="../../icons/48.png" alt="" width="22" height="22" />
+      <h1>SkinROI</h1>
+      <button id="settings-toggle" class="icon-btn" title="Settings" aria-label="Settings" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
     </header>
 
-    <section id="paired-section" class="hidden">
-      <div class="row">
-        <span class="label">Steam ID</span>
-        <span id="steam-id" class="value mono"></span>
+    <!-- Not connected yet: three steps, the last one done right here. -->
+    <main id="connect-view" class="hidden">
+      <h2 class="title">Connect to SkinROI</h2>
+      <p class="lead">Your Steam trades then show up on SkinROI by themselves.</p>
+      <ol class="steps">
+        <li>
+          <span class="num">1</span>
+          <div>
+            <p>Open SkinROI and sign in with Steam.</p>
+            <button id="open-site-connect" class="btn">Open SkinROI</button>
+          </div>
+        </li>
+        <li>
+          <span class="num">2</span>
+          <div>
+            <p>Click your avatar, then <strong>Generate pairing code</strong>.</p>
+          </div>
+        </li>
+        <li>
+          <span class="num">3</span>
+          <div>
+            <label for="code-input">Paste the code here.</label>
+            <form id="pair-form" class="code-row">
+              <input id="code-input" type="text" placeholder="XXXX-XXXX" autocomplete="off" spellcheck="false" maxlength="9" aria-describedby="pair-error" />
+              <button id="pair" class="btn primary" type="submit" disabled>Connect</button>
+            </form>
+            <p id="pair-error" class="error hidden" role="alert"></p>
+          </div>
+        </li>
+      </ol>
+    </main>
+
+    <!-- Connected: one status line, one action, then what was found. -->
+    <main id="status-view" class="hidden">
+      <section class="status">
+        <span id="status-dot" class="dot"></span>
+        <div>
+          <p id="status-title" class="status-title"></p>
+          <p id="status-detail" class="status-detail"></p>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button id="status-action" class="btn primary hidden"></button>
+        <button id="poll-now" class="btn primary">Check for trades now</button>
+        <button id="open-site" class="btn">Open SkinROI</button>
       </div>
-      <div class="row">
-        <span class="label">Paired</span>
-        <span id="paired-at" class="value"></span>
+      <p id="poll-result" class="result" role="status"></p>
+
+      <p id="csfloat-note" class="note hidden"></p>
+
+      <h2 class="section">Recent trades</h2>
+      <ul id="activity" class="activity"></ul>
+
+      <details id="problems" class="problems hidden">
+        <summary><span id="problems-count"></span></summary>
+        <ul id="problems-list"></ul>
+      </details>
+    </main>
+
+    <!-- Settings: account, disconnect and the developer options. -->
+    <main id="settings-view" class="hidden">
+      <h2 class="title">Settings</h2>
+
+      <div id="account-block" class="hidden">
+        <dl class="rows">
+          <div><dt>Steam ID</dt><dd id="steam-id" class="mono"></dd></div>
+          <div><dt>Connected since</dt><dd id="paired-at"></dd></div>
+        </dl>
+        <button id="unpair" class="btn danger">Disconnect from SkinROI</button>
+        <div id="unpair-confirm" class="confirm hidden">
+          <p>Stop syncing trades? Your portfolio stays as it is.</p>
+          <div class="actions">
+            <button id="unpair-yes" class="btn danger">Disconnect</button>
+            <button id="unpair-no" class="btn">Keep connected</button>
+          </div>
+        </div>
       </div>
-      <div class="row">
-        <span class="label">Steam session</span>
-        <span id="steam-session" class="value"></span>
-      </div>
 
-      <button id="poll-now" class="primary">Sync now</button>
-      <button id="unpair" class="secondary">Disconnect</button>
-
-      <h2>Recent activity</h2>
-      <ul id="activity"></ul>
-    </section>
-
-    <section id="unpaired-section" class="hidden">
-      <p class="hint">
-        Open <a id="skinroi-link" href="#" target="_blank">SkinROI</a>, click
-        <strong>Connect Extension</strong>, then paste the code below.
-      </p>
-      <input id="code-input" type="text" placeholder="XXXX-XXXX" autocomplete="off" maxlength="9" />
-      <button id="pair" class="primary">Pair</button>
-      <p id="pair-error" class="error hidden"></p>
-    </section>
-
-    <details class="dev">
-      <summary>Advanced</summary>
-      <label>
-        SkinROI base URL
-        <input id="base-url" type="url" />
-      </label>
-      <button id="save-base-url" class="secondary small">Save</button>
-      <label class="toggle-row">
+      <h2 class="section">For developers</h2>
+      <label class="field" for="base-url">SkinROI address</label>
+      <form id="base-url-form" class="code-row">
+        <input id="base-url" type="url" spellcheck="false" />
+        <button class="btn" type="submit">Save</button>
+      </form>
+      <p id="base-url-saved" class="result" role="status"></p>
+      <label class="check">
         <input id="verbose-logging" type="checkbox" />
-        Verbose SW logging
+        Detailed logs in the service worker console
       </label>
-    </details>
+
+      <p id="version" class="version"></p>
+    </main>
 
     <script src="popup.js" type="module"></script>
   </body>

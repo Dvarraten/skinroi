@@ -119,3 +119,16 @@ export async function getVerboseLogging() {
 export async function setVerboseLogging(val) {
   await set({ [STORAGE_KEYS.VERBOSE_LOGGING]: !!val });
 }
+
+// Outcome of the latest Steam poll, for the popup's status line:
+// { at, ok, reason } where reason is runPoll's `skipped` value when it failed.
+export async function saveLastPoll(result) {
+  const reason = result?.skipped || null;
+  await set({ [STORAGE_KEYS.LAST_POLL]: { at: Date.now(), ok: !reason, reason } });
+}
+
+export async function getLastPoll() {
+  const data = await get([STORAGE_KEYS.LAST_POLL]);
+  const raw = data[STORAGE_KEYS.LAST_POLL];
+  return raw && typeof raw === 'object' ? raw : null;
+}
