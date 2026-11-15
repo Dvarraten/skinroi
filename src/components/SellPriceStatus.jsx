@@ -15,7 +15,7 @@ export default function SellPriceStatus({ sellPrices, hasItems }) {
     .map(({ label, s }) => `${label}: ${s.error}`);
 
   const anyFresh = Object.values(prices).some((entry) =>
-    SELL_PRICE_MARKETS.some((m) => entry?.[m.id]?.at && now - entry[m.id].at <= SELL_PRICE_MAX_AGE_MS)
+    SELL_PRICE_MARKETS.some((m) => entry?.[m.id]?.at && now - entry[m.id].at <= m.maxAgeMs)
   );
   if (!problems.length && !anyFresh) {
     problems.push("Sell prices: none yet (CSFloat needs the SkinROI extension running)");
