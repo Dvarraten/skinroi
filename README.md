@@ -67,8 +67,8 @@ Local dev uses the same Redis as production, so be careful when editing items wh
 ### Extension
 
 1. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked** and select `extension/`.
-2. In the popup's Advanced section, set the base URL to `http://localhost:3000` for local dev.
-3. Sign in on the site, open the account menu (your avatar) **→ Generate pairing code**, paste the code into the popup and click **Pair**.
+2. In the popup's settings (gear icon, **For developers**), set the SkinROI address to `http://localhost:3000` for local dev.
+3. Sign in on the site, open the account menu (your avatar) **→ Generate pairing code**, paste the code into the popup (it connects by itself).
 
 ---
 

@@ -80,4 +80,5 @@ export const STORAGE_KEYS = {
   INSPECT_CACHE: 'skinroi_inspectCache',
   ACTIVITY_LOG: 'activity_log',
   VERBOSE_LOGGING: 'skinroi_verboseLogging',
+  LAST_POLL: 'skinroi_lastPoll',
 };

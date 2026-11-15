@@ -33,11 +33,11 @@ Steam session cookies.
 ## Pair with your SkinROI account
 
 1. Open your SkinROI site (default `https://skinroi.vercel.app`, or your
-   dev URL via the popup's Advanced section)
+   dev URL via the popup's settings, the gear icon, under For developers)
 2. Sign in via Steam
-3. Open **Connect Extension** and copy the 8-character code
-4. Click the extension icon, paste the code, hit **Pair**
-5. The popup switches to "Active" and starts polling on the next tick
+3. Open the account menu (your avatar), click **Generate pairing code** and copy the 8-character code
+4. Click the extension icon and paste the code (it connects by itself; a typed code needs **Connect**)
+5. The popup switches to "Syncing your trades" and starts polling on the next tick
 
 ## Icons
 
