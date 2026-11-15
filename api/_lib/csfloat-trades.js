@@ -1,8 +1,9 @@
 // CSFloat trade history → buy/sell prices for pending items.
 //
 // Uses CSFloat's undocumented GET /api/v1/me/trades (the same endpoint
-// CSFloat's own browser extension uses), authenticated with the account's API
-// key from CSFLOAT_API_KEY. Each trade carries the Steam trade offer id it was
+// CSFloat's own browser extension uses), authenticated with the API key the
+// user linked on the Connections page (_lib/connections.js), else the
+// server's CSFLOAT_API_KEY (only returns trades for the key's own account). Each trade carries the Steam trade offer id it was
 // settled through (steam_offer.id), which is the same value the extension
 // stores as `tradeid` on every pending item — so prices can be joined
 // directly onto Handle Items.
@@ -11,6 +12,7 @@
 // poll doesn't hit CSFloat on every request.
 
 import { getRedis } from './redis.js';
+import { getCredentials, markConnectionError } from './connections.js';
 
 const API_BASE = 'https://csfloat.com/api/v1/me/trades';
 const PAGE_LIMIT = 100;
@@ -81,8 +83,7 @@ async function fetchAllTrades(apiKey, steamId) {
 // Returns the slim CSFloat trades for `steamId`, from cache when fresh.
 // Never throws: a missing key or a CSFloat outage just yields [].
 export async function loadCsfloatTrades(steamId) {
-  const apiKey = process.env.CSFLOAT_API_KEY;
-  if (!apiKey || !steamId) return [];
+  if (!steamId) return [];
 
   const redis = getRedis();
   try {
@@ -98,12 +99,19 @@ export async function loadCsfloatTrades(steamId) {
     // Treat as no recent failure.
   }
 
+  const userKey = (await getCredentials(steamId, 'csfloat'))?.apiKey;
+  const apiKey = userKey || process.env.CSFLOAT_API_KEY;
+  if (!apiKey) return [];
+
   try {
     const trades = await fetchAllTrades(apiKey, steamId);
     await redis.set(CACHE_KEY(steamId), trades, { ex: CACHE_TTL_S });
     return trades;
   } catch (err) {
     console.warn('[csfloat-trades] fetch failed:', err.message || err);
+    if (userKey && (err.status === 401 || err.status === 403)) {
+      await markConnectionError(steamId, 'csfloat', 'CSFloat stopped accepting this key. Connect again with a new one.');
+    }
     try {
       await redis.set(FAIL_KEY(steamId), 1, {
         ex: err.status === 429 ? RATE_LIMITED_TTL_S : FAIL_TTL_S,
