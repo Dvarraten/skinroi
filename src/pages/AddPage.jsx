@@ -2,12 +2,13 @@
 // bought, or a deposit / withdrawal that isn't tied to one skin.
 import React, { useState } from "react";
 import PageHeader, { Page } from "../components/PageHeader";
+import { Segmented } from "../components/ui";
 import AddItemPage from "./AddItemPage";
 import TransactionPage from "./TransactionPage";
 
 const TABS = [
-  { key: "item", label: "Item" },
-  { key: "transaction", label: "Deposit or withdrawal" },
+  { value: "item", label: "Item" },
+  { value: "transaction", label: "Deposit or withdrawal" },
 ];
 
 export default function AddPage({ theme, items, onAddTransaction, ...itemProps }) {
@@ -19,21 +20,7 @@ export default function AddPage({ theme, items, onAddTransaction, ...itemProps }
         title="Add"
         hint="Trades made on Steam show up under Trades by themselves. Use this for everything else."
       >
-        <div className={`flex rounded-lg border p-0.5 ${theme.cardBorder}`} role="tablist">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-3 h-8 rounded-md text-[13px] font-medium transition-colors ${
-                tab === t.key ? theme.navActive : `${theme.subtext} ${theme.textHover}`
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <Segmented theme={theme} value={tab} onChange={setTab} options={TABS} ariaLabel="What to add" />
       </PageHeader>
       {tab === "item"
         ? <AddItemPage theme={theme} items={items} {...itemProps} />

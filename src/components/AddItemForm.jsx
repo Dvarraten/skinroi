@@ -1,18 +1,14 @@
-// Slide-in panel for adding a new tracked item. Manages its own form state
-// (name autocomplete, price, platform, quantity, pending toggle, delivery
-// date) and calls back into useItems on submit.
+// Form for adding an item by hand: name autocomplete, price, quantity,
+// platform, notes and the trade-hold switch. Calls back into useItems on
+// submit. Rendered inside a card on the Add page.
 import React, { useState, useEffect } from "react";
-import { CheckCircle, Clock, PackagePlus } from "lucide-react";
+import { Check, Minus, Plus } from "lucide-react";
 import ItemAutoComplete from "./ItemAutoComplete";
 import PlatformPicker from "./PlatformPicker";
 import PricePair from "./PricePair";
+import { Field, Input, Switch } from "./ui";
 import { useItemImage } from "../utils/itemImages";
-
 import { PLATFORMS } from "../utils/platforms";
-
-const label =
-  "block text-xs text-slate-500 font-medium mb-2";
-const inputH = "h-9";
 
 export default function AddItemForm({
   formData,
@@ -22,7 +18,6 @@ export default function AddItemForm({
   exchangeRate = null,
   currencySymbol = '¥',
   displayCurrency = 'CNY',
-  bare = false,
 }) {
   const [success, setSuccess] = useState(false);
   const [cnyPrice, setCnyPrice] = useState('');
@@ -38,8 +33,13 @@ export default function AddItemForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedIcon, formData.itemName]);
 
-  const onAdd = () => {
-    if (!formData.itemName || !formData.purchasePrice) return;
+  const ready = !!formData.itemName && !!formData.purchasePrice;
+  const quantity = parseInt(formData.quantity) || 1;
+  const setQuantity = (n) => setFormData({ ...formData, quantity: Math.max(1, Math.min(999, n)) });
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    if (!ready) return;
     handleAddItem();
     setCnyPrice('');
     setSuccess(true);
@@ -51,198 +51,135 @@ export default function AddItemForm({
     return d.toISOString().split("T")[0];
   })();
 
-  return (
-    <div
-      className={
-        bare ? "" : `${theme.panel} ${theme.panelBorder} rounded-xl p-5 border`
-      }
-    >
-      {/* Header — hidden in bare/modal mode, modal provides its own */}
-      {!bare && (
-        <div className="flex items-center gap-2 mb-5">
-          <PackagePlus size={16} className="text-slate-400" />
-          <h3 className="text-xs font-medium text-slate-500">
-            Add New Item
-          </h3>
-        </div>
-      )}
+  const stepBtn = `h-full w-8 flex items-center justify-center ${theme.subtext} ${theme.textHover} ${theme.itemHoverBg}`;
 
-      <div className="flex flex-col gap-4">
-        {/* Item Name + Quantity row */}
-        <div className="flex items-end gap-3">
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field theme={theme} label="Item">
+        <div className="flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <label className={label}>Item Name</label>
             <ItemAutoComplete
               value={formData.itemName}
               onChange={(val) => setFormData({ ...formData, itemName: val })}
-              placeholder="Search…"
+              placeholder="Search, e.g. ak redline ft"
               theme={theme}
             />
           </div>
-          <div className="shrink-0 w-[112px]">
-            <label className={label}>
-              Qty
-              {formData.quantity > 1 && formData.purchasePrice && (
-                <span className="ml-1.5 text-profit normal-case font-mono tracking-normal text-[10px]">
-                  ${(parseFloat(formData.purchasePrice) * formData.quantity).toFixed(2)}
-                </span>
-              )}
-            </label>
-            <div className={`flex items-center ${inputH} rounded-lg border ${theme.input} overflow-hidden`}>
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({
-                    ...formData,
-                    quantity: Math.max(1, (parseInt(formData.quantity) || 1) - 1),
-                  })
-                }
-                className={`h-full w-8 flex items-center justify-center text-sm ${theme.subtext} ${theme.textHover} hover:bg-white/5 transition-colors`}
-                aria-label="Decrease quantity"
-              >
-                −
-              </button>
-              <input
-                type="number"
-                min="1"
-                max="999"
-                value={formData.quantity}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    quantity: Math.max(1, parseInt(e.target.value) || 1),
-                  })
-                }
-                className={`flex-1 h-full min-w-0 bg-transparent text-center text-sm font-mono ${theme.text} focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({
-                    ...formData,
-                    quantity: (parseInt(formData.quantity) || 1) + 1,
-                  })
-                }
-                className={`h-full w-8 flex items-center justify-center text-sm ${theme.subtext} ${theme.textHover} hover:bg-white/5 transition-colors`}
-                aria-label="Increase quantity"
-              >
-                +
-              </button>
-            </div>
+          {resolvedIcon && (
+            <img src={resolvedIcon} alt="" className="w-12 h-9 object-contain shrink-0" />
+          )}
+        </div>
+      </Field>
+
+      <Field theme={theme} label="Price each">
+        <PricePair
+          usdValue={formData.purchasePrice}
+          cnyValue={cnyPrice}
+          onChange={({ usd, cny }) => {
+            setFormData({ ...formData, purchasePrice: usd });
+            setCnyPrice(cny);
+          }}
+          onCnyTyped={() => setFormData(prev => ({ ...prev, platform: 'youpin' }))}
+          exchangeRate={exchangeRate}
+          theme={theme}
+          currencySymbol={currencySymbol}
+          displayCurrency={displayCurrency}
+        />
+      </Field>
+
+      <div className="flex items-start gap-3">
+        <Field theme={theme} label="Quantity" className="w-[112px] shrink-0">
+          <div className={`field flex items-center h-9 rounded-lg border overflow-hidden ${theme.input}`}>
+            <button type="button" onClick={() => setQuantity(quantity - 1)} disabled={quantity <= 1} className={`${stepBtn} disabled:opacity-30`} aria-label="Decrease quantity">
+              <Minus size={13} />
+            </button>
+            <input
+              type="number"
+              min="1"
+              max="999"
+              value={formData.quantity}
+              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+              aria-label="Quantity"
+              className={`no-spin flex-1 h-full min-w-0 bg-transparent text-center text-sm font-mono ${theme.text} focus:outline-none`}
+            />
+            <button type="button" onClick={() => setQuantity(quantity + 1)} className={stepBtn} aria-label="Increase quantity">
+              <Plus size={13} />
+            </button>
           </div>
-        </div>
-
-        {/* Purchase Price — USD + CNY linked pair */}
-        <div>
-          <label className={label}>Purchase Price</label>
-          <PricePair
-            usdValue={formData.purchasePrice}
-            cnyValue={cnyPrice}
-            onChange={({ usd, cny }) => {
-              setFormData({ ...formData, purchasePrice: usd });
-              setCnyPrice(cny);
-            }}
-            onCnyTyped={() => setFormData(prev => ({ ...prev, platform: 'youpin' }))}
-            exchangeRate={exchangeRate}
-            theme={theme}
-            currencySymbol={currencySymbol}
-            displayCurrency={displayCurrency}
-          />
-        </div>
-
-        {/* Platform — full width so long names fit */}
-        <div>
-          <label className={label}>Platform</label>
+        </Field>
+        <Field theme={theme} label="Bought on" className="flex-1 min-w-0">
           <PlatformPicker
             value={formData.platform}
             onChange={(val) => setFormData({ ...formData, platform: val, customFee: val === 'other' ? '0' : '' })}
             theme={theme}
             platforms={PLATFORMS}
           />
-          {formData.platform === 'other' && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <input
-                type="number" min="0" max="100" step="0.1"
-                value={formData.customFee || ''}
-                onChange={(e) => setFormData({ ...formData, customFee: e.target.value })}
-                placeholder="Fee %"
-                className={`w-full ${inputH} ${theme.input} rounded-lg px-3 text-sm font-mono ${theme.text} focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-              />
-              <span className={`text-sm ${theme.subtext} shrink-0`}>%</span>
-            </div>
-          )}
-        </div>
-
-        {/* Notes */}
-        <div>
-          <label className={label}>Notes</label>
-          <input
-            type="text"
-            value={formData.notes}
-            onChange={(e) =>
-              setFormData({ ...formData, notes: e.target.value })
-            }
-            className={`w-full ${inputH} ${theme.input} rounded-lg px-3 text-sm ${theme.text} placeholder-slate-600 focus:outline-none transition-colors border`}
-            placeholder="Float, pattern, stickers"
-          />
-        </div>
+        </Field>
       </div>
 
-      {/* Action row */}
-      <div
-        className={`flex flex-wrap gap-3 mt-5 pt-4 border-t ${theme.cardBorder} items-center`}
-      >
-        <button
-          onClick={onAdd}
-          className={`flex items-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition-colors
-            ${success ? `${theme.card} ${theme.cardBorder} text-profit` : `border-transparent ${theme.primary}`}`}
-        >
-          {success ? (
-            <><CheckCircle size={15} /> Added!</>
-          ) : formData.pending ? (
-            <><Clock size={15} />{formData.quantity > 1 ? `Add ${formData.quantity} on hold` : "Add on hold"}</>
-          ) : formData.quantity > 1 ? (
-            `Add ${formData.quantity} items`
-          ) : (
-            "Add item"
-          )}
-        </button>
+      {formData.platform === 'other' && (
+        <Field theme={theme} label="Sell fee on that platform">
+          <Input
+            theme={theme} type="number" min="0" max="100" step="0.1" suffix="%"
+            value={formData.customFee || ''}
+            onChange={(e) => setFormData({ ...formData, customFee: e.target.value })}
+            placeholder="0"
+          />
+        </Field>
+      )}
 
-        <button
-          type="button"
-          onClick={() => {
-            const next = !formData.pending;
-            setFormData({
-              ...formData,
-              pending: next,
-              expectedDelivery: next
-                ? formData.expectedDelivery || defaultDeliveryISO
-                : "",
-            });
-          }}
-          title="Item is Steam trade-protected (not yet received)"
-          aria-pressed={!!formData.pending}
-          className={`flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium border transition-colors
-            ${formData.pending ? "text-warn border-warn/40 bg-warn/5" : `${theme.cardBorder} ${theme.subtext} ${theme.textHover}`}`}
-        >
-          <Clock size={15} />
-          On trade hold
-        </button>
+      <Field theme={theme} label="Notes">
+        <Input
+          theme={theme}
+          value={formData.notes}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          placeholder="Float, pattern, stickers (optional)"
+        />
+      </Field>
 
+      <div className={`border-t pt-3 ${theme.panelBorder}`}>
+        <Switch
+          theme={theme}
+          label="On trade hold"
+          hint="Bought but not in your inventory yet."
+          checked={!!formData.pending}
+          onChange={(next) => setFormData({
+            ...formData,
+            pending: next,
+            expectedDelivery: next ? formData.expectedDelivery || defaultDeliveryISO : "",
+          })}
+        />
         {formData.pending && (
-          <div className="flex items-center gap-2">
-            <span className={`text-xs ${theme.subtext}`}>Delivery:</span>
-            <input
+          <Field theme={theme} label="Arrives on" className="mt-2">
+            <Input
+              theme={theme}
               type="date"
               value={formData.expectedDelivery || defaultDeliveryISO}
-              onChange={(e) =>
-                setFormData({ ...formData, expectedDelivery: e.target.value })
-              }
-              className={`${theme.input} rounded-md px-2 py-1.5 ${theme.text} text-xs focus:outline-none border`}
+              onChange={(e) => setFormData({ ...formData, expectedDelivery: e.target.value })}
             />
-          </div>
+          </Field>
         )}
       </div>
-    </div>
+
+      {quantity > 1 && formData.purchasePrice && (
+        <div className={`flex items-center justify-between text-[13px] ${theme.subtext}`}>
+          <span>Total for {quantity}</span>
+          <span className={`font-mono ${theme.text}`}>${(parseFloat(formData.purchasePrice) * quantity).toFixed(2)}</span>
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={!ready && !success}
+        className={`w-full flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium border disabled:opacity-40 disabled:cursor-not-allowed
+          ${success ? `${theme.cardBorder} text-profit` : `border-transparent ${theme.primary}`}`}
+      >
+        {success ? (
+          <><Check size={15} /> Added</>
+        ) : (
+          `Add ${quantity > 1 ? `${quantity} items` : "item"}${formData.pending ? " on hold" : ""}`
+        )}
+      </button>
+    </form>
   );
 }

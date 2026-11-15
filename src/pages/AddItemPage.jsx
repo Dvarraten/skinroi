@@ -1,44 +1,35 @@
-// Manual item entry: Steam import shortcut, the form and what was added
+// Manual item entry: the form, the Steam import shortcut and what was added
 // lately. Rendered as a tab of the Add page.
 import React, { useMemo, useState } from "react";
-import { Package, CheckCircle2, Clock, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import AddItemForm from "../components/AddItemForm";
 import { PlatformBadge } from "../components/PlatformBadge";
 import { useItemImage } from "../utils/itemImages";
+import { PROFIT_COLOR, WARN_COLOR } from "../themes/themes";
 
 function HistoryThumb({ item }) {
   const url = useItemImage({ directIconUrl: item.iconUrl, name: item.itemName });
   const [failed, setFailed] = useState(false);
-  if (!url || failed) return <div className="w-7 h-7 rounded-md bg-white/5 flex-shrink-0" />;
+  if (!url || failed) return <div className="w-10 h-8 shrink-0" />;
   return (
-    <img src={url} alt="" loading="lazy" onError={() => setFailed(true)} className="w-7 h-7 object-contain flex-shrink-0" />
+    <img src={url} alt="" loading="lazy" onError={() => setFailed(true)} className="w-10 h-8 object-contain shrink-0" />
   );
 }
 
-function StatusPill({ item }) {
-  if (item.sold) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold rounded-md px-1.5 py-0.5 bg-white/5 text-slate-400">
-        <CheckCircle2 size={10} />
-        Sold
-      </span>
-    );
-  }
-  if (item.pending) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold rounded-md px-1.5 py-0.5 bg-warn/10 text-warn">
-        <Clock size={10} />
-        Hold
-      </span>
-    );
-  }
+// Holding, on hold or sold: a dot and a word, colour only on the dot.
+function Status({ item, theme }) {
+  const [text, color] = item.sold
+    ? ["Sold", null]
+    : item.pending ? ["On hold", WARN_COLOR] : ["Holding", PROFIT_COLOR];
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-mono font-semibold rounded-md px-1.5 py-0.5 bg-profit/10 text-profit`}>
-      <Package size={10} />
-      Active
+    <span className={`inline-flex items-center gap-1.5 text-xs ${theme.subtext}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${color ? "" : "bg-zinc-500"}`} style={color ? { backgroundColor: color } : undefined} />
+      {text}
     </span>
   );
 }
+
+const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
 
 export default function AddItemPage({
   formData, setFormData, handleAddItem, theme,
@@ -46,110 +37,79 @@ export default function AddItemPage({
   items,
   canImport = false, onImportSteam, onLogin, demo = false,
 }) {
-  const trackedItems = useMemo(
-    () => items.filter(i => !i.isTransaction),
-    [items]
-  );
-
+  const trackedItems = useMemo(() => items.filter(i => !i.isTransaction), [items]);
   const recent = useMemo(
     () => [...trackedItems].sort((a, b) => (b.id || 0) - (a.id || 0)).slice(0, 30),
     [trackedItems]
   );
 
   return (
-      <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+      <div className="md:col-span-2 space-y-4">
+        <div className={`${theme.panel} border ${theme.panelBorder} rounded-xl p-5`}>
+          <AddItemForm
+            formData={formData} setFormData={setFormData}
+            handleAddItem={handleAddItem} theme={theme}
+            exchangeRate={exchangeRate} currencySymbol={currencySymbol} displayCurrency={displayCurrency}
+          />
+        </div>
 
         {/* Steam inventory import */}
-        <div className={`${theme.panel} border ${theme.panelBorder} rounded-xl px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-3`}>
-          <div className="min-w-0 flex-1">
-            <p className={`text-sm font-semibold ${theme.text}`}>Import your Steam inventory</p>
-            <p className={`text-xs mt-0.5 ${theme.subtext}`}>
-              {canImport
-                ? "Pick items from your CS2 inventory and add them all at once. Your inventory needs to be public on Steam."
-                : demo
-                  ? "Not available in the demo. Sign in with Steam to import your own inventory in one click."
-                  : "Sign in with Steam to import your whole CS2 inventory in one click."}
-            </p>
-          </div>
+        <div className={`border ${theme.panelBorder} rounded-xl p-5`}>
+          <p className={`text-[13px] font-medium ${theme.text}`}>Have many items already?</p>
+          <p className={`text-xs mt-1 ${theme.subtext}`}>
+            {canImport
+              ? "Pick items from your CS2 inventory and add them all at once. Your inventory needs to be public on Steam."
+              : demo
+                ? "Not available in the demo. Sign in with Steam to import your own inventory."
+                : "Sign in with Steam to import your whole CS2 inventory at once."}
+          </p>
           <button
             onClick={canImport ? onImportSteam : onLogin}
-            className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97]`}
+            className={`mt-3 flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-medium border ${theme.cardBorder} ${theme.text} ${theme.itemHoverBg}`}
           >
             <Download size={14} />
             {canImport ? "Import from Steam" : "Sign in with Steam"}
           </button>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
-
-          {/* Form */}
-          <div className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden`}>
-            <div className="p-5">
-              <AddItemForm
-                formData={formData} setFormData={setFormData}
-                handleAddItem={handleAddItem} theme={theme}
-                exchangeRate={exchangeRate} currencySymbol={currencySymbol} displayCurrency={displayCurrency} bare
-              />
-            </div>
-          </div>
-
-          {/* History */}
-          <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden flex flex-col`}>
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${theme.panelBorder}`}>
-              <h2 className={`text-sm font-semibold ${theme.text}`}>Recently added</h2>
-              <span className={`text-xs ${theme.subtext}`}>last {recent.length} of {trackedItems.length}</span>
-            </div>
-
-            {recent.length === 0 ? (
-              <div className={`flex-1 flex items-center justify-center py-10 text-sm ${theme.subtext}`}>
-                Nothing tracked yet — add your first item on the left.
-              </div>
-            ) : (
-              <div className="overflow-y-auto max-h-[520px]">
-                <table className="w-full">
-                  <thead className={`text-xs font-medium ${theme.subtext}`}>
-                    <tr className={`border-b ${theme.cardBorder}`}>
-                      <th className="text-left px-4 py-2">Item</th>
-                      <th className="text-right px-3 py-2">Cost</th>
-                      <th className="text-left px-3 py-2">Platform</th>
-                      <th className="text-left px-3 py-2">Status</th>
-                      <th className="text-right px-4 py-2">Added</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recent.map(item => (
-                      <tr key={item.id} className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <HistoryThumb item={item} />
-                            <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>
-                              {item.itemName}
-                            </p>
-                          </div>
-                        </td>
-                        <td className={`px-3 py-2 text-right font-mono text-xs ${theme.text} whitespace-nowrap`}>
-                          ${item.purchasePrice?.toFixed(2)}
-                        </td>
-                        <td className="px-3 py-2">
-                          {item.platform && <PlatformBadge platform={item.platform} size="xs" />}
-                        </td>
-                        <td className="px-3 py-2">
-                          <StatusPill item={item} />
-                        </td>
-                        <td className={`px-4 py-2 text-right text-xs font-mono ${theme.subtext} whitespace-nowrap`}>
-                          {item.datePurchased
-                            ? new Date(item.datePurchased).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                            : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+      {/* Recently added */}
+      <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden`}>
+        <div className={`flex items-baseline justify-between px-5 py-4 border-b ${theme.panelBorder}`}>
+          <h2 className={`text-sm font-semibold ${theme.text}`}>Recently added</h2>
+          {trackedItems.length > 0 && (
+            <span className={`text-xs ${theme.subtext}`}>{recent.length} of {trackedItems.length}</span>
+          )}
         </div>
 
+        {recent.length === 0 ? (
+          <p className={`px-5 py-10 text-center text-[13px] ${theme.subtext}`}>
+            Nothing here yet. Items you add show up in this list.
+          </p>
+        ) : (
+          <ul className="overflow-y-auto max-h-[560px]">
+            {recent.map(item => (
+              <li key={item.id} className={`flex items-center gap-3 px-5 py-2.5 border-b last:border-b-0 ${theme.panelBorder}`}>
+                <HistoryThumb item={item} />
+                <div className="min-w-0 flex-1">
+                  <p className={`text-[13px] font-medium truncate ${theme.text}`} title={item.itemName}>{item.itemName}</p>
+                  <div className={`flex items-center gap-2 text-xs ${theme.subtext}`}>
+                    <Status item={item} theme={theme} />
+                    {item.datePurchased && <span>{shortDate(item.datePurchased)}</span>}
+                  </div>
+                </div>
+                {item.platform && (
+                  <span className={`hidden sm:block ${theme.textSecondary}`}><PlatformBadge platform={item.platform} size="xs" /></span>
+                )}
+                <span className={`w-20 text-right font-mono text-[13px] ${theme.text}`}>
+                  ${item.purchasePrice?.toFixed(2)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
+    </div>
   );
 }

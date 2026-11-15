@@ -341,7 +341,7 @@ export default function ItemAutoComplete({ value, onChange, placeholder, theme }
   // ─ Render ─
   // Derive focus-within border from the theme's focus:border-* class so it
   // matches the theme accent instead of being hardcoded indigo.
-  const focusWithin = '';
+  const focusWithin = 'field';
   const wrapperClasses = `flex flex-wrap items-center gap-1.5 w-full ${
     theme?.input ?? "bg-slate-800/60 border-slate-600/50"
   } rounded-lg pl-2 pr-9 py-1.5 min-h-[36px] border ${focusWithin} transition-colors cursor-text`;
@@ -411,8 +411,8 @@ export default function ItemAutoComplete({ value, onChange, placeholder, theme }
               onMouseEnter={() => setSelectedIndex(i)}
               className={`flex items-center justify-between gap-3 px-3 py-2 cursor-pointer transition-colors ${
                 i === selectedIndex
-                  ? `bg-white/10 ${theme?.text || 'text-white'}`
-                  : `${theme?.textSecondary || 'text-slate-200'} hover:bg-white/5`
+                  ? `${theme?.navActive || 'bg-white/10 text-white'}`
+                  : `${theme?.textSecondary || 'text-slate-200'}`
               }`}
             >
               <div className="text-sm font-medium truncate">{s.name}</div>
