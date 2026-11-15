@@ -31,14 +31,12 @@ export function TabButton({ label, count, isActive, onClick, theme, accentColor,
     <button
       onClick={onClick}
       aria-pressed={isActive}
-      className={`relative py-2 text-[13px] font-medium transition-colors flex items-center gap-2 group ${
+      className={`relative py-2.5 text-[13px] font-medium transition-colors flex items-center gap-1.5 group ${
         isActive ? theme.text : `${theme.subtext} ${theme.textHover}`
       }`}
     >
       <span>{label}</span>
-      <span className={`text-[10px] font-semibold font-mono rounded-full px-1.5 py-0.5 ${badgeClass}`}>
-        {count}
-      </span>
+      <span className={`text-[11px] font-mono ${badgeClass}`}>{count}</span>
       <span
         className={`absolute -bottom-px left-0 h-[2px] w-full rounded-full origin-left transition-transform duration-200 ${isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`}
         style={{ backgroundColor: accentColor }}
@@ -165,7 +163,7 @@ export default function TabsAndSearchbar({
         )}
 
         {/* Divider + Select — pushed to far right */}
-        <div className="hidden sm:block h-5 w-px bg-slate-600/40 ml-auto" />
+        {(allowSelect || actions) && <div className="hidden sm:block h-5 w-px bg-slate-600/40 ml-auto" />}
         {!allowSelect ? actions : !selectMode ? (
           <button
             onClick={onEnterSelectMode}

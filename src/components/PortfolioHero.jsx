@@ -1,9 +1,26 @@
-// Full-width portfolio hero band: lead value + P&L area chart + secondary metrics.
+// Top of the Portfolio page: the holding value as the one big number, the
+// all-time profit curve beside it, and a ruled row of secondary figures.
 import React, { useMemo } from "react";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { TrendingUp, TrendingDown } from "lucide-react";
 import { PROFIT_COLOR, LOSS_COLOR } from "../themes/themes";
 import { Bone } from "./Skeleton";
+
+const money = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = (n) => `${n >= 0 ? "+" : "−"}$${money(Math.abs(n))}`;
+
+function Stat({ theme, label, value, sub, tone = "", loading }) {
+  return (
+    <div className={`py-3 pr-4 sm:pl-5 sm:first:pl-0 sm:border-l sm:first:border-l-0 ${theme.cardBorder}`}>
+      <p className={`text-xs ${theme.subtext}`}>{label}</p>
+      {loading ? (
+        <span className="motion-safe:animate-pulse block mt-1.5 mb-0.5"><Bone theme={theme} className="h-5 w-20" /></span>
+      ) : (
+        <p className={`mt-1 text-lg font-mono font-medium leading-tight ${tone || theme.text}`}>{value}</p>
+      )}
+      <p className={`mt-0.5 text-[11px] ${theme.subtext}`}>{sub}</p>
+    </div>
+  );
+}
 
 export default function PortfolioHero({ stats, profitChartData, theme, loading = false }) {
   const profit = stats.totalProfit;
@@ -16,108 +33,78 @@ export default function PortfolioHero({ stats, profitChartData, theme, loading =
     }, []),
   [profitChartData]);
 
-  // Derive color from the chart's actual end value so the gradient matches
-  // what the line shows, not the overall portfolio total.
+  // Colour follows the curve's end value, so line and fill agree with it.
   const lastCumulative = cumulativeData.length > 0
     ? cumulativeData[cumulativeData.length - 1].cumulative
     : profit;
-  const isGain = lastCumulative >= 0;
-  const chartColor = isGain ? PROFIT_COLOR : LOSS_COLOR;
+  const chartColor = lastCumulative >= 0 ? PROFIT_COLOR : LOSS_COLOR;
+  const [whole, cents] = money(stats.totalActive).split(".");
 
   return (
-    <section className={`max-w-4xl mx-auto w-full rounded-xl border ${theme.cardBorder} ${theme.card} flex items-stretch overflow-hidden`}>
-
-      {/* Lead — headline value + delta chip */}
-      <div className="px-4 py-3 flex flex-col justify-center gap-1.5 shrink-0 min-w-[170px]">
-        <p className={`text-xs font-medium ${theme.subtext}`}>
-          Holding value
-        </p>
-        {loading ? (
-          <div className="motion-safe:animate-pulse space-y-2 py-0.5">
-            <Bone theme={theme} className="h-6 w-28" />
-            <Bone theme={theme} className="h-4 w-20 rounded-full" />
-          </div>
-        ) : (<>
-        <p className={`text-2xl font-semibold font-mono tracking-tight ${theme.text} tabular-nums leading-none`}>
-          ${stats.totalActive.toFixed(2)}
-        </p>
-        <div className={`inline-flex items-center gap-1 text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded-full w-fit ${
-          isGain ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'
-        }`}>
-          {isGain ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-          {isGain ? '+' : ''}{roi.toFixed(1)}%
-          <span className="opacity-40 mx-0.5">·</span>
-          {isGain ? '+' : ''}${Math.abs(profit).toFixed(2)}
+    <section aria-label="Portfolio summary">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-x-10 gap-y-4">
+        <div className="shrink-0">
+          <p className={`text-[13px] ${theme.subtext}`}>Holding value</p>
+          {loading ? (
+            <div className="motion-safe:animate-pulse mt-3 space-y-3">
+              <Bone theme={theme} className="h-11 w-56" />
+              <Bone theme={theme} className="h-4 w-40" />
+            </div>
+          ) : (<>
+            <p className={`mt-2 font-mono font-medium tracking-tight leading-none text-[44px] md:text-[56px] ${theme.text}`}>
+              ${whole}<span className={`text-[0.5em] ${theme.subtext}`}>.{cents}</span>
+            </p>
+            <p className={`mt-3 text-[13px] ${theme.subtext}`}>
+              <span className={`font-mono font-medium ${profit >= 0 ? "text-profit" : "text-loss"}`}>
+                {signed(profit)}
+              </span>{" "}
+              realised
+              <span className="mx-2 opacity-40">·</span>
+              <span className={`font-mono font-medium ${roi >= 0 ? "text-profit" : "text-loss"}`}>
+                {roi >= 0 ? "+" : "−"}{Math.abs(roi).toFixed(1)}%
+              </span>{" "}
+              return
+            </p>
+          </>)}
         </div>
-        </>)}
+
+        <div className="w-full lg:w-auto lg:flex-1 min-w-0 shrink-0 h-[96px] md:h-[116px]">
+          {loading ? null : cumulativeData.length > 1 ? (
+            <ResponsiveContainer width="100%" height="100%" style={{ pointerEvents: "none" }}>
+              <AreaChart data={cumulativeData} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chartColor} stopOpacity={0.22} />
+                    <stop offset="100%" stopColor={chartColor} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone"
+                  dataKey="cumulative"
+                  stroke={chartColor}
+                  strokeWidth={1.75}
+                  fill="url(#heroGrad)"
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className={`h-full flex items-center lg:justify-end text-xs ${theme.subtext}`}>
+              Your profit curve appears here after the first sale.
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Chart — compact sparkline, fixed width */}
-      <div className="w-[280px] shrink-0 flex items-center">
-        {loading ? (
-          <div className="w-full h-[80px]" />
-        ) : cumulativeData.length > 1 ? (
-          <ResponsiveContainer width="100%" height={80} style={{ pointerEvents: 'none' }}>
-            <AreaChart data={cumulativeData} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
-              <defs>
-                <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={chartColor} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area
-                type="monotone"
-                dataKey="cumulative"
-                stroke={chartColor}
-                strokeWidth={1.5}
-                fill="url(#heroGrad)"
-                dot={false}
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="w-full h-[80px] flex items-center justify-center">
-            <p className={`text-xs ${theme.subtext}`}>Sell items to see P&L history</p>
-          </div>
-        )}
-      </div>
-
-      {/* Secondary metrics — pushed to the right */}
-      <div className="flex items-stretch shrink-0 ml-auto">
-        <div className={`border-l ${theme.cardBorder} px-4 py-3 flex flex-col justify-center gap-0.5 min-w-[100px]`}>
-          <p className={`text-xs font-medium ${theme.subtext}`}>Realised</p>
-          {loading ? (
-            <span className="motion-safe:animate-pulse block py-px"><Bone theme={theme} className="h-3.5 w-12" /></span>
-          ) : (
-            <p className={`text-base font-mono font-semibold ${theme.text} tabular-nums leading-none`}>
-              ${stats.totalSold.toFixed(2)}
-            </p>
-          )}
-          <p className={`text-[11px] ${theme.subtext}`}>{loading ? "sold" : `${stats.totalSoldCount} sold`}</p>
-        </div>
-        <div className={`border-l ${theme.cardBorder} px-4 py-3 flex flex-col justify-center gap-0.5 min-w-[80px]`}>
-          <p className={`text-xs font-medium ${theme.subtext}`}>Pending</p>
-          {loading ? (
-            <span className="motion-safe:animate-pulse block py-px"><Bone theme={theme} className="h-3.5 w-12" /></span>
-          ) : (
-            <p className="text-base font-mono font-semibold text-warn tabular-nums leading-none">
-              {stats.totalPending}
-            </p>
-          )}
-          <p className={`text-[11px] ${theme.subtext}`}>incoming</p>
-        </div>
-        <div className={`border-l ${theme.cardBorder} px-4 py-3 flex flex-col justify-center gap-0.5 min-w-[80px]`}>
-          <p className={`text-xs font-medium ${theme.subtext}`}>Active</p>
-          {loading ? (
-            <span className="motion-safe:animate-pulse block py-px"><Bone theme={theme} className="h-3.5 w-12" /></span>
-          ) : (
-            <p className={`text-base font-mono font-semibold ${theme.text} tabular-nums leading-none`}>
-              {stats.totalActiveCount}
-            </p>
-          )}
-          <p className={`text-[11px] ${theme.subtext}`}>items held</p>
-        </div>
+      <div className={`mt-6 grid grid-cols-2 sm:grid-cols-4 border-y ${theme.cardBorder}`}>
+        <Stat theme={theme} loading={loading} label="Invested" value={`$${money(stats.totalInvested)}`} sub="all time" />
+        <Stat theme={theme} loading={loading} label="Sold for" value={`$${money(stats.totalSold)}`} sub={loading ? "sales" : `${stats.totalSoldCount} sales`} />
+        <Stat theme={theme} loading={loading} label="Holding" value={stats.totalActiveCount} sub="items" />
+        <Stat
+          theme={theme} loading={loading} label="On trade hold" value={stats.totalPending}
+          tone={stats.totalPending > 0 ? "text-warn" : ""} sub="incoming"
+        />
       </div>
     </section>
   );

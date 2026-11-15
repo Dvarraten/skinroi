@@ -48,8 +48,12 @@ skinroi/
 │           └── steam.js   Session token + GetTradeOffers + normalizer
 ├── src/                  React CRA frontend
 │   ├── App.js            Root component
-│   ├── pages/            Pages: AddItem, HandleItems, Analytics, Snipes,
-│   │                     Transactions, About
+│   ├── pages/            Pages: Add (AddItemPage + TransactionPage as tabs),
+│   │                     HandleItems ("Trades" in the UI), Analytics, Snipes,
+│   │                     About, Landing. Portfolio (start page) lives in App.js
+│   ├── components/Sidebar.jsx  Navigation: left sidebar on desktop, top bar +
+│   │                     bottom tab bar (MobileTabBar) on phones; account menu
+│   │                     with pairing, currency converter, Dark/Light toggle
 │   ├── components/       UI components
 │   │   └── ExtensionPairPanel.jsx  Pairing / connection status UI
 │   ├── hooks/            Custom React hooks
@@ -59,10 +63,24 @@ skinroi/
 │   │   ├── useChartData.js    Derives chart series from sold items
 │   │   └── useSteamSync.js    Reads pending list + extension status (read-only)
 │   ├── utils/            Helpers (itemImages, fees, CSV import/export, etc.)
-│   └── themes/themes.js  All visual theme definitions
+│   └── themes/themes.js  Theme tokens (Dark, Light) and semantic colours
 └── scripts/
     └── fetch-items.js    Pulls latest CS2 skin list → public/items.json
 ```
+
+## UI structure
+
+Four pages in the navigation plus Add: **Portfolio** (start page: holding
+value, profit curve, Holding / Sold tabs), **Trades** (`HandleItemsPage`,
+called "Handle Items" in the data-flow notes below), **Snipes**, **Analytics**
+(profit curve, figures, heatmap, activity, latest sales) and **Add** (item or
+deposit / withdrawal). About opens from the ⓘ button. Pages use `Page` and
+`PageHeader` from `components/PageHeader.jsx` for the same gutters and title row.
+
+The look is monochrome: neutral greys, white (Dark) or near-black (Light) for
+selection and the one primary button (`theme.primary`), and colour only for
+data (profit, loss, warnings) and the skins. `tailwind.config.js` maps every
+`slate-*` class to zinc so older components stay neutral.
 
 ## Key Data Flows
 
@@ -70,7 +88,8 @@ skinroi/
 → sets `cs2-session` HMAC cookie containing steamId.
 
 **Extension pairing**:
-1. Logged-in user hits Handle Items → clicks "Generate pairing code"
+1. Logged-in user opens the account menu (avatar, bottom of the sidebar) →
+   clicks "Generate pairing code"
 2. Frontend `POST /api/extension/pair` → returns 8-char code (10 min TTL)
 3. User pastes code into the extension popup
 4. Extension `POST /api/extension/claim` → returns long-lived Bearer secret
@@ -160,7 +179,7 @@ inspect (`api.csfloat.com`, `lib/inspect.js`) only looks at items from trades
 since pairing, at most 5 per poll, and caches failures for 24 h. Never add a
 CSFloat call that bypasses `csfloatFetch`.
 
-**Sell prices on Home**: each unsold item shows the lowest YouPin and
+**Sell prices on Portfolio**: each unsold item shows the lowest YouPin and
 CSFloat listing (YouPin at most 1 hour old, CSFloat at most 50 h), with a dot on the one that pays more after
 fees. YouPin comes from SteamDT on the server (`loadSteamDtRows` in
 `snipes/reference.js`, same 30 min cache and 1-call-a-minute gate as Snipes),
@@ -190,10 +209,10 @@ min ago, without buy links, CDN-cached 60 s, never rescans
 (`api/_lib/snipes/demo.js`). "Continue without an account" is guest mode
 (`localStorage['cs2-auth-dismissed']`).
 
-**Onboarding + Steam import**: `OnboardingChecklist` on Home (install, pair,
+**Onboarding + Steam import**: `OnboardingChecklist` on Portfolio (install, pair,
 first item) for signed-in users until done or closed
 (`skinroi-onboarding-done-{steamId}`). Set `REACT_APP_EXTENSION_URL` to the
-Chrome Web Store link once published. "Import from Steam" (Add item page and
+Chrome Web Store link once published. "Import from Steam" (Add page and
 checklist) reads `GET /api/inventory/state?steamInventory=1`: Steam's public
 inventory endpoint (inventory must be public), marketable items only, cached
 10 min per user (`api/_lib/steam-inventory.js`).
@@ -226,7 +245,7 @@ development.
 **Pair the extension with your account:**
 
 1. Sign in on the site via Steam
-2. Go to Handle Items → **Generate pairing code**
+2. Open the account menu (your avatar) → **Generate pairing code**
 3. Click the extension icon → paste the code → **Pair**
 
 **Reset the pending list** (wipes tombstones + processed-trade dedup):
@@ -288,7 +307,8 @@ from `src/themes/themes.js` instead:
 - `PROFIT_COLOR` — green (`#22c55e`), matches Tailwind `text-profit`
 - `LOSS_COLOR`   — red (`#ef4444`), matches Tailwind `text-loss`
 - `WARN_COLOR`   — amber (`#f59e0b`), matches Tailwind `text-warn`
-- `theme.dotColor` — the active theme's accent hex (use for inline `style={{ backgroundColor }}`)
+- `theme.accentColor` — the active theme's selection colour as hex (use for inline `style={{ backgroundColor }}`)
+- `theme.primary` — classes for the filled primary button; `theme.navActive` for a selected nav / segment
 - `SAP_CHART_COLORS` — named chart palette (use for chart series, not UI chrome)
 
 ## Known Caveats & Gotchas

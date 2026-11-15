@@ -11,22 +11,21 @@ const STEPS = [
   {
     icon: Puzzle,
     title: 'Pair the extension',
-    desc: 'Generate a code under Handle Items and paste it into the SkinROI Chrome extension. Pairing takes a few seconds.',
+    desc: 'Open your account menu, generate a code and paste it into the SkinROI Chrome extension. Pairing takes a few seconds.',
   },
   {
     icon: Inbox,
     title: 'Confirm your trades',
-    desc: 'Accepted trades show up in Handle Items with float, paint seed and stickers. Confirm a buy or a sale and the numbers update.',
+    desc: 'Accepted trades show up under Trades with float, paint seed and stickers. Confirm a buy or a sale and the numbers update.',
   },
 ];
 
 const PAGES = [
-  { title: 'Home',         desc: 'Portfolio value, profit, your items, recent sales, and the current lowest Buff163 and CSFloat price for every unsold item.' },
-  { title: 'Add item',     desc: 'Log a purchase by hand with skin search, price, date and market.' },
-  { title: 'Handle items', desc: 'Trades detected by the extension. CSFloat trades are prefilled with the price you paid or received.' },
-  { title: 'Transactions', desc: 'Deposits and withdrawals that are not tied to a single skin, so your cash flow adds up.' },
-  { title: 'Snipes',       desc: 'Live CSFloat and DMarket listings priced below Buff163, filtered by fees, return and liquidity.' },
-  { title: 'Analytics',    desc: 'Profit over time, win rate, weekly and monthly results and a 90-day sales heatmap.' },
+  { title: 'Portfolio', desc: 'What you hold and what it cost, your profit curve, and the current lowest YouPin and CSFloat price for every unsold item. The Sold tab keeps every sale.' },
+  { title: 'Trades',    desc: 'Steam trades detected by the extension. CSFloat trades are prefilled with the price you paid or received.' },
+  { title: 'Snipes',    desc: 'Live CSFloat and DMarket listings priced below YouPin, Buff163 and CSFloat, filtered by fees, return and liquidity.' },
+  { title: 'Analytics', desc: 'Profit over time, return, share of profitable sales, a 30-day daily heatmap and your latest sales.' },
+  { title: 'Add',       desc: 'Log a purchase by hand or import your Steam inventory, and record deposits and withdrawals so your cash flow adds up.' },
 ];
 
 const TRUST = [
@@ -70,8 +69,8 @@ export default function AboutPage({ theme }) {
   const rule = `border-t ${theme?.panelBorder}`;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-6 sm:py-10">
-      <div className="max-w-3xl mx-auto">
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 pt-6 md:pt-8 pb-10">
+      <div className="max-w-3xl">
         {/* ── Intro ─────────────────────────────────────────────────── */}
         <header className="pb-10">
           <p className={`text-sm ${theme?.subtext}`}>About SkinROI</p>
@@ -104,7 +103,7 @@ export default function AboutPage({ theme }) {
           </SectionTitle>
           <ol className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {STEPS.map(({ icon: Icon, title, desc }, i) => (
-              <li key={title} className={`${theme?.card} border ${theme?.cardBorder} rounded-xl p-4`}>
+              <li key={title} className={`border ${theme?.cardBorder} rounded-xl p-4`}>
                 <div className="flex items-center justify-between">
                   <Icon size={16} className={theme?.subtext} />
                   <span className={`text-xs tabular-nums ${theme?.subtext}`}>{String(i + 1).padStart(2, '0')}</span>

@@ -1,16 +1,47 @@
-// Analytics page — cumulative P&L line chart (7d / 30d / all-time),
-// weekly and monthly profit summaries, and a 30-day sale heatmap.
+// Analytics page: headline figures, the cumulative profit curve (7d / 30d /
+// all time), a 30-day daily heatmap, six months of buy/sell activity and the
+// latest sales.
 import React, { useMemo } from "react";
 import { PROFIT_COLOR, LOSS_COLOR } from "../themes/themes";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import PageHeader, { Page } from "../components/PageHeader";
+import RecentSales from "../components/RecentSales";
+
+const PERIODS = [
+  { key: "7d", label: "7 days" },
+  { key: "30d", label: "30 days" },
+  { key: "all", label: "All time" },
+];
+
+const money = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = (n) => `${n >= 0 ? "+" : "−"}$${money(Math.abs(n))}`;
+const toRgba = (hex, a) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return `rgba(${r},${g},${b},${a})`;
+};
+
+function Figure({ theme, label, value, tone = "" }) {
+  return (
+    <div className={`py-3 pr-4 sm:pl-5 sm:first:pl-0 sm:border-l sm:first:border-l-0 ${theme.cardBorder}`}>
+      <p className={`text-xs ${theme.subtext}`}>{label}</p>
+      <p className={`mt-1 text-lg font-mono font-medium leading-tight ${tone || theme.text}`}>{value}</p>
+    </div>
+  );
+}
+
+function Section({ theme, title, aside, children, className = "" }) {
+  return (
+    <section className={className}>
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <h2 className={`text-sm font-semibold ${theme.text}`}>{title}</h2>
+        {aside}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function AnalyticsPage({
   profitChartData,
@@ -22,29 +53,28 @@ export default function AnalyticsPage({
 }) {
   const totalInvested = stats?.totalInvested ?? 0;
   const totalProfit = stats?.totalProfit ?? 0;
-  // Cumulative profit over the filtered period
+  const roi = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+
   const cumulativeData = useMemo(
     () =>
       profitChartData.reduce((acc, d) => {
         const prev = acc[acc.length - 1]?.cumulative ?? 0;
-        return [
-          ...acc,
-          { ...d, cumulative: Math.round((prev + d.profit) * 100) / 100 },
-        ];
+        return [...acc, { ...d, cumulative: Math.round((prev + d.profit) * 100) / 100 }];
       }, []),
     [profitChartData],
   );
-
   const totalInPeriod = profitChartData.reduce((s, d) => s + d.profit, 0);
+  const lineColor = totalInPeriod >= 0 ? PROFIT_COLOR : LOSS_COLOR;
 
-  // Win rate
-  const soldItems = items.filter((i) => i.sold);
-  const winRate =
-    soldItems.length > 0
-      ? `${Math.round((soldItems.filter((i) => i.profit > 0).length / soldItems.length) * 100)}%`
-      : "—";
+  const sales = useMemo(() => items.filter((i) => i.sold && !i.isTransaction), [items]);
+  const winRate = sales.length > 0
+    ? `${Math.round((sales.filter((i) => i.profit > 0).length / sales.length) * 100)}%`
+    : "—";
+  const avgProfit = sales.length > 0
+    ? signed(sales.reduce((s, i) => s + (i.profit ?? 0), 0) / sales.length)
+    : "—";
 
-  // Heatmap — last 90 days from items directly
+  // Profit per day for the last 30 days.
   const heatmapDays = useMemo(() => {
     const map = new Map();
     for (const it of items) {
@@ -59,180 +89,183 @@ export default function AnalyticsPage({
       return { date: key, profit: map.get(key) ?? 0 };
     });
   }, [items]);
-
   const maxAbs = Math.max(...heatmapDays.map((d) => Math.abs(d.profit)), 0.01);
 
-  const summaryCards = [
-    {
-      label: "Invested",
-      value: `$${totalInvested.toFixed(2)}`,
-      colored: false,
-    },
-    {
-      label: "Total profit",
-      value: `${totalProfit >= 0 ? "+" : ""}$${totalProfit.toFixed(2)}`,
-      colored: true,
-      val: totalProfit,
-    },
-    {
-      label: "Profit rate",
-      value: winRate,
-      colored: false,
-    },
-  ];
+  // Items bought and sold per month, last six months.
+  const activity = useMemo(() => {
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        label: d.toLocaleDateString("en-US", { month: "short" }),
+        bought: 0,
+        sold: 0,
+      });
+    }
+    for (const it of items) {
+      if (it.isTransaction) continue;
+      const bought = months.find((m) => m.key === `${it.datePurchased || ""}`.slice(0, 7));
+      if (bought) bought.bought += 1;
+      const sold = it.sold && months.find((m) => m.key === `${it.dateSold || ""}`.slice(0, 7));
+      if (sold) sold.sold += 1;
+    }
+    return months;
+  }, [items]);
 
-  const PERIODS = [
-    { key: "7d", label: "7d" },
-    { key: "30d", label: "30d" },
-    { key: "all", label: "All time" },
-  ];
+  const tooltipStyle = {
+    background: theme.chartTooltipBg,
+    border: `1px solid ${theme.chartTooltipBorder}`,
+    borderRadius: 8,
+    fontSize: 12,
+  };
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-4">
-      <div className={`max-w-4xl mx-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl overflow-hidden`}>
-        <div className={`flex items-center px-6 py-4 border-b ${theme.panelBorder}`}>
-          <h2 className={`font-semibold ${theme.text}`}>Profit analytics</h2>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Period selector + total in period */}
-          <div className="flex items-center gap-5">
-            {PERIODS.map((p) => {
-              const active = chartPeriod === p.key;
-              return (
-                <button
-                  key={p.key}
-                  onClick={() => setChartPeriod(p.key)}
-                  aria-pressed={active}
-                  className={`relative py-1 text-sm font-medium transition-colors ${
-                    active ? theme.text : `${theme.subtext} ${theme.textHover}`
-                  }`}
-                >
-                  {p.label}
-                  <span
-                    className={`absolute -bottom-0.5 left-0 h-[2px] w-full rounded-full origin-left transition-transform duration-200 ${active ? 'scale-x-100' : 'scale-x-0'}`}
-                    style={{ backgroundColor: theme.accentColor }}
-                  />
-                </button>
-              );
-            })}
-            <span
-              className={`ml-auto text-sm font-mono font-semibold ${totalInPeriod >= 0 ? "text-profit" : "text-loss"}`}
+    <Page>
+      <PageHeader theme={theme} title="Analytics" hint="What your trading has returned, after fees.">
+        <div className={`flex rounded-lg border p-0.5 ${theme.cardBorder}`}>
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setChartPeriod(p.key)}
+              aria-pressed={chartPeriod === p.key}
+              className={`px-3 h-8 rounded-md text-[13px] font-medium transition-colors ${
+                chartPeriod === p.key ? theme.navActive : `${theme.subtext} ${theme.textHover}`
+              }`}
             >
-              {totalInPeriod >= 0 ? "+" : ""}${totalInPeriod.toFixed(2)}
-            </span>
-          </div>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </PageHeader>
 
-          {/* Cumulative line chart */}
-          <div className="h-52">
-            {cumulativeData.length === 0 ? (
-              <div className={`h-full flex items-center justify-center text-sm ${theme.subtext}`}>
-                No sales in this period yet
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={cumulativeData}>
-                  <CartesianGrid stroke={theme.chartGrid} vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: theme.chartAxis, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    interval="preserveStartEnd"
-                  />
-                  <YAxis
-                    tick={{ fill: theme.chartAxis, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `$${v}`}
-                    width={52}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: theme.chartTooltipBg,
-                      border: `1px solid ${theme.chartTooltipBorder}`,
-                      borderRadius: 8,
-                    }}
-                    labelStyle={{ color: theme.chartAxis, fontSize: 12 }}
-                    formatter={(v) => [
-                      `$${parseFloat(v).toFixed(2)}`,
-                      "Cumulative",
-                    ]}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="cumulative"
-                    stroke={theme.chartLine}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 4, fill: theme.chartLine }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+      {/* Profit in the chosen period */}
+      <div>
+        <p className={`text-[13px] ${theme.subtext}`}>
+          Profit, {PERIODS.find((p) => p.key === chartPeriod)?.label.toLowerCase()}
+        </p>
+        <p className={`mt-2 font-mono font-medium tracking-tight leading-none text-[40px] ${totalInPeriod >= 0 ? "text-profit" : "text-loss"}`}>
+          {signed(totalInPeriod)}
+        </p>
+      </div>
 
-          {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3">
-            {summaryCards.map((card) => (
-              <div
-                key={card.label}
-                className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}
-              >
-                <p className={`text-xs ${theme.subtext} mb-1`}>{card.label}</p>
-                <p
-                  className={`text-lg font-mono font-semibold tabular-nums ${
-                    card.colored
-                      ? (card.val ?? 0) >= 0
-                        ? "text-profit"
-                        : "text-loss"
-                      : theme.text
-                  }`}
-                >
-                  {card.value}
-                </p>
-              </div>
-            ))}
+      <div className="h-64 mt-6">
+        {cumulativeData.length === 0 ? (
+          <div className={`h-full flex items-center justify-center text-sm rounded-xl border border-dashed ${theme.cardBorder} ${theme.subtext}`}>
+            No sales in this period yet
           </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={cumulativeData} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="analyticsGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={lineColor} stopOpacity={0.18} />
+                  <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={theme.chartGrid} vertical={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: theme.chartAxis, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+                minTickGap={40}
+              />
+              <YAxis
+                tick={{ fill: theme.chartAxis, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v}`}
+                width={52}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                labelStyle={{ color: theme.chartAxis, fontSize: 12 }}
+                itemStyle={{ color: lineColor }}
+                formatter={(v) => [`$${parseFloat(v).toFixed(2)}`, "Cumulative"]}
+              />
+              <Area
+                type="monotone"
+                dataKey="cumulative"
+                stroke={lineColor}
+                strokeWidth={1.75}
+                fill="url(#analyticsGrad)"
+                dot={false}
+                activeDot={{ r: 4, fill: lineColor }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
 
-          {/* Daily P&L heatmap */}
-          <div>
-            <p className={`text-xs ${theme.subtext} mb-3`}>
-              Daily P&L, last 30 days
-            </p>
-            <div className="flex flex-wrap gap-1">
+      {/* All-time figures */}
+      <div className={`mt-6 grid grid-cols-2 sm:grid-cols-5 border-y ${theme.cardBorder}`}>
+        <Figure theme={theme} label="Invested" value={`$${money(totalInvested)}`} />
+        <Figure theme={theme} label="Total profit" value={signed(totalProfit)} tone={totalProfit >= 0 ? "text-profit" : "text-loss"} />
+        <Figure theme={theme} label="Return" value={`${roi >= 0 ? "+" : "−"}${Math.abs(roi).toFixed(1)}%`} tone={roi >= 0 ? "text-profit" : "text-loss"} />
+        <Figure theme={theme} label="Profitable sales" value={winRate} />
+        <Figure theme={theme} label="Average per sale" value={avgProfit} />
+      </div>
+
+      <div className="mt-10 grid lg:grid-cols-[1fr_340px] gap-x-12 gap-y-10">
+        <div className="space-y-10 min-w-0">
+          <Section theme={theme} title="Daily profit" aside={<span className={`text-xs ${theme.subtext}`}>last 30 days</span>}>
+            <div className="flex flex-wrap gap-1.5">
               {heatmapDays.map((d) => {
-                const intensity =
-                  d.profit === 0 ? 0 : Math.min(Math.abs(d.profit) / maxAbs, 1);
-                const toRgba = (hex, a) => {
-                  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-                  return `rgba(${r},${g},${b},${a})`;
-                };
-                const bg =
-                  d.profit === 0
-                    ? theme.chartGrid
-                    : d.profit > 0
-                      ? toRgba(PROFIT_COLOR, 0.15 + intensity * 0.85)
-                      : toRgba(LOSS_COLOR,   0.15 + intensity * 0.85);
+                const intensity = d.profit === 0 ? 0 : Math.min(Math.abs(d.profit) / maxAbs, 1);
+                const bg = d.profit === 0
+                  ? theme.chartGrid
+                  : toRgba(d.profit > 0 ? PROFIT_COLOR : LOSS_COLOR, 0.2 + intensity * 0.8);
                 return (
                   <div key={d.date} className="relative group">
-                    <div
-                      className="w-4 h-4 rounded-sm cursor-default transition duration-150 group-hover:scale-[1.5] group-hover:ring-1 group-hover:ring-white/20 group-hover:z-10"
-                      style={{ backgroundColor: bg }}
-                    />
+                    <div className="w-5 h-5 rounded cursor-default" style={{ backgroundColor: bg }} />
                     <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 rounded-lg text-[10px] whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 ${theme.panel} border ${theme.cardBorder} shadow-lg`}>
-                      <div className="text-slate-500 mb-0.5">{d.date}</div>
-                      <div className={`font-mono font-semibold ${d.profit === 0 ? theme.subtext : d.profit > 0 ? 'text-profit' : 'text-loss'}`}>
-                        {d.profit === 0 ? '—' : `${d.profit > 0 ? '+' : ''}$${d.profit.toFixed(2)}`}
+                      <div className={`${theme.subtext} mb-0.5`}>{d.date}</div>
+                      <div className={`font-mono font-semibold ${d.profit === 0 ? theme.subtext : d.profit > 0 ? "text-profit" : "text-loss"}`}>
+                        {d.profit === 0 ? "—" : signed(d.profit)}
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
+          </Section>
+
+          <Section
+            theme={theme}
+            title="Activity"
+            aside={
+              <span className={`flex items-center gap-3 text-xs ${theme.subtext}`}>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: theme.chartLine }} />Bought</span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: theme.chartMuted }} />Sold</span>
+              </span>
+            }
+          >
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={activity} margin={{ top: 4, right: 0, bottom: 0, left: 0 }} barGap={3}>
+                  <CartesianGrid stroke={theme.chartGrid} vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: theme.chartAxis }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: theme.chartAxis }} axisLine={false} tickLine={false} width={28} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: theme.chartAxis, fontSize: 12 }}
+                    cursor={{ fill: toRgba(theme.chartAxis, 0.12) }}
+                  />
+                  <Bar dataKey="bought" name="Bought" fill={theme.chartLine} radius={[3, 3, 0, 0]} maxBarSize={18} />
+                  <Bar dataKey="sold" name="Sold" fill={theme.chartMuted} radius={[3, 3, 0, 0]} maxBarSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Section>
         </div>
+
+        <Section theme={theme} title="Latest sales">
+          <RecentSales items={items} theme={theme} />
+        </Section>
       </div>
-    </div>
+    </Page>
   );
 }

@@ -2,7 +2,7 @@
 
 A personal profit/loss tracker for buying and selling **Counter-Strike 2** skins across third-party markets (CSFloat, Buff163, YouPin, CSMoney, DMarket and others).
 
-Sign in with Steam, pair the SkinROI browser extension, and your Steam trades show up in **Handle Items** so you can add or sell them with one click. Analytics show realised profit by day, week and month.
+Sign in with Steam, pair the SkinROI browser extension, and your Steam trades show up under **Trades** so you can add or sell them with one click. Analytics show realised profit by day, week and month.
 
 ---
 
@@ -11,12 +11,12 @@ Sign in with Steam, pair the SkinROI browser extension, and your Steam trades sh
 - **Item tracker** — log every purchase with platform, price (USD or CNY) and notes. Mark items as sold and the app computes profit after platform fees.
 - **Trade sync via browser extension** — the extension reads your accepted Steam trades from your own browser session and pushes them to SkinROI. No Steam Web API key, and the server never talks to Steam.
 - **CSFloat price prefill** — trades made on CSFloat get their price filled in, and exact copies are added or marked sold automatically.
-- **Sell prices on Home** — each unsold item shows the lowest YouPin and CSFloat listing, with a dot on the market that pays more after fees.
+- **Sell prices on Portfolio** — each unsold item shows the lowest YouPin and CSFloat listing, with a dot on the market that pays more after fees.
 - **Snipes** — listings on CSFloat and DMarket priced below YouPin / Buff163 / CSFloat, with fee, ROI and liquidity filters.
 - **Tag-based skin autocomplete** — type "but dop fn" → *Butterfly Knife · Doppler · Factory New*. Backed by the [ByMykel/CSGO-API](https://github.com/ByMykel/CSGO-API) dataset.
 - **Currency converter** — live USD ⇄ CNY (and other currencies) in the header and in the price inputs.
 - **Analytics** — profit over time, weekly and monthly summaries, and a daily P&L heatmap.
-- **CSV import/export** and **themes** (Dark is the default).
+- **CSV import/export** and **Dark and Light themes** (Dark is the default).
 - **Persistence** — logged-in users are stored in Upstash Redis; guests use `localStorage`.
 
 ---
@@ -68,7 +68,7 @@ Local dev uses the same Redis as production, so be careful when editing items wh
 
 1. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked** and select `extension/`.
 2. In the popup's Advanced section, set the base URL to `http://localhost:3000` for local dev.
-3. Sign in on the site, go to **Handle Items → Generate pairing code**, paste the code into the popup and click **Pair**.
+3. Sign in on the site, open the account menu (your avatar) **→ Generate pairing code**, paste the code into the popup and click **Pair**.
 
 ---
 

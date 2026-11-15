@@ -1,21 +1,24 @@
-import React, { useMemo } from "react";
-import { PackagePlus, Package, CheckCircle2, Clock, Download } from "lucide-react";
+// Manual item entry: Steam import shortcut, the form and what was added
+// lately. Rendered as a tab of the Add page.
+import React, { useMemo, useState } from "react";
+import { Package, CheckCircle2, Clock, Download } from "lucide-react";
 import AddItemForm from "../components/AddItemForm";
 import { PlatformBadge } from "../components/PlatformBadge";
 import { useItemImage } from "../utils/itemImages";
 
 function HistoryThumb({ item }) {
   const url = useItemImage({ directIconUrl: item.iconUrl, name: item.itemName });
-  if (!url) return <div className="w-7 h-7 rounded-md bg-white/5 flex-shrink-0" />;
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return <div className="w-7 h-7 rounded-md bg-white/5 flex-shrink-0" />;
   return (
-    <img src={url} alt="" loading="lazy" className="w-7 h-7 object-contain flex-shrink-0" />
+    <img src={url} alt="" loading="lazy" onError={() => setFailed(true)} className="w-7 h-7 object-contain flex-shrink-0" />
   );
 }
 
 function StatusPill({ item }) {
   if (item.sold) {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold rounded-md px-1.5 py-0.5 bg-loss/10 text-loss">
+      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold rounded-md px-1.5 py-0.5 bg-white/5 text-slate-400">
         <CheckCircle2 size={10} />
         Sold
       </span>
@@ -48,58 +51,16 @@ export default function AddItemPage({
     [items]
   );
 
-  const stats = useMemo(() => {
-    const total = trackedItems.length;
-    const active = trackedItems.filter(i => !i.sold).length;
-    const sold = trackedItems.filter(i => i.sold).length;
-    return { total, active, sold };
-  }, [trackedItems]);
-
   const recent = useMemo(
     () => [...trackedItems].sort((a, b) => (b.id || 0) - (a.id || 0)).slice(0, 30),
     [trackedItems]
   );
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-      <div className="max-w-5xl mx-auto space-y-4">
-
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <PackagePlus size={12} className={theme.accent} />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Total items</p>
-            </div>
-            <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
-              {stats.total}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>tracked so far</p>
-          </div>
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <Package size={12} className="text-profit" />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Active</p>
-            </div>
-            <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
-              {stats.active}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>currently held</p>
-          </div>
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <CheckCircle2 size={12} className="text-loss" />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Sold</p>
-            </div>
-            <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
-              {stats.sold}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>realised</p>
-          </div>
-        </div>
+      <div className="space-y-4">
 
         {/* Steam inventory import */}
-        <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-3`}>
+        <div className={`${theme.panel} border ${theme.panelBorder} rounded-xl px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-3`}>
           <div className="min-w-0 flex-1">
             <p className={`text-sm font-semibold ${theme.text}`}>Import your Steam inventory</p>
             <p className={`text-xs mt-0.5 ${theme.subtext}`}>
@@ -122,11 +83,7 @@ export default function AddItemPage({
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
 
           {/* Form */}
-          <div className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
-            <div className={`flex items-center gap-2 px-5 py-4 border-b ${theme.panelBorder}`}>
-              <PackagePlus size={15} className="text-slate-400" />
-              <h2 className={`font-semibold ${theme.text}`}>Add new item</h2>
-            </div>
+          <div className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden`}>
             <div className="p-5">
               <AddItemForm
                 formData={formData} setFormData={setFormData}
@@ -137,10 +94,10 @@ export default function AddItemPage({
           </div>
 
           {/* History */}
-          <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden flex flex-col`}>
+          <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden flex flex-col`}>
             <div className={`flex items-center justify-between px-5 py-4 border-b ${theme.panelBorder}`}>
-              <h2 className={`font-semibold ${theme.text}`}>Recently added</h2>
-              <span className={`text-xs ${theme.subtext}`}>last {recent.length} of {stats.total}</span>
+              <h2 className={`text-sm font-semibold ${theme.text}`}>Recently added</h2>
+              <span className={`text-xs ${theme.subtext}`}>last {recent.length} of {trackedItems.length}</span>
             </div>
 
             {recent.length === 0 ? (
@@ -194,6 +151,5 @@ export default function AddItemPage({
         </div>
 
       </div>
-    </div>
   );
 }

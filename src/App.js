@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { themes } from './themes/themes';
 import './index.css';
 
@@ -14,20 +13,17 @@ import { useSellPrices } from './hooks/useSellPrices';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
 
-import Header from './components/Header';
-import ThemePicker from './components/ThemePicker';
+import Sidebar, { MobileTabBar } from './components/Sidebar';
+import { Page } from './components/PageHeader';
 import ItemGrid from './components/ItemGrid';
-import TabsAndSearchbar from './components/TabsAndSearchbar';
+import TabsAndSearchbar, { TabButton } from './components/TabsAndSearchbar';
 import PortfolioHero from './components/PortfolioHero';
-import RecentSales from './components/RecentSales';
 import SellPriceStatus from './components/SellPriceStatus';
-import { ItemGridSkeleton, RecentSalesSkeleton } from './components/Skeleton';
-import CurrencyConverter from './components/CurrencyConverter';
+import { ItemGridSkeleton } from './components/Skeleton';
 import HandleItemsPage from './pages/HandleItemsPage';
 import AboutPage from './pages/AboutPage';
-import TransactionPage from './pages/TransactionPage';
 import AnalyticsPage from './pages/AnalyticsPage';
-import AddItemPage from './pages/AddItemPage';
+import AddPage from './pages/AddPage';
 import SnipesPage from './pages/SnipesPage';
 import LandingPage from './pages/LandingPage';
 import DemoBanner from './components/DemoBanner';
@@ -96,15 +92,16 @@ export default function CS2TradingTracker() {
     displayCurrency, setDisplayCurrency, currencySymbol,
   } = useExchangeRate();
 
-  // Home shows active items only. Trades are handled in Handle Items; manual
-  // sell / mark received / delete sit in the ⋯ menu on each Home card.
-  const { searchTerm, setSearchTerm, sortBy, setSortBy, sortedItems } = usePortfolioView(items, 'active');
-  const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'snipes' | 'analytics' | 'about'
+  // Portfolio lists what the user holds and, on its second tab, what they sold.
+  // Trades are handled on the Trades page; manual sell / mark received / delete
+  // sit in the ⋯ menu on each card.
+  const [portfolioTab, setPortfolioTab] = useState('active'); // 'active' | 'sold'
+  const { searchTerm, setSearchTerm, sortBy, setSortBy, sortedItems } = usePortfolioView(items, portfolioTab);
+  const [activePage, setActivePage] = useState(null); // null = Portfolio | 'add' | 'handleItems' | 'snipes' | 'analytics' | 'about'
   const [chartPeriod, setChartPeriod] = useState('30d');
   // Dark is the default; a theme the user picked is kept in localStorage.
-  const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'dark'); return themes[r] ? r : 'dark'; });
-  const [showThemePicker, setShowThemePicker] = useState(false);
-  const [converterPinned, setConverterPinned] = useState(() => !!localStorage.getItem('skinroi-converter-pinned'));
+  // (Older saved themes that no longer exist fall back to Dark.)
+  const [theme, setTheme] = useState(() => (localStorage.getItem('cs2-theme') === 'light' ? 'light' : 'dark'));
   const [viewMode, setViewMode] = useState(() => {
     const saved = localStorage.getItem('skinroi-view-mode');
     return saved === 'list' ? 'list' : 'grid';
@@ -115,13 +112,11 @@ export default function CS2TradingTracker() {
   // Auth or portfolio still on its way: Home shows skeletons, not empty states.
   const homeLoading = authLoading || itemsLoading;
   const isAnalyticsPage    = activePage === 'analytics';
-  const isAddItemPage      = activePage === 'addItem';
+  const isAddPage          = activePage === 'add';
   const isHandleItemsPage  = activePage === 'handleItems';
-  const isTransactionsPage = activePage === 'transactions';
   const isAboutPage        = activePage === 'about';
   const isSnipesPage       = activePage === 'snipes';
-  const openPage  = (name) => setActivePage(prev => prev === name ? null : name);
-  const closePage = () => setActivePage(null);
+  const openPage = (name) => setActivePage(name || null);
 
   const themeStyles = themes[theme];
   const { profitChartData, allTimeProfitChartData } = useChartData(items, chartPeriod);
@@ -129,13 +124,10 @@ export default function CS2TradingTracker() {
   useEffect(() => {
     localStorage.setItem('cs2-theme', theme);
     // Selection, caret and focus rings in index.css read the theme accent.
-    document.documentElement.style.setProperty('--accent', themes[theme].accentColor || themes[theme].dotColor);
+    document.documentElement.style.setProperty('--accent', themes[theme].accentColor);
+    document.documentElement.style.colorScheme = theme;
   }, [theme]);
   useEffect(() => { localStorage.setItem('skinroi-view-mode', viewMode); }, [viewMode]);
-  useEffect(() => {
-    if (converterPinned) localStorage.setItem('skinroi-converter-pinned', '1');
-    else localStorage.removeItem('skinroi-converter-pinned');
-  }, [converterPinned]);
 
   useEffect(() => {
     if (isHandleItemsPage) steamSync.refreshState();
@@ -164,15 +156,11 @@ export default function CS2TradingTracker() {
   };
 
   return (
-    <div
-      className="flex flex-col h-screen overflow-hidden"
-      onClick={() => showThemePicker && setShowThemePicker(false)}
-    >
-      <div className={`fixed inset-0 -z-10 pointer-events-none ${themeStyles.bg}`} />
-
+    <div className={`flex flex-col md:flex-row h-[100dvh] overflow-hidden ${themeStyles.bg} ${themeStyles.text}`}>
       {showLanding && (
         <LandingPage
           theme={themeStyles}
+          isDark={theme === 'dark'}
           onLogin={signIn}
           onDemo={() => { setDemo(true); setActivePage(null); }}
           onGuest={continueAsGuest}
@@ -180,17 +168,10 @@ export default function CS2TradingTracker() {
       )}
 
       {!showLanding && (<>
-      {/* ── Top header ────────────────────────────────────────────────────── */}
-      <Header
+      <Sidebar
         theme={themeStyles}
         activePage={activePage}
-        onAnalyticsClick={() => openPage('analytics')}
-        onSnipesClick={() => openPage('snipes')}
-        onAddItemClick={() => openPage('addItem')}
-        onHandleItemsClick={() => openPage('handleItems')}
-        onTransactionClick={() => openPage('transactions')}
-        onAboutClick={() => openPage('about')}
-        onHomeClick={closePage}
+        onNavigate={openPage}
         pendingCount={steamSync.pendingCount}
         user={user}
         onLogin={signIn}
@@ -204,33 +185,17 @@ export default function CS2TradingTracker() {
           : null
         }
         onExtensionChange={steamSync.refreshState}
-        usdAmount={usdAmount}
-        rmbAmount={rmbAmount}
-        sidebarRate={sidebarRate}
+        isDark={theme === 'dark'}
+        onToggleTheme={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))}
         lastUpdated={lastUpdated}
-        handleUsdChange={handleUsdChange}
-        handleRmbChange={handleRmbChange}
-        currency1={currency1}
-        setCurrency1={setCurrency1}
-        currency1Symbol={currency1Symbol}
-        displayCurrency={displayCurrency}
-        setDisplayCurrency={setDisplayCurrency}
-        currencySymbol={currencySymbol}
-        converterPinned={converterPinned}
-        setConverterPinned={setConverterPinned}
-      >
-        <div onClick={e => e.stopPropagation()}>
-          <ThemePicker
-            themeStyles={themeStyles}
-            setShowThemePicker={setShowThemePicker}
-            showThemePicker={showThemePicker}
-            setTheme={setTheme}
-            theme={theme}
-            themes={themes}
-          />
-        </div>
-      </Header>
+        converter={{
+          usdAmount, rmbAmount, sidebarRate, handleUsdChange, handleRmbChange,
+          currency1, setCurrency1, currency1Symbol,
+          displayCurrency, setDisplayCurrency, currencySymbol,
+        }}
+      />
 
+      <main className="flex-1 min-w-0 min-h-0 flex flex-col">
       {demo && (
         <DemoBanner
           theme={themeStyles}
@@ -239,12 +204,11 @@ export default function CS2TradingTracker() {
         />
       )}
 
-      {/* ── Home view ─────────────────────────────────────────────────────── */}
+      {/* ── Portfolio ─────────────────────────────────────────────────────── */}
       {isHome && (
-      <div className="flex flex-1 min-h-0 flex-col gap-4 px-4 md:px-6 pt-3 pb-4 overflow-hidden">
-
+      <Page>
         {user && !homeLoading && steamSync.extension && (
-          <div className="shrink-0">
+          <div className="mb-8 empty:hidden">
             <OnboardingChecklist
               theme={themeStyles}
               steamId={user.steamId}
@@ -252,114 +216,74 @@ export default function CS2TradingTracker() {
               items={items}
               onExtensionChange={steamSync.refreshState}
               onImportSteam={() => setImportOpen(true)}
-              onAddManually={() => openPage('addItem')}
+              onAddManually={() => openPage('add')}
             />
           </div>
         )}
 
-        {/* Row 1 — hero (centered) + currency converter (right, same height) */}
-        <div className="shrink-0 flex items-stretch gap-6">
-          <div className="flex-1 min-w-0">
-            <PortfolioHero
-              stats={stats}
-              profitChartData={allTimeProfitChartData}
-              theme={themeStyles}
-              loading={homeLoading}
-            />
-          </div>
-          <div className="hidden lg:flex w-[280px] shrink-0 flex-col justify-center gap-3">
-            <p className={`text-xs font-medium ${themeStyles.subtext}`}>Currency converter</p>
-            <CurrencyConverter
-              usdAmount={usdAmount}
-              rmbAmount={rmbAmount}
-              sidebarRate={sidebarRate}
-              handleUsdChange={handleUsdChange}
-              handleRmbChange={handleRmbChange}
-              theme={themeStyles}
-              currency1={currency1}
-              setCurrency1={setCurrency1}
-              currency1Symbol={currency1Symbol}
-              displayCurrency={displayCurrency}
-              setDisplayCurrency={setDisplayCurrency}
+        <PortfolioHero
+          stats={stats}
+          profitChartData={allTimeProfitChartData}
+          theme={themeStyles}
+          loading={homeLoading}
+        />
+
+        <div className={`mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-b ${themeStyles.cardBorder}`}>
+          <TabButton
+            label="Holding" count={homeLoading ? '' : stats.totalActiveCount}
+            isActive={portfolioTab === 'active'} onClick={() => setPortfolioTab('active')}
+            theme={themeStyles} accentColor={themeStyles.accentColor}
+            badgeClass={themeStyles.subtext}
+          />
+          <TabButton
+            label="Sold" count={homeLoading ? '' : stats.totalSoldCount}
+            isActive={portfolioTab === 'sold'} onClick={() => setPortfolioTab('sold')}
+            theme={themeStyles} accentColor={themeStyles.accentColor}
+            badgeClass={themeStyles.subtext}
+          />
+          {!homeLoading && portfolioTab === 'active' && (
+            <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
+          )}
+        </div>
+
+        <div className="mt-4">
+          <TabsAndSearchbar
+            theme={themeStyles}
+            activeTab={portfolioTab}
+            showTabs={false}
+            allowSelect={false}
+            searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+            sortBy={sortBy} setSortBy={setSortBy}
+            viewMode={viewMode} setViewMode={setViewMode}
+          />
+        </div>
+
+        <div className="mt-4">
+          {homeLoading ? (
+            <ItemGridSkeleton theme={themeStyles} viewMode={viewMode} />
+          ) : (
+            <ItemGrid
+              menuActions={portfolioTab === 'active'}
+              sellPlatform={sellPlatform} setSellData={setSellData}
+              sellData={sellData} setSellPlatform={setSellPlatform}
+              handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
+              promotePendingItem={promotePendingItem}
+              exchangeRate={exchangeRate}
               currencySymbol={currencySymbol}
+              displayCurrency={displayCurrency}
+              theme={themeStyles} sortedItems={sortedItems}
+              searchTerm={searchTerm} activeTab={portfolioTab}
+              viewMode={viewMode}
+              sellPrices={portfolioTab === 'active' ? sellPrices : null}
             />
-          </div>
+          )}
         </div>
-
-        {/* Row 2+3 — tabs + grid (left) and recent sales (right) */}
-        <div className="flex-1 min-h-0 flex gap-6 overflow-hidden">
-          <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden lg:px-10">
-            <div className="shrink-0 space-y-2 pr-3 md:pr-[18px]">
-              <div className="flex items-baseline gap-2">
-                <h2 className={`text-sm font-semibold ${themeStyles.text}`}>Active items</h2>
-                {!homeLoading && (
-                  <span className={`text-xs font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
-                )}
-                {!homeLoading && stats.totalPending > 0 && (
-                  <span className="text-xs text-warn">· {stats.totalPending} on trade hold</span>
-                )}
-                {!homeLoading && (
-                  <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
-                )}
-              </div>
-              <TabsAndSearchbar
-                theme={themeStyles}
-                activeTab="active"
-                showTabs={false}
-                allowSelect={false}
-                actions={
-                  <button
-                    onClick={() => openPage('handleItems')}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-[7px] rounded-lg border ${themeStyles.cardBorder} ${themeStyles.subtext} ${themeStyles.textHover} transition-colors`}
-                  >
-                    Manage items
-                    <ChevronRight size={12} />
-                  </button>
-                }
-                searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-                sortBy={sortBy} setSortBy={setSortBy}
-                viewMode={viewMode} setViewMode={setViewMode}
-              />
-            </div>
-            <div className="flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable]">
-              {homeLoading ? (
-                <ItemGridSkeleton theme={themeStyles} viewMode={viewMode} />
-              ) : (
-              <ItemGrid
-                menuActions
-                sellPlatform={sellPlatform} setSellData={setSellData}
-                sellData={sellData} setSellPlatform={setSellPlatform}
-                handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
-                promotePendingItem={promotePendingItem}
-                exchangeRate={exchangeRate}
-                currencySymbol={currencySymbol}
-                displayCurrency={displayCurrency}
-                theme={themeStyles} sortedItems={sortedItems}
-                searchTerm={searchTerm} activeTab="active"
-                viewMode={viewMode}
-                sellPrices={sellPrices}
-              />
-              )}
-            </div>
-          </div>
-          <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div>
-              <p className={`text-xs font-medium ${themeStyles.subtext} mb-2 px-1`}>
-                Recent sales
-              </p>
-              {homeLoading
-                ? <RecentSalesSkeleton theme={themeStyles} />
-                : <RecentSales items={items} theme={themeStyles} />}
-            </div>
-          </div>
-        </div>
-
-      </div>
+      </Page>
       )}
 
-      {/* ── Add Item page ─────────────────────────────────────────────────── */}
-      {isAddItemPage && (
-        <AddItemPage
+      {/* ── Add (item or deposit / withdrawal) ────────────────────────────── */}
+      {isAddPage && (
+        <AddPage
           formData={formData} setFormData={setFormData}
           handleAddItem={handleAddItem} theme={themeStyles}
           exchangeRate={exchangeRate} currencySymbol={currencySymbol} displayCurrency={displayCurrency}
@@ -368,27 +292,16 @@ export default function CS2TradingTracker() {
           onImportSteam={() => setImportOpen(true)}
           onLogin={signIn}
           demo={demo}
+          onAddTransaction={handleAddTransaction}
         />
       )}
 
-      {/* ── About page ───────────────────────────────────────────────────── */}
       {isAboutPage && <AboutPage theme={themeStyles} />}
 
-      {/* ── Transactions page ────────────────────────────────────────────── */}
-      {isTransactionsPage && (
-        <TransactionPage
-          onAdd={(tx) => { handleAddTransaction(tx); }}
-          theme={themeStyles}
-          items={items}
-        />
-      )}
-
-      {/* ── Snipes page ──────────────────────────────────────────────────── */}
       {isSnipesPage && (
         <SnipesPage key={user ? 'live' : 'demo'} theme={themeStyles} rates={allRates} demo={!user} onLogin={signIn} />
       )}
 
-      {/* ── Analytics page ───────────────────────────────────────────────── */}
       {isAnalyticsPage && (
         <AnalyticsPage
           profitChartData={profitChartData}
@@ -400,7 +313,7 @@ export default function CS2TradingTracker() {
         />
       )}
 
-      {/* ── Handle Items page ────────────────────────────────────────────── */}
+      {/* ── Trades (pending Steam trades) ─────────────────────────────────── */}
       {isHandleItemsPage && (
         <HandleItemsPage
           theme={themeStyles}
@@ -419,6 +332,14 @@ export default function CS2TradingTracker() {
           onDismiss={steamSync.dismiss}
         />
       )}
+      </main>
+
+      <MobileTabBar
+        theme={themeStyles}
+        activePage={activePage}
+        onNavigate={openPage}
+        pendingCount={steamSync.pendingCount}
+      />
       </>)}
 
       {importOpen && user && (

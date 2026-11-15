@@ -77,7 +77,7 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
   const set = (key) => (value) => setFilters((f) => ({ ...f, [key]: value }));
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-4 px-4 md:px-6 py-4 overflow-y-auto md:overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
       <FilterPanel
         open={filtersOpen}
         theme={theme}
@@ -87,11 +87,11 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
         onReset={() => setFilters(demo ? DEMO_FILTERS : DEFAULT_SNIPE_FILTERS)}
       />
 
-      <div className={`md:flex-1 min-w-0 flex flex-col ${theme.panel} border ${theme.panelBorder} rounded-2xl md:overflow-hidden`}>
-        <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-4 md:px-5 py-3 border-b ${theme.panelBorder}`}>
-          <h2 className={`font-semibold ${theme.text}`}>Snipes</h2>
-          <span className={`text-xs ${theme.subtext}`}>
-            {visible.length} of {deals.length} shown
+      <div className="md:flex-1 min-w-0 flex flex-col md:overflow-hidden">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 md:px-8 pt-6 md:pt-8 pb-4">
+          <h1 className={`text-xl font-semibold tracking-tight ${theme.text}`}>Snipes</h1>
+          <span className={`text-xs font-mono ${theme.subtext}`}>
+            {visible.length} of {deals.length}
           </span>
           {demo ? (
             <span className="text-[11px] text-warn">Delayed 15+ min preview</span>
@@ -110,7 +110,7 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
             onChange={(e) => setCurrency(e.target.value)}
             title="Currency"
             aria-label="Currency"
-            className={`md:ml-auto px-2 py-1 rounded-lg text-xs border ${theme.input} ${theme.text} focus:outline-none`}
+            className={`md:ml-auto h-8 px-2 rounded-lg text-xs border ${theme.input} ${theme.text} focus:outline-none`}
           >
             {CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>{c.code}</option>
@@ -119,14 +119,14 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
           <button
             onClick={refresh}
             title="Refresh"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors"
+            className={`p-2 rounded-lg transition-colors ${theme.subtext} ${theme.textHover} ${theme.itemHoverBg}`}
           >
             <RefreshCw size={15} />
           </button>
         </div>
 
         {demo && (
-          <div className={`px-4 md:px-5 py-2.5 text-xs border-b ${theme.panelBorder} flex flex-wrap items-center gap-x-3 gap-y-1.5 ${theme.textSecondary}`}>
+          <div className={`px-4 md:px-8 py-2.5 text-xs border-y ${theme.panelBorder} flex flex-wrap items-center gap-x-3 gap-y-1.5 ${theme.textSecondary}`}>
             <span>
               These deals were found 15 minutes or more ago and are probably gone. Signed-in users see new ones within a minute, with buy links.
             </span>
@@ -140,17 +140,29 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
         )}
 
         {!demo && meta?.refProvider === "csgotrader" && (
-          <div className="px-5 py-2 text-xs text-warn border-b border-white/5 flex items-center gap-2">
+          <div className={`px-4 md:px-8 py-2 text-xs text-warn border-y ${theme.panelBorder} flex items-center gap-2`}>
             <AlertTriangle size={13} />
             Using free Buff163 prices (no listing counts). Set STEAMDT_API_KEY for YouPin prices and listing counts.
           </div>
         )}
 
-        <div className="md:flex-1 md:overflow-y-auto">
-          {error && <p className="p-6 text-sm text-loss">{error}</p>}
-          {!error && loading && <p className={`p-6 text-sm ${theme.subtext}`}>Scanning markets…</p>}
+        {/* Column labels, lined up with the rows below */}
+        {visible.length > 0 && (
+          <div className={`hidden md:flex items-center gap-x-4 px-8 pb-2 text-xs border-b [scrollbar-gutter:stable] overflow-y-hidden ${theme.panelBorder} ${theme.subtext}`}>
+            <span className="w-16 shrink-0" />
+            <span className="flex-1">Listing</span>
+            <span className="w-32 shrink-0 text-right">Buy at</span>
+            <span className="w-36 shrink-0 text-right">Sell at</span>
+            <span className="w-28 shrink-0 text-right">Profit after fees</span>
+            <span className="w-[68px] shrink-0" />
+          </div>
+        )}
+
+        <div className="md:flex-1 md:overflow-y-auto [scrollbar-gutter:stable]">
+          {error && <p className="px-4 md:px-8 py-6 text-sm text-loss">{error}</p>}
+          {!error && loading && <p className={`px-4 md:px-8 py-6 text-sm ${theme.subtext}`}>Scanning markets…</p>}
           {!error && !loading && visible.length === 0 && (
-            <p className={`p-6 text-sm ${theme.subtext}`}>
+            <p className={`px-4 md:px-8 py-6 text-sm ${theme.subtext}`}>
               {demo
                 ? "No delayed deals match these filters right now. Try a lower min ROI or liquidity."
                 : "No deals match your filters right now. New listings are checked about every 45 seconds."}
@@ -184,7 +196,7 @@ function ScanStatus({ meta, now, theme }) {
   if (!meta) return null;
   const sources = meta.sources || {};
   return (
-    <span className={`flex items-center gap-3 text-[11px] ${theme.subtext}`}>
+    <span className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 min-w-0 text-[11px] ${theme.subtext}`}>
       <span>Scanned {ago(meta.lastScan, now)}</span>
       {SNIPE_MARKETS.map((name) => {
         const s = sources[name];
@@ -239,7 +251,7 @@ function SnipeRow({ deal: d, theme, money, now, onLogin }) {
   ].filter(Boolean).join(" · ");
 
   return (
-    <div className={`flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3 border-b ${theme.panelBorder} ${theme.itemHoverBg || "hover:bg-white/5"}`}>
+    <div className={`flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 px-4 md:px-8 py-3 border-b ${theme.panelBorder} ${theme.itemHoverBg}`}>
       <SnipeImage image={d.image} name={d.name} />
 
       <div className="flex-1 min-w-0 basis-[calc(100%-4rem)] md:basis-auto">
@@ -284,7 +296,7 @@ function SnipeRow({ deal: d, theme, money, now, onLogin }) {
           onClick={onLogin || undefined}
           disabled={!onLogin}
           title="Sign in with Steam to get buy links"
-          className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.subtext} hover:bg-white/5 active:scale-[0.97] disabled:opacity-40`}
+          className={`shrink-0 w-[68px] flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.subtext} ${theme.itemHoverBg} disabled:opacity-40`}
         >
           <Lock size={12} /> Buy
         </button>
@@ -293,7 +305,7 @@ function SnipeRow({ deal: d, theme, money, now, onLogin }) {
           href={d.url}
           target="_blank"
           rel="noreferrer"
-          className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97]`}
+          className={`shrink-0 w-[68px] flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${theme.primary}`}
         >
           Buy <ExternalLink size={12} />
         </a>
@@ -344,12 +356,12 @@ function FilterPanel({ open, theme, filters: f, set, symbol, onReset }) {
   );
 
   return (
-    <aside className={`${open ? '' : 'hidden'} md:block order-first w-full md:w-72 shrink-0 md:overflow-y-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl p-4 space-y-4`}>
-      <div className="flex items-center">
-        <h3 className={`font-semibold ${theme.text}`}>Filters</h3>
+    <aside className={`${open ? '' : 'hidden'} md:block order-first md:order-last w-full md:w-[272px] shrink-0 md:overflow-y-auto border-b md:border-b-0 md:border-l ${theme.panelBorder} px-4 py-4 md:px-5 md:py-8 space-y-4`}>
+      <div className="flex items-center md:h-7">
+        <h2 className={`text-sm font-semibold ${theme.text}`}>Filters</h2>
         <button
           onClick={onReset}
-          className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-white"
+          className={`ml-auto flex items-center gap-1 text-xs ${theme.subtext} ${theme.textHover}`}
         >
           <RotateCcw size={12} /> Reset
         </button>
