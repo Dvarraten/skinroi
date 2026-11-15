@@ -2,12 +2,20 @@ import { describePrice, sellPricesFor, sellPriceKey, SELL_PRICE_MAX_AGE_MS } fro
 
 const NOW = 1_800_000_000_000;
 
-test("hides prices older than an hour", () => {
-  const old = describePrice({ priceUsd: 10, at: NOW - SELL_PRICE_MAX_AGE_MS - 1 }, "csfloat", NOW);
+test("hides YouPin prices older than an hour", () => {
+  const old = describePrice({ priceUsd: 10, at: NOW - SELL_PRICE_MAX_AGE_MS - 1 }, "youpin", NOW);
   expect(old.state).toBe("stale");
-  const fresh = describePrice({ priceUsd: 10, at: NOW - 5 * 60000 }, "csfloat", NOW);
-  expect(fresh.state).toBe("ok");
-  expect(fresh.net).toBeCloseTo(9.8);
+  expect(describePrice({ priceUsd: 10, at: NOW - 5 * 60000 }, "youpin", NOW).state).toBe("ok");
+});
+
+test("CSFloat prices stay shown for two days", () => {
+  const H = 60 * 60 * 1000;
+  const dayOld = describePrice({ priceUsd: 10, at: NOW - 30 * H }, "csfloat", NOW);
+  expect(dayOld.state).toBe("ok");
+  expect(dayOld.net).toBeCloseTo(9.8);
+  const old = describePrice({ priceUsd: 10, at: NOW - 51 * H }, "csfloat", NOW);
+  expect(old.state).toBe("stale");
+  expect(old.note).toMatch(/older than 50 hours/);
 });
 
 test("nothing listed and never fetched are told apart", () => {

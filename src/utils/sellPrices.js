@@ -1,9 +1,14 @@
 // Helpers for the YouPin / CSFloat sell prices shown on Home.
 import { getPlatformFee } from "./platformFees";
 
+// maxAgeMs: prices older than this are not shown. YouPin is re-read from
+// SteamDT on every load, so an hour is plenty. CSFloat prices for owned items
+// cost the extension a rate-limited CSFloat call each, so it refreshes them
+// only every 48 h (extension config SELL_PRICES_REFRESH_AFTER_MS); the extra
+// 2 h covers the wait in the extension's queue before the refresh lands.
 export const SELL_PRICE_MARKETS = [
-  { id: "youpin", label: "YouPin" },
-  { id: "csfloat", label: "CSFloat" },
+  { id: "youpin", label: "YouPin", maxAgeMs: 60 * 60 * 1000 },
+  { id: "csfloat", label: "CSFloat", maxAgeMs: 50 * 60 * 60 * 1000 },
 ];
 
 // Doppler phase handling, mirrored from api/_lib/doppler-phase.js (keep in
@@ -32,8 +37,18 @@ export function sellPriceKey(item) {
   return phase ? `${name}|${phase}` : name;
 }
 
-// Prices older than this are not shown at all.
+// Default for markets without their own maxAgeMs; also how long a market's
+// error status stays on screen.
 export const SELL_PRICE_MAX_AGE_MS = 60 * 60 * 1000;
+
+export function maxAgeFor(market) {
+  return SELL_PRICE_MARKETS.find((m) => m.id === market)?.maxAgeMs ?? SELL_PRICE_MAX_AGE_MS;
+}
+
+function formatLimit(ms) {
+  const h = Math.round(ms / 3600000);
+  return h === 1 ? "1 hour" : `${h} hours`;
+}
 
 export function formatAge(ms) {
   const min = Math.max(0, Math.round(ms / 60000));
@@ -45,14 +60,15 @@ export function formatAge(ms) {
 
 // One market's price for an item, ready to render.
 // state: 'ok' (fresh price), 'none' (fresh, but nothing listed), 'stale'
-// (older than an hour or never fetched), 'error' (last lookup failed).
+// (older than the market's max age or never fetched), 'error' (last lookup failed).
 export function describePrice(entry, market, now) {
   if (!entry || !entry.at) {
     return entry?.error ? { state: "error", note: entry.error } : { state: "stale", note: "No price yet" };
   }
   const age = now - entry.at;
-  if (age > SELL_PRICE_MAX_AGE_MS) {
-    return { state: "stale", note: `Last price is ${formatAge(age)}, older than 1 hour` };
+  const maxAge = maxAgeFor(market);
+  if (age > maxAge) {
+    return { state: "stale", note: `Last price is ${formatAge(age)}, older than ${formatLimit(maxAge)}` };
   }
   if (entry.priceUsd == null) return { state: "none", note: `Nothing listed · checked ${formatAge(age)}` };
   const net = entry.priceUsd * (1 - getPlatformFee(market));

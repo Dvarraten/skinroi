@@ -53,11 +53,12 @@ export const CSFLOAT_PAUSE_MAX_MS = 60 * 60 * 1000;
 
 // CSFloat sell prices for Home (see lib/sellprices.js): at most
 // SELL_PRICES_CALLS_PER_RUN CSFloat calls each poll (a Doppler can need more
-// than one); a price is refreshed once it is 30 min
-// old so the site (which hides prices older than 1 hour) always has a fresh one.
+// than one). Prices for items the user owns barely matter minute to minute,
+// so each one is cached 48 h before it costs another CSFloat call (the site
+// shows CSFloat prices up to 50 h old). New items have no price and go first.
 export const CSFLOAT_LISTINGS_API = 'https://csfloat.com/api/v1/listings';
 export const SELL_PRICES_CALLS_PER_RUN = 3;
-export const SELL_PRICES_REFRESH_AFTER_MS = 30 * 60 * 1000;
+export const SELL_PRICES_REFRESH_AFTER_MS = 48 * 60 * 60 * 1000;
 export const SELL_PRICES_RETRY_ERROR_MS = 10 * 60 * 1000;
 
 // Only offers in state 3 (Accepted) count as completed trades — items have
