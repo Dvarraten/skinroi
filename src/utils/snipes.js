@@ -11,7 +11,7 @@ export const BUY_MARKETS = ["csfloat", "dmarket", "youpin", "buff163"];
 export const SELL_MARKETS = ["youpin", "buff163", "csfloat"];
 
 export const DEFAULT_SNIPE_FILTERS = {
-  version: 2,
+  version: 3,
   buyMarkets: ["csfloat", "dmarket"],
   sellMarkets: ["youpin", "buff163"],
   minRoi: 5,                  // %
@@ -19,7 +19,7 @@ export const DEFAULT_SNIPE_FILTERS = {
   minPrice: "",               // display currency, "" = no limit
   maxPrice: "",
   buyFee: 0,                  // % added to the buy price (deposit fees etc.)
-  minLiquidity: 50,           // 0–100 score on the market we'd sell on
+  minLiquidity: 75,           // 0–100 score on the market we'd sell on
   hideUnknownLiquidity: true,
   hideVolatile: true,
   maxChange7d: 15,            // % price move over 7 days counted as volatile
@@ -33,10 +33,19 @@ export const DEFAULT_SNIPE_FILTERS = {
   sortBy: "roi",
 };
 
-// Filters saved before buy/sell markets existed: keep what still means the
-// same, map the old "markets" to buy markets, drop the old liquidity fields.
+// Older saved filters. Version 1 (before buy/sell markets): keep what still
+// means the same, map the old "markets" to buy markets, drop the old
+// liquidity fields. Version 2: the server now only keeps items scoring 75+,
+// so a lower saved minimum is raised to the new default.
 export function migrateFilters(saved) {
   if (!saved || saved.version === DEFAULT_SNIPE_FILTERS.version) return saved;
+  if (saved.version === 2) {
+    return {
+      ...saved,
+      minLiquidity: Math.max(Number(saved.minLiquidity) || 0, DEFAULT_SNIPE_FILTERS.minLiquidity),
+      version: DEFAULT_SNIPE_FILTERS.version,
+    };
+  }
   const { markets, reference, minListings, minBidAsk, minLiquidity, ...rest } = saved;
   return {
     ...rest,
@@ -54,6 +63,8 @@ const linear = (v, lo, hi) => (v == null ? null : Math.max(0, Math.min(1, (v - l
 // order is to the lowest ask (a tight spread sells fast) and listings.
 // CSFloat: the sales CSFloat has recorded for the item and Steam's daily volume.
 // Missing parts are left out and the rest re-weighted; null if none known.
+// The server uses the same formula to drop items under 75 before storing
+// them (api/_lib/snipes/liquidity.js): keep the two equal.
 export function liquidityScore(market, ref) {
   if (!ref) return null;
   const bidAsk = ref.bidUsd && ref.askUsd ? ref.bidUsd / ref.askUsd : null;

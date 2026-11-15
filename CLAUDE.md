@@ -137,7 +137,7 @@ CSFloat listings come from the extension instead: every poll (2 min) it fetches
 API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
 "too many IPs" when Vercel fetches them, because functions call out from many
 IPs. Both paths price listings against YouPin, Buff163 and CSFloat and store
-every listing at least 2% under the best of them for 30 min. CSFloat's price is
+every listing at least 5% under the best of them for 30 min (only very liquid items, see below). CSFloat's price is
 its cheapest listing of the same item (never CSFloat's appraisal), excluding
 the listing being priced (`snipes/csfloat-lowest.js`). The server can't look
 it up, so each listings push answers with up to 2 `csfloatLookups` (items with
@@ -159,13 +159,21 @@ with neither, the free csgotrader.app Buff163 dump is used) and
 `SNIPES_MIN_PRICE_CENTS` (default 200). A source that answers 429 pauses 15 min. Dopplers without a known phase
 are skipped so phases never get mixed.
 
-**Liquidity prefilter** (`snipes/liquidity.js`): before any listing is priced,
+**Liquidity prefilter** (`snipes/liquidity.js`): Snipes only keeps very
+liquid items (Ludvig's Pricempire habit: liquidity >75 %, no cases, capsules,
+stickers, souvenirs or Well-Worn, ROI >5 %). Before any listing is priced,
 Souvenir, Well-Worn and Battle-Scarred skins, stickers/graffiti/patches/music
-kits/charms, and items with a Steam daily volume under 3 (from CSFloat's feed)
-are dropped, so they never cost a SteamDT batch slot or a CSFloat lookup.
-CSFloat lookups also skip items with under 20 YouPin/Buff163 listings and items
-that can't sell above their buy price. Tune with `SNIPES_SKIP_WEARS`
-(comma list), `SNIPES_KEEP_SOUVENIRS=1` and `SNIPES_MIN_STEAM_VOLUME`.
+kits/charms, containers (cases, capsules, packages, keys, pins: any name
+without " | " that isn't a ★ item) and items with a Steam daily volume under
+10 (from CSFloat's feed) are dropped, so they never cost a SteamDT batch slot
+or a CSFloat lookup. After pricing, an item must score at least 75 on the
+page's 0–100 liquidity score (`liquidityScore`, mirrored from
+`src/utils/snipes.js`) on a market it can be sold on, or it is dropped and
+never looked up; items with no liquidity data are dropped too. The page's
+"Min liquidity" defaults to 75 as well. CSFloat lookups also skip items with
+under 20 YouPin/Buff163 listings and items that can't sell above their buy
+price. Tune with `SNIPES_MIN_LIQUIDITY`, `SNIPES_SKIP_WEARS` (comma list),
+`SNIPES_KEEP_SOUVENIRS=1` and `SNIPES_MIN_STEAM_VOLUME`.
 SteamDT batch calls are 75 s apart; an answer like 当前接口请求已达到上限
 (limit reached) or 429 pauses SteamDT 5 min, doubling to 60 min; names SteamDT
 has no price for are cached 6 h.

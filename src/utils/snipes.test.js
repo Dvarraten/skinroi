@@ -46,7 +46,8 @@ test("uses buy-order spread when listing counts are unknown", () => {
   const buffOnly = (bidUsd) => deal({
     refs: { buff163: ref({ count: null, liquidity: null, bidUsd, askUsd: 100, priceUsd: 100 }) },
   });
-  expect(passes(buffOnly(90))).toBe(true);
+  expect(passes(buffOnly(95))).toBe(true);
+  expect(passes(buffOnly(90))).toBe(false); // score 68, under 75
   expect(passes(buffOnly(60))).toBe(false);
   expect(passes(buffOnly(null))).toBe(false);
   expect(passes(buffOnly(null), f({ hideUnknownLiquidity: false }))).toBe(true);
@@ -82,6 +83,12 @@ test("old saved filters keep their buy markets and lose the old liquidity fields
   const m = migrateFilters({ markets: ["dmarket"], reference: "youpin", minListings: 20, minBidAsk: 85, minLiquidity: 0, minRoi: 8 });
   expect(m).toEqual({ buyMarkets: ["dmarket"], minRoi: 8, version: DEFAULT_SNIPE_FILTERS.version });
   expect(migrateFilters(null)).toBe(null);
+});
+
+test("version 2 filters get the 75 liquidity minimum", () => {
+  expect(migrateFilters({ version: 2, minLiquidity: 50, minRoi: 8 }))
+    .toEqual({ version: DEFAULT_SNIPE_FILTERS.version, minLiquidity: 75, minRoi: 8 });
+  expect(migrateFilters({ version: 2, minLiquidity: 90 }).minLiquidity).toBe(90);
 });
 
 test("hides volatile, stale, old and unprofitable deals", () => {
