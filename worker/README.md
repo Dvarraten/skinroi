@@ -37,7 +37,7 @@ Kräver Node 20 eller nyare (`node -v`).
 ```powershell
 cd C:\Users\ludvi\Documents\Programmering\Projekt\skinroi\worker
 npm run setup                     # npm install + laddar ner Chromium (ca 150 MB)
-Copy-Item .env.example .env
+Copy-Item env.example .env
 notepad .env
 ```
 

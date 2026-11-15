@@ -1,5 +1,5 @@
 // Settings for the home worker. Values come from worker/.env (see
-// .env.example) or real environment variables, which win.
+// env.example) or real environment variables, which win.
 //
 // The CSFloat numbers mirror extension/src/lib/config.js on purpose: the worker
 // does the extension's CSFloat work from the same home IP, so it must stay
