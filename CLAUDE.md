@@ -76,6 +76,10 @@ called "Handle Items" in the data-flow notes below), **Snipes**, **Analytics**
 (profit curve, figures, heatmap, activity, latest sales) and **Add** (item or
 deposit / withdrawal). About opens from the ⓘ button. Pages use `Page` and
 `PageHeader` from `components/PageHeader.jsx` for the same gutters and title row.
+Form controls come from `components/ui.jsx` (`Field`, `Input`, `Select`,
+`Segmented`, `Switch`, `Chip`): 36px high, one border, focus on the border.
+Use them instead of native `<select>` and checkboxes; platform dropdowns use
+`PlatformPicker`.
 
 The look is monochrome: neutral greys, white (Dark) or near-black (Light) for
 selection and the one primary button (`theme.primary`), and colour only for

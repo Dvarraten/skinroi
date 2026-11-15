@@ -14,7 +14,7 @@ import skinsIcon    from "../assets/platforms/skins.webp";
 
 // Colors sourced from SAP Fiori Morning Horizon chart palette
 // sapChart_OrderedColor_* from SAP/theming-base-content
-const PLATFORM_CONFIG = {
+export const PLATFORM_CONFIG = {
   buff163:  { label: "Buff163",  icon: buff163Icon  },
   csfloat:  { label: "CSFloat",  icon: csfloatIcon  },
 

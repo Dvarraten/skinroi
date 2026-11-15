@@ -1,14 +1,24 @@
 // Deposits and withdrawals: the form and its history. Rendered as a tab of
 // the Add page.
 import React, { useState, useMemo } from "react";
-import { CheckCircle, ArrowDown, ArrowUp, Bitcoin, Landmark } from "lucide-react";
+import { Check, ArrowDownLeft, ArrowUpRight, Bitcoin, Landmark } from "lucide-react";
 import PlatformPicker from "../components/PlatformPicker";
 import { PlatformBadge } from "../components/PlatformBadge";
+import { Field, Input, Segmented } from "../components/ui";
 import { PLATFORMS } from "../utils/platforms";
 
 const TX_PLATFORMS = PLATFORMS.filter(p => p.value !== 'other');
 
-const labelCls = "block text-xs text-slate-500 font-medium mb-1.5";
+const TYPES = [
+  { value: 'withdrawal', label: 'Withdrawal', icon: ArrowUpRight },
+  { value: 'deposit',    label: 'Deposit',    icon: ArrowDownLeft },
+];
+const METHODS = [
+  { value: 'crypto', label: 'Crypto',        icon: Bitcoin  },
+  { value: 'bank',   label: 'Bank transfer', icon: Landmark },
+];
+
+const usd = (n) => `$${(n || 0).toFixed(2)}`;
 
 export default function TransactionPage({ onAdd, theme, items = [] }) {
   const [type, setType] = useState('withdrawal');
@@ -31,218 +41,123 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
   );
 
   const stats = useMemo(() => {
-    const deposits = transactions.filter(t => t.transactionType === 'deposit');
-    const withdrawals = transactions.filter(t => t.transactionType === 'withdrawal');
-    const totalFees = transactions.reduce((s, t) => s + Math.abs(t.profit || 0), 0);
+    const sum = (kind) => transactions
+      .filter(t => t.transactionType === kind)
+      .reduce((s, t) => s + (t.transactionAmount || 0), 0);
     return {
-      depositCount: deposits.length,
-      depositTotal: deposits.reduce((s, t) => s + (t.transactionAmount || 0), 0),
-      withdrawalCount: withdrawals.length,
-      withdrawalTotal: withdrawals.reduce((s, t) => s + (t.transactionAmount || 0), 0),
-      totalFees,
+      depositTotal: sum('deposit'),
+      withdrawalTotal: sum('withdrawal'),
+      totalFees: transactions.reduce((s, t) => s + Math.abs(t.profit || 0), 0),
     };
   }, [transactions]);
 
-  const handleSubmit = () => {
-    if (!amt || amt <= 0) return;
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (amt <= 0) return;
     onAdd({ type, platform, method, amount: amt, feePercent: feePct });
     setAmount('');
     setSuccess(true);
     setTimeout(() => setSuccess(false), 2000);
   };
 
-  const inputCls = `w-full h-9 ${theme.input} rounded-lg px-3 text-sm font-mono ${theme.text} focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
-
   return (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
 
-          {/* Form card */}
-          <div className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden`}>
+      <form onSubmit={handleSubmit} className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-xl p-5 flex flex-col gap-4`}>
+        <Segmented theme={theme} full value={type} onChange={setType} options={TYPES} ariaLabel="Type" />
 
-            <div className="p-5 space-y-4">
-              {/* Type toggle */}
-              <div>
-                <label className={labelCls}>Type</label>
-                <div className={`flex rounded-lg border ${theme.cardBorder} overflow-hidden`}>
-                  {[
-                    { value: 'withdrawal', label: 'Withdrawal' },
-                    { value: 'deposit',    label: 'Deposit'    },
-                  ].map(t => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => setType(t.value)}
-                      className={`flex-1 h-9 text-sm font-medium transition-colors ${
-                        type === t.value
-                          ? `${theme.card} ${theme.text}`
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+        <Field theme={theme} label="Platform">
+          <PlatformPicker value={platform} onChange={setPlatform} theme={theme} platforms={TX_PLATFORMS} />
+        </Field>
 
-              <div>
-                <label className={labelCls}>Platform</label>
-                <PlatformPicker
-                  value={platform}
-                  onChange={setPlatform}
-                  theme={theme}
-                  platforms={TX_PLATFORMS}
-                />
-              </div>
+        <Field theme={theme} label="Paid by">
+          <Segmented theme={theme} full value={method} onChange={setMethod} options={METHODS} ariaLabel="Paid by" />
+        </Field>
 
-              <div>
-                <label className={labelCls}>Method</label>
-                <div className={`flex rounded-lg border ${theme.cardBorder} overflow-hidden`}>
-                  {[
-                    { value: 'crypto', label: 'Crypto',        icon: Bitcoin  },
-                    { value: 'bank',   label: 'Bank transfer', icon: Landmark },
-                  ].map(m => (
-                    <button
-                      key={m.value}
-                      type="button"
-                      onClick={() => setMethod(m.value)}
-                      className={`flex-1 h-9 flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${
-                        method === m.value
-                          ? `${theme.card} ${theme.text}`
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                      }`}
-                    >
-                      <m.icon size={13} />
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className={labelCls}>Amount</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-mono pointer-events-none">$</span>
-                  <input
-                    type="number" min="0" step="0.01"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className={`${inputCls} pl-7`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className={labelCls}>Fee</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number" min="0" max="100" step="0.01"
-                    value={feePercent}
-                    onChange={e => setFeePercent(e.target.value)}
-                    className={inputCls}
-                  />
-                  <span className={`text-sm ${theme.subtext} shrink-0`}>%</span>
-                </div>
-              </div>
-
-              {amt > 0 && (
-                <div className="rounded-lg px-3 py-2 bg-loss/8 border border-loss/20 flex items-center justify-between">
-                  <span className={`text-xs ${theme.subtext}`}>Fee deducted</span>
-                  <span className="text-sm font-mono font-semibold text-loss">
-                    −${feeAmt.toFixed(2)}
-                    <span className="text-loss/50 ml-1.5 text-xs">({feePct}%)</span>
-                  </span>
-                </div>
-              )}
-
-              <button
-                onClick={handleSubmit}
-                disabled={!amt || amt <= 0}
-                className={`relative group w-full flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium border transition
-                  ${(!amt || amt <= 0) ? 'opacity-40 cursor-not-allowed' : ''}
-                  ${success
-                    ? 'text-profit border-profit/30 bg-profit/10'
-                    : `border-transparent ${theme.primary}`
-                  }`}
-              >
-                {success
-                  ? <><CheckCircle size={14} /> Recorded!</>
-                  : `Record ${type}`
-                }
-              </button>
-            </div>
-          </div>
-
-          {/* History */}
-          <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden flex flex-col`}>
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${theme.panelBorder}`}>
-              <h2 className={`text-sm font-semibold ${theme.text}`}>History</h2>
-              <span className={`text-xs font-mono ${theme.subtext}`}>
-                in ${stats.depositTotal.toFixed(2)}
-                <span className="mx-1.5 opacity-40">·</span>
-                out ${stats.withdrawalTotal.toFixed(2)}
-                <span className="mx-1.5 opacity-40">·</span>
-                <span className={stats.totalFees > 0 ? 'text-loss' : ''}>fees −${stats.totalFees.toFixed(2)}</span>
-              </span>
-            </div>
-
-            {transactions.length === 0 ? (
-              <div className={`flex-1 flex items-center justify-center py-10 text-sm ${theme.subtext}`}>
-                No transactions yet.
-              </div>
-            ) : (
-              <div className="overflow-y-auto max-h-[520px]">
-                <table className="w-full text-sm">
-                  <thead className={`text-xs font-medium ${theme.subtext}`}>
-                    <tr className={`border-b ${theme.cardBorder}`}>
-                      <th className="text-left px-4 py-2 font-semibold">Type</th>
-                      <th className="text-left px-3 py-2 font-semibold">Platform</th>
-                      <th className="text-left px-3 py-2 font-semibold">Method</th>
-                      <th className="text-right px-3 py-2 font-semibold">Amount</th>
-                      <th className="text-right px-3 py-2 font-semibold">Fee</th>
-                      <th className="text-right px-4 py-2 font-semibold">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map(t => {
-                      const isCrypto = (t.transactionMethod ?? 'crypto') === 'crypto';
-                      return (
-                        <tr key={t.id} className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>
-                          <td className="px-4 py-2">
-                            <span className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${t.transactionType === 'deposit' ? 'text-profit' : 'text-loss'}`}>
-                              {t.transactionType === 'deposit' ? <ArrowDown size={11} /> : <ArrowUp size={11} />}
-                              {t.transactionType}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">
-                            {t.platform && <PlatformBadge platform={t.platform} size="xs" />}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className={`inline-flex items-center gap-1 text-xs ${theme.textSecondary}`}>
-                              {isCrypto ? <Bitcoin size={11} /> : <Landmark size={11} />}
-                              {isCrypto ? 'Crypto' : 'Bank'}
-                            </span>
-                          </td>
-                          <td className={`px-3 py-2 text-right font-mono text-xs ${theme.text}`}>
-                            ${t.transactionAmount?.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <span className="text-xs font-mono font-semibold text-loss">
-                              −${Math.abs(t.profit || 0).toFixed(2)}
-                              <span className="text-loss/50 ml-1">({t.transactionFeePercent}%)</span>
-                            </span>
-                          </td>
-                          <td className={`px-4 py-2 text-right text-xs font-mono ${theme.subtext}`}>
-                            {t.dateSold ? new Date(t.dateSold).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+        <div className="flex items-start gap-3">
+          <Field theme={theme} label="Amount" className="flex-1 min-w-0">
+            <Input
+              theme={theme} type="number" min="0" step="0.01" prefix="$"
+              value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00"
+            />
+          </Field>
+          <Field theme={theme} label="Fee" className="w-[112px] shrink-0">
+            <Input
+              theme={theme} type="number" min="0" max="100" step="0.01" suffix="%"
+              value={feePercent} onChange={e => setFeePercent(e.target.value)}
+            />
+          </Field>
         </div>
+
+        <dl className={`border-t pt-3 space-y-1.5 text-[13px] ${theme.panelBorder} ${theme.subtext}`}>
+          <div className="flex items-center justify-between">
+            <dt>Fee</dt>
+            <dd className={`font-mono ${feeAmt > 0 ? 'text-loss' : ''}`}>−{usd(feeAmt)}</dd>
+          </div>
+          <div className="flex items-center justify-between">
+            <dt>{type === 'deposit' ? 'Lands on the platform' : 'You receive'}</dt>
+            <dd className={`font-mono ${theme.text}`}>{usd(Math.max(0, amt - feeAmt))}</dd>
+          </div>
+        </dl>
+
+        <button
+          type="submit"
+          disabled={amt <= 0 && !success}
+          className={`w-full flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium border disabled:opacity-40 disabled:cursor-not-allowed
+            ${success ? `${theme.cardBorder} text-profit` : `border-transparent ${theme.primary}`}`}
+        >
+          {success ? <><Check size={15} /> Recorded</> : `Record ${type}`}
+        </button>
+      </form>
+
+      {/* History */}
+      <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-xl overflow-hidden`}>
+        <div className={`flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 py-4 border-b ${theme.panelBorder}`}>
+          <h2 className={`text-sm font-semibold ${theme.text}`}>History</h2>
+          {transactions.length > 0 && (
+            <span className={`flex gap-3 text-xs ${theme.subtext}`}>
+              <span>In <span className={`font-mono ${theme.textSecondary}`}>{usd(stats.depositTotal)}</span></span>
+              <span>Out <span className={`font-mono ${theme.textSecondary}`}>{usd(stats.withdrawalTotal)}</span></span>
+              <span>Fees <span className="font-mono text-loss">−{usd(stats.totalFees)}</span></span>
+            </span>
+          )}
+        </div>
+
+        {transactions.length === 0 ? (
+          <p className={`px-5 py-10 text-center text-[13px] ${theme.subtext}`}>
+            No deposits or withdrawals yet. Their fees count against your profit.
+          </p>
+        ) : (
+          <ul className="overflow-y-auto max-h-[560px]">
+            {transactions.map(t => {
+              const deposit = t.transactionType === 'deposit';
+              const crypto = (t.transactionMethod ?? 'crypto') === 'crypto';
+              const Arrow = deposit ? ArrowDownLeft : ArrowUpRight;
+              return (
+                <li key={t.id} className={`flex items-center gap-3 px-5 py-2.5 border-b last:border-b-0 ${theme.panelBorder}`}>
+                  <span className={`w-7 h-7 shrink-0 flex items-center justify-center rounded-full border ${theme.panelBorder} ${theme.subtext}`}>
+                    <Arrow size={14} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-[13px] font-medium ${theme.text}`}>{deposit ? 'Deposit' : 'Withdrawal'}</p>
+                    <p className={`text-xs ${theme.subtext}`}>
+                      {crypto ? 'Crypto' : 'Bank transfer'}
+                      {t.dateSold && ` · ${new Date(t.dateSold).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                    </p>
+                  </div>
+                  {t.platform && (
+                    <span className={`hidden sm:block ${theme.textSecondary}`}><PlatformBadge platform={t.platform} size="xs" /></span>
+                  )}
+                  <div className="w-24 text-right">
+                    <p className={`font-mono text-[13px] ${theme.text}`}>{usd(t.transactionAmount)}</p>
+                    <p className="font-mono text-xs text-loss">−{usd(Math.abs(t.profit || 0))}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }

@@ -1,12 +1,13 @@
 // Snipes page — items to buy on one market and sell on another after fees,
 // filtered for liquidity so hard-to-sell items stay hidden.
 import React, { useEffect, useMemo, useState } from "react";
-import { ExternalLink, RefreshCw, RotateCcw, AlertTriangle, Lock, Sticker, SlidersHorizontal } from "lucide-react";
+import { ExternalLink, RefreshCw, RotateCcw, AlertTriangle, Lock, Sticker, SlidersHorizontal, Search, ChevronDown } from "lucide-react";
 import { useSnipes } from "../hooks/useSnipes";
 import {
   BUY_MARKETS, DEFAULT_SNIPE_FILTERS, SELL_MARKETS, SNIPE_MARKETS, migrateFilters, selectSnipes,
 } from "../utils/snipes";
-import { PlatformBadge } from "../components/PlatformBadge";
+import { PlatformBadge, PLATFORM_CONFIG } from "../components/PlatformBadge";
+import { Chip, Field, Input, SectionTitle, Select, Switch } from "../components/ui";
 import { useItemImage } from "../utils/itemImages";
 import { CURRENCIES } from "../hooks/useExchangeRate";
 
@@ -19,6 +20,8 @@ const MARKET_LABELS = { csfloat: "CSFloat", dmarket: "DMarket", youpin: "YouPin"
 // The demo preview only has deals 15+ minutes old and no saved filters, so
 // it starts from looser defaults to have something to show.
 const DEMO_FILTERS = { ...DEFAULT_SNIPE_FILTERS, sellMarkets: SELL_MARKETS, minLiquidity: 30, maxAgeMin: 60 };
+
+const CURRENCY_OPTIONS = CURRENCIES.map((c) => ({ value: c.code, label: c.code }));
 
 function loadFilters(demo) {
   if (demo) return DEMO_FILTERS;
@@ -84,6 +87,9 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
         filters={filters}
         set={set}
         symbol={symbol}
+        defaults={demo ? DEMO_FILTERS : DEFAULT_SNIPE_FILTERS}
+        onClose={() => setFiltersOpen(false)}
+        count={visible.length}
         onReset={() => setFilters(demo ? DEMO_FILTERS : DEFAULT_SNIPE_FILTERS)}
       />
 
@@ -101,25 +107,25 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
           <button
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
-            className={`md:hidden ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs ${theme.cardBorder} ${filtersOpen ? theme.text : theme.subtext}`}
+            className={`md:hidden ml-auto flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-xs font-medium ${filtersOpen ? `${theme.navActive} border-transparent` : `${theme.cardBorder} ${theme.subtext}`}`}
           >
             <SlidersHorizontal size={13} /> Filters
           </button>
-          <select
+          <Select
+            theme={theme}
+            compact
+            align="right"
+            ariaLabel="Currency"
+            className="md:ml-auto w-[76px]"
             value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            title="Currency"
-            aria-label="Currency"
-            className={`md:ml-auto h-8 px-2 rounded-lg text-xs border ${theme.input} ${theme.text} focus:outline-none`}
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.code}</option>
-            ))}
-          </select>
+            onChange={setCurrency}
+            options={CURRENCY_OPTIONS}
+          />
           <button
             onClick={refresh}
             title="Refresh"
-            className={`p-2 rounded-lg transition-colors ${theme.subtext} ${theme.textHover} ${theme.itemHoverBg}`}
+            aria-label="Refresh"
+            className={`h-8 w-8 flex items-center justify-center rounded-lg ${theme.subtext} ${theme.textHover} ${theme.itemHoverBg}`}
           >
             <RefreshCw size={15} />
           </button>
@@ -314,116 +320,170 @@ function SnipeRow({ deal: d, theme, money, now, onLogin }) {
   );
 }
 
-function FilterPanel({ open, theme, filters: f, set, symbol, onReset }) {
-  const label = `text-xs font-medium ${theme.subtext}`;
-  const input = `w-full px-2 py-1.5 rounded-lg text-sm border ${theme.input} ${theme.text} focus:outline-none`;
+const SORT_OPTIONS = [
+  { value: "roi", label: "Highest ROI" },
+  { value: "profit", label: "Highest profit" },
+  { value: "newest", label: "Newest" },
+  { value: "price", label: "Lowest price" },
+];
 
-  const numberField = (key, text, suffix) => (
-    <label className="block">
-      <span className={label}>{text}</span>
-      <div className="flex items-center gap-1.5 mt-1">
-        <input
-          type="number"
-          value={f[key]}
-          onChange={(e) => set(key)(e.target.value === "" ? "" : Number(e.target.value))}
-          className={input}
-        />
-        {suffix && <span className={`text-xs ${theme.subtext}`}>{suffix}</span>}
-      </div>
-    </label>
+// Keys the "More" section holds, so it opens by itself when one is changed.
+const MORE_KEYS = ["buyFee", "maxAgeMin", "maxRefAgeMin"];
+
+function FilterPanel({ open, theme, filters: f, set, symbol, defaults, onReset, onClose, count }) {
+  const changed = (keys) => keys.some((k) => JSON.stringify(f[k]) !== JSON.stringify(defaults[k]));
+  const dirty = changed(Object.keys(defaults).filter((k) => k !== "version"));
+  const [moreOpen, setMoreOpen] = useState(() => changed(MORE_KEYS));
+
+  const number = (key, props = {}) => (
+    <Input
+      theme={theme}
+      type="number"
+      value={f[key]}
+      onChange={(e) => set(key)(e.target.value === "" ? "" : Number(e.target.value))}
+      {...props}
+    />
   );
 
-  const toggle = (key, text) => (
-    <label className={`flex items-center gap-2 text-sm cursor-pointer ${theme.textSecondary}`}>
-      <input type="checkbox" checked={!!f[key]} onChange={(e) => set(key)(e.target.checked)} />
-      {text}
-    </label>
-  );
-
-  const marketChecks = (key, markets) => (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-      {markets.map((m) => (
-        <label key={m} className={`flex items-center gap-1.5 text-sm cursor-pointer ${theme.textSecondary}`}>
-          <input
-            type="checkbox"
-            checked={f[key].includes(m)}
-            onChange={() => set(key)(f[key].includes(m) ? f[key].filter((x) => x !== m) : [...f[key], m])}
-          />
+  const markets = (key, list) => (
+    <div className="flex flex-wrap gap-1.5">
+      {list.map((m) => (
+        <Chip
+          key={m}
+          theme={theme}
+          icon={PLATFORM_CONFIG[m]?.icon}
+          selected={f[key].includes(m)}
+          onClick={() => set(key)(f[key].includes(m) ? f[key].filter((x) => x !== m) : [...f[key], m])}
+        >
           {MARKET_LABELS[m]}
-        </label>
+        </Chip>
       ))}
     </div>
   );
 
+  const section = `pt-5 border-t ${theme.panelBorder} space-y-3`;
+  const liquidity = Number(f.minLiquidity) || 0;
+
   return (
-    <aside className={`${open ? '' : 'hidden'} md:block order-first md:order-last w-full md:w-[272px] shrink-0 md:overflow-y-auto border-b md:border-b-0 md:border-l ${theme.panelBorder} px-4 py-4 md:px-5 md:py-8 space-y-4`}>
+    <aside className={`${open ? '' : 'hidden'} md:block order-first md:order-last w-full md:w-[288px] shrink-0 md:overflow-y-auto [scrollbar-gutter:stable] border-b md:border-b-0 md:border-l ${theme.panelBorder} px-4 py-4 md:px-5 md:py-8 space-y-5`}>
       <div className="flex items-center md:h-7">
         <h2 className={`text-sm font-semibold ${theme.text}`}>Filters</h2>
         <button
           onClick={onReset}
-          className={`ml-auto flex items-center gap-1 text-xs ${theme.subtext} ${theme.textHover}`}
+          disabled={!dirty}
+          className={`ml-auto flex items-center gap-1 h-7 px-2 -mr-2 rounded-md text-xs ${theme.subtext} ${theme.textHover} ${theme.itemHoverBg} disabled:opacity-0 disabled:pointer-events-none`}
         >
           <RotateCcw size={12} /> Reset
         </button>
       </div>
 
-      <input
-        type="text"
-        placeholder="Search, e.g. ak redline"
-        value={f.search}
-        onChange={(e) => set("search")(e.target.value)}
-        className={input}
-      />
-
-      <div>
-        <span className={label}>Buy on</span>
-        {marketChecks("buyMarkets", BUY_MARKETS)}
+      <div className="space-y-3">
+        <Input
+          theme={theme}
+          prefix={<Search size={13} className="translate-y-px" />}
+          placeholder="Search, e.g. ak redline"
+          aria-label="Search deals"
+          value={f.search}
+          onChange={(e) => set("search")(e.target.value)}
+        />
+        <Field theme={theme} label="Sort by">
+          <Select theme={theme} value={f.sortBy} onChange={set("sortBy")} options={SORT_OPTIONS} ariaLabel="Sort by" />
+        </Field>
       </div>
 
-      <div>
-        <span className={label}>Sell on</span>
-        {marketChecks("sellMarkets", SELL_MARKETS)}
-        <p className={`text-[11px] mt-1 ${theme.subtext}`}>Each deal uses the sell market that pays most after fees.</p>
+      <div className={section}>
+        <SectionTitle theme={theme}>Markets</SectionTitle>
+        <Field theme={theme} label="Buy on">{markets("buyMarkets", BUY_MARKETS)}</Field>
+        <Field theme={theme} label="Sell on" hint="Each deal uses the sell market that pays most after fees.">
+          {markets("sellMarkets", SELL_MARKETS)}
+        </Field>
       </div>
 
-      <label className="block">
-        <span className={label}>Sort by</span>
-        <select value={f.sortBy} onChange={(e) => set("sortBy")(e.target.value)} className={`${input} mt-1`}>
-          <option value="roi">Highest ROI</option>
-          <option value="profit">Highest profit</option>
-          <option value="newest">Newest</option>
-          <option value="price">Lowest price</option>
-        </select>
-      </label>
-
-      <div className="grid grid-cols-2 gap-2">
-        {numberField("minRoi", "Min ROI", "%")}
-        {numberField("minProfit", "Min profit", symbol)}
-        {numberField("minPrice", "Min price", symbol)}
-        {numberField("maxPrice", "Max price", symbol)}
-      </div>
-      {numberField("buyFee", "Extra buy cost (deposit etc.)", "%")}
-
-      <div className={`pt-3 border-t ${theme.panelBorder} space-y-3`}>
-        <p className={label}>Liquidity</p>
-        {numberField("minLiquidity", "Min liquidity score (0–100)")}
-        {toggle("hideUnknownLiquidity", "Hide unknown liquidity")}
-        {toggle("hideVolatile", "Hide volatile prices")}
-        {f.hideVolatile && numberField("maxChange7d", "Max 7d change", "%")}
+      <div className={section}>
+        <SectionTitle theme={theme}>Profit and price</SectionTitle>
+        <div className="grid grid-cols-2 gap-2">
+          <Field theme={theme} label="Min ROI">{number("minRoi", { suffix: "%" })}</Field>
+          <Field theme={theme} label="Min profit">{number("minProfit", { prefix: symbol })}</Field>
+        </div>
+        <Field theme={theme} label="Buy price">
+          <div className="flex items-center gap-2">
+            {number("minPrice", { prefix: symbol, placeholder: "Min", "aria-label": "Min buy price" })}
+            <span className={`text-xs ${theme.subtext}`}>to</span>
+            {number("maxPrice", { prefix: symbol, placeholder: "Max", "aria-label": "Max buy price" })}
+          </div>
+        </Field>
       </div>
 
-      <div className={`pt-3 border-t ${theme.panelBorder} space-y-2`}>
-        <p className={label}>Items</p>
-        {toggle("hideStatTrak", "Hide StatTrak™")}
-        {toggle("hideSouvenir", "Hide Souvenir")}
-        {toggle("hideTradeLocked", "Hide trade locked")}
-        {toggle("hideStickered", "Hide items with stickers")}
+      <div className={section}>
+        <SectionTitle theme={theme}>Liquidity</SectionTitle>
+        <Field
+          theme={theme}
+          label="Min liquidity score"
+          aside={<span className={`text-xs font-mono ${theme.text}`}>{liquidity}</span>}
+          hint="0 to 100 on the sell market. Higher sells faster."
+        >
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value={liquidity}
+            onChange={(e) => set("minLiquidity")(Number(e.target.value))}
+            aria-label="Min liquidity score"
+            className="slider"
+            style={{ "--fill": `${liquidity}%` }}
+          />
+        </Field>
+        <div>
+          <Switch theme={theme} label="Hide unknown liquidity" checked={f.hideUnknownLiquidity} onChange={set("hideUnknownLiquidity")} />
+          <Switch theme={theme} label="Hide volatile prices" checked={f.hideVolatile} onChange={set("hideVolatile")} />
+        </div>
+        {f.hideVolatile && (
+          <Field theme={theme} label="Volatile means a 7-day change over">{number("maxChange7d", { suffix: "%" })}</Field>
+        )}
       </div>
 
-      <div className={`pt-3 border-t ${theme.panelBorder} grid grid-cols-2 gap-2`}>
-        {numberField("maxAgeMin", "Max age", "min")}
-        {numberField("maxRefAgeMin", "Max ref age", "min")}
+      <div className={`pt-5 border-t ${theme.panelBorder} space-y-2`}>
+        <SectionTitle theme={theme}>Hide</SectionTitle>
+        <div>
+          <Switch theme={theme} label="StatTrak™" checked={f.hideStatTrak} onChange={set("hideStatTrak")} />
+          <Switch theme={theme} label="Souvenir" checked={f.hideSouvenir} onChange={set("hideSouvenir")} />
+          <Switch theme={theme} label="Trade locked" checked={f.hideTradeLocked} onChange={set("hideTradeLocked")} />
+          <Switch theme={theme} label="Items with stickers" checked={f.hideStickered} onChange={set("hideStickered")} />
+        </div>
       </div>
+
+      <div className={`pt-3 border-t ${theme.panelBorder}`}>
+        <button
+          type="button"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen((o) => !o)}
+          className={`w-full flex items-center justify-between h-8 text-[13px] font-medium ${theme.subtext} ${theme.textHover}`}
+        >
+          More
+          <ChevronDown size={14} className={`transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+        </button>
+        {moreOpen && (
+          <div className="pt-2 space-y-3">
+            <Field theme={theme} label="Extra buy cost" hint="Added to every buy price, for deposit fees and the like.">
+              {number("buyFee", { suffix: "%" })}
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field theme={theme} label="Listing seen within">{number("maxAgeMin", { suffix: "min" })}</Field>
+              <Field theme={theme} label="Sell price within">{number("maxRefAgeMin", { suffix: "min" })}</Field>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Phones: the panel covers the list, so say how to get back to it. */}
+      <button
+        type="button"
+        onClick={onClose}
+        className={`md:hidden w-full h-9 rounded-lg text-sm font-medium ${theme.primary}`}
+      >
+        Show {count} {count === 1 ? "deal" : "deals"}
+      </button>
     </aside>
   );
 }
