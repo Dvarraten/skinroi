@@ -317,7 +317,7 @@ export default async function handler(req, res) {
       lastSyncOk: true,
       lastError: null,
     };
-    // Most pushes change nothing; rewriting the whole state every 2 min only
+    // Most pushes change nothing; rewriting the whole state every 5 min only
     // burns Redis quota. lastSync is refreshed at most every STATE_REFRESH_MS.
     const changed =
       newOfferIds.length > 0 ||

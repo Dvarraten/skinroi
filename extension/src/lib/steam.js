@@ -487,7 +487,7 @@ function collectItems(rawItems, type, descByKey, sink) {
     if (!assetid) continue;
     // Drop items we can't name yet. Steam's inventory endpoint sometimes
     // takes a few minutes to propagate a just-received item's description,
-    // especially for unique-classid items like Souvenir skins. The 2-min
+    // especially for unique-classid items like Souvenir skins. The 5-min
     // background poll retries automatically; users can add anything the
     // extension permanently missed via the manual Add form.
     if (!marketHashName) continue;

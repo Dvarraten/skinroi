@@ -39,7 +39,7 @@ skinroi/
 ├── extension/            Chrome extension (Manifest V3, load unpacked)
 │   ├── manifest.json
 │   └── src/
-│       ├── background.js  Service worker — polls GetTradeOffers every 2 min
+│       ├── background.js  Service worker — polls GetTradeOffers every 5 min
 │       ├── popup/         Popup UI: connect steps, status, recent trades, settings
 │       └── lib/
 │           ├── config.js  Endpoints, storage keys
@@ -99,7 +99,7 @@ data (profit, loss, warnings) and the skins. `tailwind.config.js` maps every
 - Extension pulls a session-derived WebAPI token from
   `steamcommunity.com/pointssummary/ajaxgetasyncconfig` (falls back to the
   `data-loyalty_webapi_token` embedded in `/my/home/` HTML)
-- Every 2 minutes calls `IEconService/GetTradeOffers/v1/` across three filter
+- Every 5 minutes calls `IEconService/GetTradeOffers/v1/` across three filter
   modes to catch all state 3 (Accepted) trades, plus
   `IEconService/GetTradeHistory/v1/` — merged and deduped by `tradeofferid`
 - The extension sends every accepted trade; the backend applies the cutoff:
@@ -132,7 +132,7 @@ Items added via Handle Items store the Steam `assetid` for this matching.
 (DMarket) when the last scan is older than 90s, guarded by a Redis lock. The page polls with
 `?since=<meta.updatedAt>` and gets `{ unchanged: true }` without the deal list
 when nothing changed (the deal list is several hundred KB; see Redis budget).
-CSFloat listings come from the extension instead: every poll (2 min) it fetches
+CSFloat listings come from the extension instead: every poll (5 min) it fetches
 `csfloat.com/api/v1/listings?sort_by=most_recent` with the browser session (no
 API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
 "too many IPs" when Vercel fetches them, because functions call out from many
@@ -176,7 +176,7 @@ headers). Every extension call to it goes through `extension/src/lib/csfloat.js`
 one queue, 18 s apart (at most 3 a minute, leaving room for the user's own
 csfloat.com browsing), and after a 429 every CSFloat call pauses
 until `Retry-After`/`X-RateLimit-Reset`, else 10 min doubling to 60 min. Per
-2-min poll that is at most 1 feed + 2 lookups + 3 sell-price calls. CSFloat
+5-min poll that is at most 1 feed + 2 lookups + 3 sell-price calls. CSFloat
 inspect (`api.csfloat.com`, `lib/inspect.js`) only looks at items from trades
 since pairing, at most 5 per poll, and caches failures for 24 h. Never add a
 CSFloat call that bypasses `csfloatFetch`.
@@ -304,7 +304,8 @@ value: every read or write of it costs several hundred KB of bandwidth. The
 free plan's 10 GB/month bandwidth (not commands or storage) is what ran out in
 Nov 2026. So it is capped at 250 deals, null ref fields are dropped before
 storing, and `readDeals` in `scan.js` reads the small meta key first and reuses
-the warm instance's copy when `meta.updatedAt` matches.
+the warm instance's copy when `meta.updatedAt` matches. The extension polls every
+5 min (`POLL_INTERVAL_MIN`, was 2) because each poll makes several pushes.
 
 ## Hard Project Rules
 

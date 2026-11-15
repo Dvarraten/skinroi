@@ -157,7 +157,7 @@ async function runSellPricesSafe() {
   }
 }
 
-// Runs a poll and remembers how it went, so the popup can say "checked 2 min
+// Runs a poll and remembers how it went, so the popup can say "checked 5 min
 // ago" or name what is wrong. A poll skipped because one is already running
 // (or because nothing is paired) says nothing new and is not recorded.
 async function pollAndRecord(opts) {

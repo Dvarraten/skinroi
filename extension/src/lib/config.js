@@ -11,7 +11,7 @@ export const EXT_VERSION = chrome.runtime.getManifest().version;
 // How often the background service worker polls Steam for changes.
 // Chrome's alarms API enforces a 1-minute minimum for unpacked extensions
 // (30s in dev — see chrome://extensions).
-export const POLL_INTERVAL_MIN = 2;
+export const POLL_INTERVAL_MIN = 5;
 
 // Steam endpoints called from the service worker.
 export const STEAM_HOME = 'https://steamcommunity.com/my/home/';
@@ -46,7 +46,7 @@ export const SNIPE_LOOKUPS_PER_RUN = 2;
 // about 5, and the user's own browsing on csfloat.com shares that budget)
 // and pauses all of them after a 429: until Retry-After / X-RateLimit-Reset,
 // else 10 min, doubling for each 429 in a row, at most 60 min.
-// Per 2-minute poll: 1 Snipes feed + 2 lookups + 3 sell-price calls = 6.
+// Per 5-minute poll: 1 Snipes feed + 2 lookups + 3 sell-price calls = 6.
 export const CSFLOAT_MIN_GAP_MS = 18 * 1000;
 export const CSFLOAT_PAUSE_MIN_MS = 10 * 60 * 1000;
 export const CSFLOAT_PAUSE_MAX_MS = 60 * 60 * 1000;
