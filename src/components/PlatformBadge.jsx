@@ -33,7 +33,7 @@ export function PlatformBadge({ platform, size = "sm" }) {
   const key = platform.toLowerCase();
   const config = PLATFORM_CONFIG[key] ?? PLATFORM_CONFIG.other;
   const imgSize = size === "xs" ? "w-3.5 h-3.5" : "w-4 h-4";
-  const textSize = size === "xs" ? "text-[10px]" : "text-xs";
+  const textSize = size === "xs" ? "text-[11px]" : "text-xs";
 
   return (
     <span

@@ -1,44 +1,56 @@
-// Sticky app header — logo, nav buttons, currency popover, theme picker,
-// pending-item badge, and user account dropdown.
+// Sticky app header. Left: logo and the main destinations. Right: the one
+// primary action (Add item), the currency converter and the account menu,
+// which also holds extension status, theme, CSV import / export and About.
+// On phones the destinations move to BottomNav.
 import React, { useRef, useState, useEffect } from "react";
 import {
-  BarChart3,
   LogOut,
   ExternalLink,
   Download,
   Upload,
   User,
-  PackagePlus,
-  Inbox,
   Info,
   AlertTriangle,
   ArrowLeftRight,
-  ArrowDownUp,
-  Home,
-  PanelLeft,
-  Crosshair,
+  Plus,
+  Menu,
 } from "lucide-react";
 import steamLogo from "../assets/platforms/steam.png";
 import logoSrc from "../utils/skinroi-logo.svg";
 import logoLightSrc from "../utils/skinroi-logo-light.svg";
 import CurrencyConverter from "./CurrencyConverter";
 import ExtensionPairPanel from "./ExtensionPairPanel";
-import { PROFIT_COLOR, WARN_COLOR, LOSS_COLOR } from "../themes/themes";
+import ThemePicker from "./ThemePicker";
+import { Button, IconButton } from "./ui/Button";
+import { NAV_ITEMS } from "./nav";
+import { PROFIT_COLOR, WARN_COLOR, LOSS_COLOR, themes } from "../themes/themes";
 
 function SteamIcon({ className }) {
   return <img src={steamLogo} alt="" className={className} />;
 }
 
+// Closes a popover when the user clicks outside `ref` or presses Escape.
+function useDismiss(open, ref, onClose, ignoreSelector) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (ignoreSelector && e.target.closest?.(ignoreSelector)) return;
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    };
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, ref, onClose, ignoreSelector]);
+}
+
 export default function Header({
   theme,
   activePage = null,
-  onAnalyticsClick,
-  onSnipesClick,
-  onAddItemClick,
-  onHandleItemsClick,
-  onTransactionClick,
-  onAboutClick,
-  onHomeClick,
+  onNavigate,
   pendingCount = 0,
   user,
   onLogin,
@@ -50,7 +62,9 @@ export default function Header({
   extension = null,
   syncError = null,
   onExtensionChange,
-  // Currency converter props (for popover)
+  themeKey,
+  setTheme,
+  // Currency converter props (for the popover)
   usdAmount,
   rmbAmount,
   sidebarRate,
@@ -63,137 +77,111 @@ export default function Header({
   displayCurrency,
   setDisplayCurrency,
   currencySymbol,
-  converterPinned,
-  setConverterPinned,
-  children,
 }) {
   const importInputRef = useRef(null);
   const extStatus = syncError ? 'error' : extension?.connected ? 'connected' : 'disconnected';
   const ringColor = { connected: PROFIT_COLOR, disconnected: WARN_COLOR, error: LOSS_COLOR }[extStatus];
   const ringTitle = {
-    connected: 'Extension connected',
-    disconnected: 'Extension not connected',
-    error: `Extension sync problem: ${syncError}`,
+    connected: 'Account menu · extension connected',
+    disconnected: 'Account menu · extension not connected',
+    error: `Account menu · extension sync problem: ${syncError}`,
   }[extStatus];
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   // A broken Steam avatar URL falls back to the placeholder icon instead of
   // leaving an empty circle.
   const [avatarFailed, setAvatarFailed] = useState(false);
   useEffect(() => { setAvatarFailed(false); }, [user?.avatarUrl]);
   const [currencyOpen, setCurrencyOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const menuRef = useRef(null);
   const currencyRef = useRef(null);
 
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [dropdownOpen]);
+  useDismiss(menuOpen, menuRef, () => setMenuOpen(false));
+  // The currency picker's list is portaled to <body>, so it sits outside
+  // currencyRef; closing on it would unmount the list before the click lands.
+  useDismiss(currencyOpen, currencyRef, () => setCurrencyOpen(false), '[data-currency-menu]');
 
-  useEffect(() => {
-    if (!currencyOpen) return;
-    const handler = (e) => {
-      // The currency picker's list is portaled to <body>, so it sits outside
-      // currencyRef; closing on it would unmount the list before the click lands.
-      if (e.target.closest?.('[data-currency-menu]')) return;
-      if (currencyRef.current && !currencyRef.current.contains(e.target)) {
-        setCurrencyOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [currencyOpen]);
+  const accent = theme.accentColor || theme.dotColor;
+  const go = (key) => { setMenuOpen(false); onNavigate(key); };
 
-  const navBtn = (active) =>
-    `relative shrink-0 px-0.5 py-2 text-[13px] font-medium transition-colors group ${
-      active ? (theme?.text || "text-white") : `${theme?.subtext || "text-slate-400"} ${theme?.textHover || "hover:text-white"}`
-    }`;
-
-  const dotColor = theme?.accentColor || theme?.dotColor || '#3b82f6';
-
-  const navItems = [
-    { key: 'home',         label: 'Home',         icon: Home,        onClick: onHomeClick,        badge: 0 },
-    { key: 'addItem',      label: 'Add item',     icon: PackagePlus, onClick: onAddItemClick,     badge: 0 },
-    { key: 'handleItems',  label: 'Handle items', icon: Inbox,       onClick: onHandleItemsClick, badge: pendingCount },
-    { key: 'transactions', label: 'Transactions', icon: ArrowDownUp, onClick: onTransactionClick, badge: 0 },
-    { key: 'snipes',       label: 'Snipes',       icon: Crosshair,   onClick: onSnipesClick,      badge: 0 },
-    { key: 'analytics',    label: 'Analytics',    icon: BarChart3,   onClick: onAnalyticsClick,   badge: 0 },
-    { key: 'about',        label: 'About',        icon: Info,        onClick: onAboutClick,       badge: 0 },
-  ];
-
-  // One nav row, rendered in the bar on desktop and as a scrollable strip
-  // under it on phones. The active page is marked by a 2px accent line as
-  // wide as its label; hover draws the same line in from the left.
-  const renderNav = (showIcons) => navItems.map(({ key, label, icon: Icon, onClick, badge }) => {
-    const active = key === 'home' ? !activePage : activePage === key;
-    return (
-      <button
-        key={key}
-        onClick={onClick}
-        aria-current={active ? 'page' : undefined}
-        className={`flex items-center gap-1.5 ${navBtn(active)}`}
-      >
-        {showIcons && <Icon size={15} strokeWidth={1.75} />}
-        <span>{label}</span>
-        {badge > 0 && (
-          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-loss text-white text-[10px] font-semibold leading-none tabular-nums">
-            {badge > 99 ? '99+' : badge}
-          </span>
-        )}
-        <span
-          className={`absolute bottom-0 left-0 h-[2px] w-full rounded-full origin-left transition-transform duration-200 ${active ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}
-          style={{ backgroundColor: dotColor }}
-        />
-      </button>
-    );
-  });
+  const menuRow = `w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-left ${theme.textSecondary} ${theme.textHover} ${theme.itemHoverBg} transition-colors`;
+  const menuDivider = `border-t ${theme.panelBorder}`;
 
   return (
-    <header className={`w-full sticky top-0 z-50 px-4 pt-3 pb-1 ${theme?.bg || 'bg-[#0c1120]'}`}>
-      <div className={`px-4 md:px-5 h-14 flex items-center justify-between rounded-2xl shadow-lg ${theme?.header || "bg-gradient-to-b from-[#0e1a32] to-[#070c16]"}`}>
-        {/* LEFT: Logo + Nav */}
-        <div className="flex items-center gap-8">
+    <header className={`w-full sticky top-0 z-50 px-3 md:px-4 pt-3 pb-1 ${theme.bg}`}>
+      <div className={`pl-3 pr-3 md:pl-5 md:pr-4 h-14 flex items-center justify-between gap-3 rounded-2xl shadow-lg ${theme.header}`}>
+        {/* LEFT: logo + destinations */}
+        <div className="flex items-center gap-6 lg:gap-8 min-w-0">
           <button
             type="button"
-            onClick={onHomeClick}
+            onClick={() => go(null)}
             title="Home"
-            className="flex items-center hover:opacity-80 transition-opacity"
+            className="flex items-center shrink-0 hover:opacity-80 transition-opacity"
           >
             <img
-              src={theme?.name === 'Light' ? logoLightSrc : logoSrc}
+              src={theme.name === 'Light' ? logoLightSrc : logoSrc}
               alt="SkinROI"
-              style={{ height: "52px", width: "auto" }}
+              className="h-11 md:h-[52px] w-auto"
             />
           </button>
-          <nav aria-label="Main" className="hidden md:flex items-center gap-5">
-            {renderNav(true)}
+          <nav aria-label="Main" className="hidden md:flex items-center gap-1">
+            {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+              const active = (activePage || null) === key;
+              const badge = key === 'handleItems' ? pendingCount : 0;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => go(key)}
+                  aria-current={active ? 'page' : undefined}
+                  className={`relative group flex items-center gap-2 h-14 px-2.5 lg:px-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                    active ? theme.text : `${theme.subtext} ${theme.textHover}`
+                  }`}
+                >
+                  <Icon size={16} strokeWidth={1.75} className="hidden lg:block" />
+                  <span>{label}</span>
+                  {badge > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-loss text-white text-[11px] font-semibold leading-none tabular-nums">
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                  {/* 2px accent line under the active page; hover previews it */}
+                  <span
+                    className={`absolute bottom-2.5 left-2.5 right-2.5 lg:left-3 lg:right-3 h-[2px] rounded-full origin-left transition-transform duration-200 ${active ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}
+                    style={{ backgroundColor: accent }}
+                  />
+                </button>
+              );
+            })}
           </nav>
         </div>
 
-        {/* RIGHT */}
-        <div className="flex items-center gap-3">
+        {/* RIGHT: primary action, tools, account */}
+        <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Plus size={15} strokeWidth={2.5} />}
+            onClick={() => go('addItem')}
+            aria-current={activePage === 'addItem' ? 'page' : undefined}
+            className="mr-1"
+          >
+            Add item
+          </Button>
+
           {/* Currency converter popover */}
           <div className="relative" ref={currencyRef}>
-            <button
+            <IconButton
+              label="Currency converter"
+              size="md"
+              pressed={currencyOpen}
               onClick={() => setCurrencyOpen(o => !o)}
-              title="Currency converter"
-              className={`p-2 rounded-lg transition ${
-                currencyOpen
-                  ? `${theme?.text || 'text-white'} bg-white/8`
-                  : 'text-slate-400 hover:text-white hover:bg-white/8'
-              }`}
             >
-              <ArrowLeftRight size={18} />
-            </button>
+              <ArrowLeftRight size={17} />
+            </IconButton>
 
             {currencyOpen && (
-              <div className={`pop-in origin-top-right absolute right-0 top-12 w-72 rounded-xl border ${theme?.panelBorder || 'border-white/10'} ${theme?.panel || 'bg-[#151f35]'} shadow-xl p-4 z-[60]`}>
-                <p className={`text-xs font-medium ${theme?.subtext || 'text-slate-400'} mb-3`}>Currency converter</p>
+              <div className={`pop-in origin-top-right absolute right-0 top-12 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border ${theme.panelBorder} ${theme.panel} shadow-xl p-4 z-[60]`}>
+                <p className={`text-xs font-medium ${theme.subtext} mb-3`}>Currency converter</p>
                 <CurrencyConverter
                   usdAmount={usdAmount}
                   rmbAmount={rmbAmount}
@@ -209,161 +197,165 @@ export default function Header({
                   currencySymbol={currencySymbol}
                 />
                 {lastUpdated && (
-                  <p className={`text-[10px] ${theme?.subtext || 'text-slate-500'} mt-2 text-center`}>
+                  <p className={`text-[11px] ${theme.subtext} mt-2 text-center`}>
                     Rate from: {lastUpdated}
                   </p>
-                )}
-                {setConverterPinned && (
-                  <button
-                    onClick={() => setConverterPinned(p => !p)}
-                    className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-                      converterPinned
-                        ? `${theme?.accent || 'text-blue-400'} bg-white/8`
-                        : `text-slate-500 hover:text-slate-300 hover:bg-white/5`
-                    }`}
-                  >
-                    <PanelLeft size={12} />
-                    {converterPinned ? 'Pinned to sidebar' : 'Pin to sidebar'}
-                  </button>
                 )}
               </div>
             )}
           </div>
 
-          {children}
+          {!user && (
+            <Button
+              size="sm"
+              icon={<SteamIcon className="h-3.5 w-3.5" />}
+              onClick={onLogin}
+              className="hidden sm:inline-flex"
+            >
+              Sign in
+            </Button>
+          )}
 
-          {user ? (
-            <div className="relative" ref={dropdownRef}>
+          {/* Account menu: avatar when signed in, a menu icon otherwise */}
+          <div className="relative" ref={menuRef}>
+            {user ? (
               <button
-                onClick={() => setDropdownOpen((o) => !o)}
+                type="button"
+                onClick={() => setMenuOpen((o) => !o)}
                 title={ringTitle}
-                className="rounded-full p-0.5 transition"
+                aria-label={ringTitle}
+                aria-expanded={menuOpen}
+                className="rounded-full p-0.5 ml-1 block"
               >
                 {user.avatarUrl && !avatarFailed ? (
                   <img
                     src={user.avatarUrl}
-                    alt={user.personaName || ""}
+                    alt=""
                     referrerPolicy="no-referrer"
                     onError={() => setAvatarFailed(true)}
-                    className={`w-10 h-10 rounded-full transition ${dropdownOpen ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
+                    className="w-9 h-9 rounded-full"
                     style={{ boxShadow: `0 0 0 2px ${ringColor}` }}
                   />
                 ) : (
                   <div
-                    className={`w-10 h-10 rounded-full transition flex items-center justify-center ${theme?.card || 'bg-white/10'}`}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center ${theme.card}`}
                     style={{ boxShadow: `0 0 0 2px ${ringColor}` }}
                   >
-                    <User size={18} className="text-slate-400" />
+                    <User size={17} className={theme.subtext} />
                   </div>
                 )}
               </button>
+            ) : (
+              <IconButton label="Menu" size="md" pressed={menuOpen} aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+                <Menu size={18} />
+              </IconButton>
+            )}
 
-              {dropdownOpen && (
-                <div className={`pop-in origin-top-right absolute right-0 top-12 w-80 rounded-xl border ${theme?.panelBorder || 'border-white/10'} ${theme?.panel || 'bg-[#151f35]'} shadow-xl overflow-hidden z-50`}>
-                  {user.personaName && (
-                    <div className={`px-4 py-3 border-b ${theme?.panelBorder || 'border-white/10'}`}>
-                      <p className={`${theme?.text || 'text-white'} text-sm font-medium truncate`}>
-                        {user.personaName}
-                      </p>
+            {menuOpen && (
+              <div className={`pop-in origin-top-right absolute right-0 top-12 w-80 max-w-[calc(100vw-1.5rem)] max-h-[calc(100vh-5.5rem)] overflow-y-auto rounded-xl border ${theme.panelBorder} ${theme.panel} shadow-xl z-50`}>
+                {user ? (
+                  <>
+                    <div className={`px-4 py-3 border-b ${theme.panelBorder}`}>
+                      <p className={`${theme.text} text-sm font-semibold truncate`}>{user.personaName || 'Signed in'}</p>
+                      <p className={`text-xs ${theme.subtext}`}>Signed in with Steam</p>
                     </div>
+                    {/* Extension status + pairing */}
+                    <div className={`p-3 border-b ${theme.panelBorder} space-y-2`}>
+                      {syncError && (
+                        <div className="px-3 py-2 rounded-lg border border-red-500/30 bg-red-500/5 text-xs text-red-300 flex items-start gap-1.5">
+                          <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                          <span>{syncError}</span>
+                        </div>
+                      )}
+                      <ExtensionPairPanel theme={theme} extension={extension} onChange={onExtensionChange} />
+                    </div>
+                  </>
+                ) : (
+                  <div className={`p-3 border-b ${theme.panelBorder}`}>
+                    <Button variant="primary" block icon={<SteamIcon className="h-4 w-4" />} onClick={() => { setMenuOpen(false); onLogin(); }}>
+                      Sign in with Steam
+                    </Button>
+                    <p className={`text-xs mt-2 ${theme.subtext}`}>
+                      Saves your portfolio to your account and syncs trades with the extension.
+                    </p>
+                  </div>
+                )}
+
+                <ThemePicker themeStyles={theme} themes={themes} theme={themeKey} setTheme={setTheme} />
+
+                <div className={`${menuDivider} py-1`}>
+                  {user && (
+                    <>
+                      <a
+                        href={`https://steamcommunity.com/profiles/${user.steamId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={menuRow}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <ExternalLink size={15} />
+                        Steam profile
+                      </a>
+                      <a
+                        href={`https://steamcommunity.com/profiles/${user.steamId}/inventory/#730`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={menuRow}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <ExternalLink size={15} />
+                        CS2 inventory
+                      </a>
+                    </>
                   )}
-                  {/* Extension status + pairing (moved here from Handle Items) */}
-                  <div className={`p-3 border-b ${theme?.panelBorder || 'border-white/10'} space-y-2`}>
-                    {syncError && (
-                      <div className="px-3 py-2 rounded-lg border border-red-500/30 bg-red-500/5 text-[11px] text-red-300 flex items-start gap-1.5">
-                        <AlertTriangle size={12} className="shrink-0 mt-0.5" />
-                        <span>{syncError}</span>
-                      </div>
-                    )}
-                    <ExtensionPairPanel theme={theme} extension={extension} onChange={onExtensionChange} />
-                  </div>
-                  <div className="py-1">
-                    <a
-                      href={`https://steamcommunity.com/profiles/${user.steamId}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      <ExternalLink size={15} />
-                      Steam Profile
-                    </a>
-                    <a
-                      href={`https://steamcommunity.com/profiles/${user.steamId}/inventory/#730`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      <ExternalLink size={15} />
-                      CS2 Inventory
-                    </a>
-                    {onExportCSV && (
-                      <button
-                        onClick={() => { onExportCSV(); setDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
-                      >
-                        <Download size={15} />
-                        Export CSV
-                      </button>
-                    )}
-                    {onImportCSV && (
-                      <>
-                        <input
-                          ref={importInputRef}
-                          type="file"
-                          accept=".csv"
-                          className="hidden"
-                          onChange={(e) => {
-                            onImportCSV(e.target.files?.[0]);
-                            e.target.value = "";
-                            setDropdownOpen(false);
-                          }}
-                        />
-                        <button
-                          onClick={() => importInputRef.current?.click()}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
-                        >
-                          <Upload size={15} />
-                          Import CSV
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => { onAnalyticsClick(); setDropdownOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm ${theme?.textSecondary || 'text-slate-300'} ${theme?.textHover || 'hover:text-white'} ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
-                    >
-                      <BarChart3 size={15} />
-                      Analytics
+                  {onExportCSV && (
+                    <button type="button" onClick={() => { onExportCSV(); setMenuOpen(false); }} className={menuRow}>
+                      <Download size={15} />
+                      Export CSV
                     </button>
-                    <div className={`border-t ${theme?.panelBorder || 'border-white/10'} mt-1 pt-1`}>
-                      <button
-                        onClick={() => { onLogout(); setDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 ${theme?.itemHoverBg || 'hover:bg-white/8'} transition`}
-                      >
-                        <LogOut size={15} />
-                        Sign out
+                  )}
+                  {onImportCSV && (
+                    <>
+                      <input
+                        ref={importInputRef}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={(e) => {
+                          onImportCSV(e.target.files?.[0]);
+                          e.target.value = "";
+                          setMenuOpen(false);
+                        }}
+                      />
+                      <button type="button" onClick={() => importInputRef.current?.click()} className={menuRow}>
+                        <Upload size={15} />
+                        Import CSV
                       </button>
-                    </div>
-                  </div>
+                    </>
+                  )}
+                  <button type="button" onClick={() => go('about')} className={menuRow}>
+                    <Info size={15} />
+                    About SkinROI
+                  </button>
                 </div>
-              )}
-            </div>
-          ) : (
-            <button
-              onClick={onLogin}
-              className={`relative flex items-center gap-1.5 px-0.5 py-2 text-[13px] font-medium transition-colors group ${theme?.subtext || "text-slate-400"} ${theme?.textHover || "hover:text-white"}`}
-            >
-              <SteamIcon className="h-3.5 w-3.5" />
-              Sign in
-              <span className="absolute bottom-0 left-0 h-[2px] w-full rounded-full origin-left scale-x-0 transition-transform duration-200 group-hover:scale-x-100" style={{ backgroundColor: dotColor }} />
-            </button>
-          )}
+
+                {user && (
+                  <div className={`${menuDivider} py-1`}>
+                    <button
+                      type="button"
+                      onClick={() => { onLogout(); setMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-400 hover:text-red-300 ${theme.itemHoverBg} transition-colors`}
+                    >
+                      <LogOut size={15} />
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      <nav aria-label="Main" className="md:hidden flex items-center gap-5 overflow-x-auto px-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {renderNav(false)}
-      </nav>
     </header>
   );
 }

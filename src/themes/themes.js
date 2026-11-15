@@ -32,6 +32,8 @@ export const themes = {
   // ── 1. Original (finance terminal, amber accent) ──────────────
   bloomberg: {
     name: "Original",
+    onAccent: "#1a1203",
+    activeBg: "bg-white/10",
     dot: "bg-amber-500",
     dotColor: "#f59e0b",
     accentColor: WARN_COLOR,
@@ -66,6 +68,8 @@ export const themes = {
   // ── 2. Dark (default) ──────────────────────────────────────────────────────────
   dark: {
     name: "Dark",
+    onAccent: "#1a1203",
+    activeBg: "bg-white/10",
     dot: "bg-[#09090b]",
     dotColor: "#09090b",
     accentColor: WARN_COLOR,
@@ -85,6 +89,7 @@ export const themes = {
     text: "text-white",
     textSecondary: "text-slate-300",
     textHover: "hover:text-white",
+    itemHoverBg: "hover:bg-white/[0.06]",
     soldCard: "bg-[#1a1f2e] border-[#1e2028]",
     sidebarItem: "bg-[#1e2330] hover:bg-[#252b3a] border-[#1e2028]",
     header: "bg-gradient-to-b from-[#181c24] to-[#0d1117] border border-[#1e2028]",
@@ -99,6 +104,8 @@ export const themes = {
   // ── 3. Light ─────────────────────────────────────────────────────────────
   light: {
     name: "Light",
+    onAccent: "#1a1203",
+    activeBg: "bg-black/10",
     dot: "bg-blue-500",
     dotColor: "#dce0e6",
     accentColor: WARN_COLOR,
@@ -133,6 +140,8 @@ export const themes = {
   // ── 4. Midnight Blue ────────────────────────────────────────────────────
   default: {
     name: "Midnight Blue",
+    onAccent: "#ffffff",
+    activeBg: "bg-white/10",
     dot: "bg-blue-500",
     dotColor: "#3b82f6",
     accentColor: "#3b82f6",
@@ -152,7 +161,7 @@ export const themes = {
     text: "text-white",
     textSecondary: "text-slate-300",
     textHover: "hover:text-white",
-    itemHoverBg: "hover:bg-white/8",
+    itemHoverBg: "hover:bg-white/[0.08]",
     soldCard: "bg-[#1a2540] border-slate-600/30",
     sidebarItem: "bg-slate-700/50 hover:bg-slate-600/50 border-slate-600/50",
     header: "bg-gradient-to-b from-[#1e2d4a] to-[#0f1929] border border-slate-700/40",
@@ -167,6 +176,8 @@ export const themes = {
   // ── 5. Quartz (SAP Quartz Dark — deep indigo on near-black) ───────────
   quartz: {
     name: "Quartz",
+    onAccent: "#ffffff",
+    activeBg: "bg-white/10",
     dot: "bg-[#5d36ff]",
     dotColor: "#5d36ff",
     accentColor: "#5d36ff",
@@ -186,7 +197,7 @@ export const themes = {
     text: "text-white",
     textSecondary: "text-slate-300",
     textHover: "hover:text-white",
-    itemHoverBg: "hover:bg-[#5d36ff]/8",
+    itemHoverBg: "hover:bg-[#5d36ff]/[0.08]",
     soldCard: "bg-[#1a1a35] border-[#1e1e3a]",
     sidebarItem: "bg-[#1a1a35]/60 hover:bg-[#1e1e40] border-[#1e1e3a]",
     header: "bg-gradient-to-b from-[#1a1a35] to-[#0e0e1a] border border-[#1e1e3a]",

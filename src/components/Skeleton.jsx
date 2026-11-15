@@ -48,7 +48,7 @@ export function ItemGridSkeleton({ theme, viewMode = 'grid', count = 8 }) {
           ))}
         </div>
       ) : (
-        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(172px, 1fr))' }}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
           {slots.map(i => <CardSkeleton key={i} theme={theme} />)}
         </div>
       )}

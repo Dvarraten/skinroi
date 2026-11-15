@@ -3,10 +3,12 @@ import { ArrowDownUp, CheckCircle, ArrowDown, ArrowUp, Bitcoin, Landmark } from 
 import PlatformPicker from "../components/PlatformPicker";
 import { PlatformBadge } from "../components/PlatformBadge";
 import { PLATFORMS } from "../utils/platforms";
+import { Page, PageHeader, StatCard } from "../components/ui/Page";
+import { Button } from "../components/ui/Button";
+import Segmented from "../components/ui/Segmented";
+import { formatUsd } from "../utils/format";
 
 const TX_PLATFORMS = PLATFORMS.filter(p => p.value !== 'other');
-
-const labelCls = "block text-xs text-slate-500 font-medium mb-1.5";
 
 export default function TransactionPage({ onAdd, theme, items = [] }) {
   const [type, setType] = useState('withdrawal');
@@ -49,78 +51,48 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
     setTimeout(() => setSuccess(false), 2000);
   };
 
+  const labelCls = `block text-xs font-medium mb-1.5 ${theme.subtext}`;
   const inputCls = `w-full h-9 ${theme.input} rounded-lg px-3 text-sm font-mono ${theme.text} focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-      <div className="max-w-5xl mx-auto space-y-4">
+    <Page width="max-w-5xl">
+      <PageHeader
+        title="Transactions"
+        description="Record deposits and withdrawals, so the fees you pay to move money count toward your profit."
+      />
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <ArrowDown size={12} className="text-profit" />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Deposits</p>
-            </div>
-            <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
-              ${stats.depositTotal.toFixed(2)}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>{stats.depositCount} recorded</p>
-          </div>
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <ArrowUp size={12} className="text-loss" />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Withdrawals</p>
-            </div>
-            <p className={`text-lg font-mono font-semibold ${theme.text} tabular-nums`}>
-              ${stats.withdrawalTotal.toFixed(2)}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>{stats.withdrawalCount} recorded</p>
-          </div>
-          <div className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}>
-            <div className="flex items-center gap-2 mb-1">
-              <ArrowDownUp size={12} className="text-loss" />
-              <p className={`text-xs font-medium ${theme.subtext}`}>Total fees paid</p>
-            </div>
-            <p className="text-lg font-mono font-semibold text-loss tabular-nums">
-              −${stats.totalFees.toFixed(2)}
-            </p>
-            <p className={`text-xs ${theme.subtext}`}>across all transactions</p>
-          </div>
-        </div>
+      {/* Stats row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard
+          label="Deposits" icon={<ArrowDown size={13} className="text-profit" />}
+          value={formatUsd(stats.depositTotal)} hint={`${stats.depositCount} recorded`}
+        />
+        <StatCard
+          label="Withdrawals" icon={<ArrowUp size={13} className="text-loss" />}
+          value={formatUsd(stats.withdrawalTotal)} hint={`${stats.withdrawalCount} recorded`}
+        />
+        <StatCard
+          label="Total fees paid" icon={<ArrowDownUp size={13} className={theme.subtext} />}
+          value={formatUsd(-stats.totalFees)} tone={stats.totalFees > 0 ? 'loss' : null} hint="across all transactions"
+        />
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-5 items-start">
 
           {/* Form card */}
-          <div className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden`}>
-            <div className={`flex items-center gap-2 px-5 py-4 border-b ${theme.panelBorder}`}>
-              <ArrowDownUp size={15} className="text-slate-400" />
-              <h2 className={`font-semibold ${theme.text}`}>Record transaction</h2>
-            </div>
+          <section className={`md:col-span-2 ${theme.panel} border ${theme.panelBorder} rounded-2xl p-5`}>
+            <h2 className={`text-[15px] font-semibold mb-4 ${theme.text}`}>Record a transaction</h2>
 
-            <div className="p-5 space-y-4">
-              {/* Type toggle */}
+            <div className="space-y-4">
               <div>
                 <label className={labelCls}>Type</label>
-                <div className={`flex rounded-lg border ${theme.cardBorder} overflow-hidden`}>
-                  {[
-                    { value: 'withdrawal', label: 'Withdrawal' },
-                    { value: 'deposit',    label: 'Deposit'    },
-                  ].map(t => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => setType(t.value)}
-                      className={`flex-1 h-9 text-sm font-medium transition-colors ${
-                        type === t.value
-                          ? `${theme.card} ${theme.text}`
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
+                <Segmented
+                  block size="md" label="Type"
+                  items={[
+                    { key: 'withdrawal', label: 'Withdrawal', icon: <ArrowUp size={13} /> },
+                    { key: 'deposit',    label: 'Deposit',    icon: <ArrowDown size={13} /> },
+                  ].map(t => ({ ...t, active: type === t.key, onClick: () => setType(t.key) }))}
+                />
               </div>
 
               <div>
@@ -135,26 +107,13 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
 
               <div>
                 <label className={labelCls}>Method</label>
-                <div className={`flex rounded-lg border ${theme.cardBorder} overflow-hidden`}>
-                  {[
-                    { value: 'crypto', label: 'Crypto',        icon: Bitcoin  },
-                    { value: 'bank',   label: 'Bank transfer', icon: Landmark },
-                  ].map(m => (
-                    <button
-                      key={m.value}
-                      type="button"
-                      onClick={() => setMethod(m.value)}
-                      className={`flex-1 h-9 flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${
-                        method === m.value
-                          ? `${theme.card} ${theme.text}`
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                      }`}
-                    >
-                      <m.icon size={13} />
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
+                <Segmented
+                  block size="md" label="Method"
+                  items={[
+                    { key: 'crypto', label: 'Crypto',        icon: <Bitcoin size={13} /> },
+                    { key: 'bank',   label: 'Bank transfer', icon: <Landmark size={13} /> },
+                  ].map(m => ({ ...m, active: method === m.key, onClick: () => setMethod(m.key) }))}
+                />
               </div>
 
               <div>
@@ -188,66 +147,54 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
                 <div className="rounded-lg px-3 py-2 bg-loss/8 border border-loss/20 flex items-center justify-between">
                   <span className={`text-xs ${theme.subtext}`}>Fee deducted</span>
                   <span className="text-sm font-mono font-semibold text-loss">
-                    −${feeAmt.toFixed(2)}
+                    {formatUsd(-feeAmt)}
                     <span className="text-loss/50 ml-1.5 text-xs">({feePct}%)</span>
                   </span>
                 </div>
               )}
 
-              <button
+              <Button
+                variant={success ? "success" : "primary"}
+                block
                 onClick={handleSubmit}
-                disabled={!amt || amt <= 0}
-                className={`relative group w-full flex items-center justify-center gap-2 h-9 rounded-lg text-sm font-medium border transition
-                  ${(!amt || amt <= 0) ? 'opacity-40 cursor-not-allowed' : ''}
-                  ${success
-                    ? 'text-profit border-profit/30 bg-profit/10'
-                    : `${theme.card} ${theme.cardBorder} ${theme.text}`
-                  }`}
+                disabled={(!amt || amt <= 0) && !success}
+                icon={success ? <CheckCircle size={15} /> : null}
               >
-                {success
-                  ? <><CheckCircle size={14} /> Recorded!</>
-                  : `Record ${type === 'withdrawal' ? 'Withdrawal' : 'Deposit'}`
-                }
-                {!success && amt > 0 && (
-                  <span
-                    className="absolute bottom-0 left-0 h-[2px] w-0 rounded-full transition duration-200 group-hover:w-full"
-                    style={{ backgroundColor: theme.accentColor }}
-                  />
-                )}
-              </button>
+                {success ? 'Recorded' : `Record ${type === 'withdrawal' ? 'withdrawal' : 'deposit'}`}
+              </Button>
             </div>
-          </div>
+          </section>
 
           {/* History */}
-          <div className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-2xl shadow-lg overflow-hidden flex flex-col`}>
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${theme.panelBorder}`}>
-              <h2 className={`font-semibold ${theme.text}`}>History</h2>
-              <span className={`text-xs ${theme.subtext}`}>{transactions.length} entries</span>
+          <section className={`md:col-span-3 ${theme.panel} border ${theme.panelBorder} rounded-2xl overflow-hidden flex flex-col`}>
+            <div className={`flex items-baseline justify-between px-5 py-4 border-b ${theme.panelBorder}`}>
+              <h2 className={`text-[15px] font-semibold ${theme.text}`}>History</h2>
+              <span className={`text-xs ${theme.subtext}`}>{transactions.length} {transactions.length === 1 ? 'entry' : 'entries'}</span>
             </div>
 
             {transactions.length === 0 ? (
-              <div className={`flex-1 flex items-center justify-center py-10 text-sm ${theme.subtext}`}>
-                No transactions yet.
+              <div className={`flex-1 flex items-center justify-center px-5 py-12 text-sm text-center ${theme.subtext}`}>
+                No transactions yet. Record your first one with the form.
               </div>
             ) : (
               <div className="overflow-y-auto max-h-[520px]">
                 <table className="w-full text-sm">
                   <thead className={`text-xs font-medium ${theme.subtext}`}>
                     <tr className={`border-b ${theme.cardBorder}`}>
-                      <th className="text-left px-4 py-2 font-semibold">Type</th>
-                      <th className="text-left px-3 py-2 font-semibold">Platform</th>
-                      <th className="text-left px-3 py-2 font-semibold">Method</th>
-                      <th className="text-right px-3 py-2 font-semibold">Amount</th>
-                      <th className="text-right px-3 py-2 font-semibold">Fee</th>
-                      <th className="text-right px-4 py-2 font-semibold">Date</th>
+                      <th className="text-left px-5 py-2.5 font-medium">Type</th>
+                      <th className="text-left px-3 py-2.5 font-medium">Platform</th>
+                      <th className="text-left px-3 py-2.5 font-medium">Method</th>
+                      <th className="text-right px-3 py-2.5 font-medium">Amount</th>
+                      <th className="text-right px-3 py-2.5 font-medium">Fee</th>
+                      <th className="text-right px-5 py-2.5 font-medium">Date</th>
                     </tr>
                   </thead>
                   <tbody>
                     {transactions.map(t => {
                       const isCrypto = (t.transactionMethod ?? 'crypto') === 'crypto';
                       return (
-                        <tr key={t.id} className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>
-                          <td className="px-4 py-2">
+                        <tr key={t.id} className={`border-b last:border-b-0 ${theme.cardBorder} ${theme.itemHoverBg} transition-colors`}>
+                          <td className="px-5 py-2.5">
                             <span className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${t.transactionType === 'deposit' ? 'text-profit' : 'text-loss'}`}>
                               {t.transactionType === 'deposit' ? <ArrowDown size={11} /> : <ArrowUp size={11} />}
                               {t.transactionType}
@@ -263,15 +210,15 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
                             </span>
                           </td>
                           <td className={`px-3 py-2 text-right font-mono text-xs ${theme.text}`}>
-                            ${t.transactionAmount?.toFixed(2)}
+                            {formatUsd(t.transactionAmount)}
                           </td>
                           <td className="px-3 py-2 text-right">
                             <span className="text-xs font-mono font-semibold text-loss">
-                              −${Math.abs(t.profit || 0).toFixed(2)}
+                              {formatUsd(-Math.abs(t.profit || 0))}
                               <span className="text-loss/50 ml-1">({t.transactionFeePercent}%)</span>
                             </span>
                           </td>
-                          <td className={`px-4 py-2 text-right text-xs font-mono ${theme.subtext}`}>
+                          <td className={`px-5 py-2.5 text-right text-xs ${theme.subtext} whitespace-nowrap`}>
                             {t.dateSold ? new Date(t.dateSold).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                           </td>
                         </tr>
@@ -281,9 +228,8 @@ export default function TransactionPage({ onAdd, theme, items = [] }) {
                 </table>
               </div>
             )}
-          </div>
+          </section>
         </div>
-      </div>
-    </div>
+    </Page>
   );
 }

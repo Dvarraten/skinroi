@@ -89,14 +89,14 @@ export default function PlatformPicker({ value, onChange, theme, platforms, comp
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`w-full ${compact ? 'h-7 px-2 text-xs' : 'h-9 px-3 text-sm'} flex items-center justify-between gap-2 rounded-lg border font-medium transition-colors
+        className={`w-full ${compact ? 'h-8 px-2 text-xs' : 'h-9 px-3 text-sm'} flex items-center justify-between gap-2 rounded-lg border font-medium transition-colors
           ${theme.input} ${theme.text} hover:bg-white/5`}
       >
         <span className="flex items-center gap-2 min-w-0">
           <PlatformIcon platform={selected} size={compact ? 12 : 14} />
           <span className="truncate">{selected.label}</span>
           {selected.fee && !compact && (
-            <span className={`${theme.subtext} text-[10px]`}>· fee {selected.fee}</span>
+            <span className={`${theme.subtext} text-xs font-normal`}>· fee {selected.fee}</span>
           )}
         </span>
         <ChevronDown
@@ -132,15 +132,15 @@ export default function PlatformPicker({ value, onChange, theme, platforms, comp
                     onChange(p.value);
                     setOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors
-                    ${isSelected ? "bg-white/10 text-white" : "text-slate-200 hover:bg-white/5"}`}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] transition-colors
+                    ${isSelected ? `${theme.activeBg} ${theme.text}` : `${theme.textSecondary} ${theme.itemHoverBg}`}`}
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <PlatformIcon platform={p} size={14} />
                     <span className="truncate">{p.label}</span>
                   </span>
                   {p.fee && (
-                    <span className={`${theme.subtext} text-[10px] shrink-0`}>fee {p.fee}</span>
+                    <span className={`${theme.subtext} text-[11px] shrink-0`}>fee {p.fee}</span>
                   )}
                 </button>
               );

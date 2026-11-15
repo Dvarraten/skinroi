@@ -23,7 +23,7 @@ function CopyButton({ value }) {
       className={`p-1.5 rounded-md transition shrink-0 ${
         copied
           ? "text-profit bg-profit/10"
-          : "text-slate-600 hover:text-slate-300 hover:bg-white/8 disabled:opacity-30 disabled:cursor-not-allowed"
+          : "text-slate-400 hover:text-slate-200 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
       }`}
     >
       {copied ? <Check size={13} /> : <Copy size={13} />}
@@ -54,7 +54,7 @@ function CurrencySelect({ value, onChange, theme }) {
         ref={btnRef}
         type="button"
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1 px-1.5 h-7 rounded border text-[10px] font-mono font-medium transition-colors ${theme.input} ${theme.text}`}
+        className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[11px] font-mono font-medium transition-colors ${theme.input} ${theme.text}`}
       >
         {value}
         <ChevronDown size={9} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -116,7 +116,7 @@ export default function CurrencyConverter({
               value={usdAmount}
               onChange={(e) => handleUsdChange(e.target.value)}
               placeholder="0.00"
-              className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currency1Symbol)} pr-2 py-1.5 rounded-lg text-xs font-mono ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors`}
+              className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currency1Symbol)} pr-2 py-1.5 rounded-lg text-xs font-mono ${theme.textSecondary} placeholder-slate-500 focus:outline-none transition-colors`}
             />
           </div>
         </div>
@@ -138,7 +138,7 @@ export default function CurrencyConverter({
               onChange={(e) => handleRmbChange(e.target.value)}
               placeholder="0.00"
               disabled={!sidebarRate}
-              className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currencySymbol)} pr-2 py-1.5 rounded-lg text-xs font-mono ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors ${!sidebarRate ? 'opacity-50' : ''}`}
+              className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currencySymbol)} pr-2 py-1.5 rounded-lg text-xs font-mono ${theme.textSecondary} placeholder-slate-500 focus:outline-none transition-colors ${!sidebarRate ? 'opacity-50' : ''}`}
             />
           </div>
         </div>
@@ -159,7 +159,7 @@ export default function CurrencyConverter({
           value={usdAmount}
           onChange={(e) => handleUsdChange(e.target.value)}
           placeholder={currency1}
-          className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currency1Symbol)} pr-20 py-2 rounded-lg text-sm font-mono ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors`}
+          className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currency1Symbol)} pr-20 py-2 rounded-lg text-sm font-mono ${theme.textSecondary} placeholder-slate-500 focus:outline-none transition-colors`}
         />
         <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
           <CurrencySelect value={currency1} onChange={setCurrency1} theme={theme} />
@@ -179,7 +179,7 @@ export default function CurrencyConverter({
           onChange={(e) => handleRmbChange(e.target.value)}
           placeholder={displayCurrency}
           disabled={!sidebarRate}
-          className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currencySymbol)} pr-20 py-2 rounded-lg text-sm font-mono ${theme.textSecondary} placeholder-slate-600 focus:outline-none transition-colors ${!sidebarRate ? 'opacity-50' : ''}`}
+          className={`w-full ${theme.card} border ${theme.cardBorder} ${symbolPad(currencySymbol)} pr-20 py-2 rounded-lg text-sm font-mono ${theme.textSecondary} placeholder-slate-500 focus:outline-none transition-colors ${!sidebarRate ? 'opacity-50' : ''}`}
         />
         <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
           <CurrencySelect value={displayCurrency} onChange={setDisplayCurrency} theme={theme} />

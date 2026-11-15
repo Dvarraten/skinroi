@@ -10,6 +10,8 @@ import { PROFIT_COLOR, LOSS_COLOR, WARN_COLOR } from "../themes/themes";
 import { useItemImage } from "../utils/itemImages";
 import { useLocalPriceSync } from "../hooks/useLocalPriceSync";
 import { sellPricesFor, formatAge } from "../utils/sellPrices";
+import { formatUsd, formatSignedUsd, formatSignedPercent } from "../utils/format";
+import { Button, IconButton } from "./ui/Button";
 import buff163Icon  from "../assets/platforms/buff163.webp";
 import csfloatIcon  from "../assets/platforms/csfloat.webp";
 import csmoneyIcon  from "../assets/platforms/csmoney.webp";
@@ -61,7 +63,7 @@ function HoldChip({ countdown }) {
   return (
     <span
       title={countdown.overdue ? 'Trade hold is over' : `Trade-locked, tradeable in ${countdown.label}`}
-      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border backdrop-blur-sm inline-flex items-center gap-1 ${
+      className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md border backdrop-blur-sm inline-flex items-center gap-1 ${
         countdown.overdue
           ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
           : 'bg-black/60 text-warn border-warn/30'
@@ -83,14 +85,14 @@ function CardMedia({ item, wear, countdown, count, hideWear, hideNotes, keepNote
     <div className="relative h-28 px-4 flex justify-center items-center bg-gradient-to-b from-white/[0.06] to-black/25">
       <ItemThumbnail item={item} />
       {wearShort && !hideWear && (
-        <span title={wear} className="absolute top-2 left-2 text-[10px] font-semibold tracking-wide px-1.5 py-0.5 rounded-md bg-black/50 text-slate-200">
+        <span title={wear} className="absolute top-2 left-2 text-[11px] font-semibold tracking-wide px-1.5 py-0.5 rounded-md bg-black/50 text-slate-200">
           {wearShort}
         </span>
       )}
       {item.notes && !hideNotes && (
         <span
           title={item.notes}
-          className={`absolute top-2 right-2 max-w-[60%] truncate text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/50 text-warn transition-opacity ${
+          className={`absolute top-2 right-2 max-w-[60%] truncate text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-black/50 text-warn transition-opacity ${
             keepNotesOnHover ? '' : 'group-hover:opacity-0 group-focus-within:opacity-0'
           }`}
         >
@@ -118,10 +120,10 @@ function CardTitle({ item, baseName, wear, showWear, theme }) {
     .filter(Boolean).join(' · ');
   return (
     <div className="min-w-0">
-      <h3 title={item.itemName} className={`text-[13px] font-semibold ${theme.text} leading-snug line-clamp-2`}>
+      <h3 title={item.itemName} className={`text-sm font-semibold ${theme.text} leading-snug line-clamp-2`}>
         {baseName}
       </h3>
-      <p className={`text-[11px] ${theme.subtext} truncate leading-tight mt-0.5`}>{sub || '\u00a0'}</p>
+      <p className={`text-xs ${theme.subtext} truncate leading-tight mt-1`}>{sub || '\u00a0'}</p>
     </div>
   );
 }
@@ -131,10 +133,10 @@ function CostRow({ item, theme }) {
   return (
     <div className="flex items-end justify-between gap-2">
       <div className="min-w-0">
-        <p className={`text-[11px] font-medium ${theme.subtext}`}>Cost</p>
-        <p className={`font-mono text-base font-semibold ${theme.text} leading-tight`}>${item.purchasePrice.toFixed(2)}</p>
+        <p className={`text-xs font-medium ${theme.subtext}`}>Cost</p>
+        <p className={`font-mono text-base font-semibold ${theme.text} leading-tight`}>{formatUsd(item.purchasePrice)}</p>
       </div>
-      <div className={`flex flex-col items-end gap-0.5 text-[11px] ${theme.textSecondary} min-w-0`}>
+      <div className={`flex flex-col items-end gap-0.5 text-xs ${theme.textSecondary} min-w-0`}>
         {item.platform && <PlatformBadge platform={item.platform} size="xs" />}
         <span className={`${theme.subtext} pr-1.5`}>{formatShortDate(item.datePurchased)}</span>
       </div>
@@ -148,15 +150,15 @@ function sellPriceTitle(r, item) {
   if (r.state !== 'ok') return `${r.label}: ${r.note}`;
   const profit = r.net - item.purchasePrice;
   return [
-    `Lowest ${r.label} listing $${r.priceUsd.toFixed(2)}`,
-    `$${r.net.toFixed(2)} after fee (${profit >= 0 ? '+' : '−'}$${Math.abs(profit).toFixed(2)} vs cost)`,
+    `Lowest ${r.label} listing ${formatUsd(r.priceUsd)}`,
+    `${formatUsd(r.net)} after fee (${formatSignedUsd(profit)} vs cost)`,
     `updated ${formatAge(r.age)}`,
     ...(r.anyPhase ? ['* lowest of any Doppler phase'] : []),
   ].join(' · ');
 }
 
 function sellPriceText(r) {
-  if (r.state === 'ok') return `$${r.priceUsd.toFixed(2)}${r.anyPhase ? '*' : ''}`;
+  if (r.state === 'ok') return `${formatUsd(r.priceUsd)}${r.anyPhase ? '*' : ''}`;
   return r.state === 'none' ? 'none' : '—';
 }
 
@@ -176,8 +178,8 @@ function SellPriceRow({ item, sellPrices, theme }) {
     <div className={`grid grid-cols-2 gap-2 pt-2 border-t ${theme.cardBorder}`}>
       {rows.map((r) => (
         <div key={r.id} title={sellPriceTitle(r, item)} className="min-w-0">
-          <p className={`text-[11px] font-medium ${theme.subtext}`}>{r.label}</p>
-          <p className={`flex items-center gap-1 font-mono text-xs leading-tight ${sellPriceClass(r, best, theme)}`}>
+          <p className={`text-xs font-medium ${theme.subtext}`}>{r.label}</p>
+          <p className={`flex items-center gap-1 font-mono text-[13px] leading-tight ${sellPriceClass(r, best, theme)}`}>
             {sellPriceText(r)}
             <BestDot show={best === r.id} />
           </p>
@@ -192,8 +194,8 @@ function SellPriceCell({ item, sellPrices, theme }) {
   return (
     <div className="flex flex-col leading-tight">
       {rows.map((r) => (
-        <span key={r.id} title={sellPriceTitle(r, item)} className={`flex items-center gap-1 text-[11px] font-mono ${sellPriceClass(r, best, theme)}`}>
-          <span className={`w-12 font-sans font-normal ${theme.subtext}`}>{r.label}</span>
+        <span key={r.id} title={sellPriceTitle(r, item)} className={`flex items-center gap-1 text-xs font-mono ${sellPriceClass(r, best, theme)}`}>
+          <span className={`w-14 font-sans font-normal ${theme.subtext}`}>{r.label}</span>
           {sellPriceText(r)}
           <BestDot show={best === r.id} />
         </span>
@@ -365,11 +367,11 @@ function SellPlatformPicker({ value, onChange, theme }) {
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`w-full h-8 flex items-center gap-1.5 px-2 rounded-lg border text-[10px] font-medium transition-colors ${theme.inputSell} ${theme.text}`}
+        className={`w-full h-8 flex items-center gap-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${theme.inputSell} ${theme.text}`}
       >
         <PlatformIcon platform={selected} size={13} />
         <span className="truncate">{selected.label}</span>
-        <span className={`${theme.subtext} text-[9px] shrink-0`}>{selected.fee}</span>
+        <span className={`${theme.subtext} text-[11px] shrink-0`}>{selected.fee}</span>
         <ChevronDown size={10} className={`text-slate-400 transition-transform ml-auto shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -403,7 +405,7 @@ function SellPlatformPicker({ value, onChange, theme }) {
                   <PlatformIcon platform={p} size={14} />
                   <span className="truncate">{p.label}</span>
                 </span>
-                <span className={`${theme.subtext} text-[10px] shrink-0`}>{p.fee}</span>
+                <span className={`${theme.subtext} text-[11px] shrink-0`}>{p.fee}</span>
               </button>
             );
           })}
@@ -435,19 +437,21 @@ function ActionMenu({ actions, theme, className = '' }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         title="Actions"
-        className={`p-1 rounded-md transition-colors ${open ? `bg-black/60 ${theme.text}` : 'bg-black/40 text-slate-300 hover:text-white hover:bg-black/60'}`}
+        aria-label="Actions"
+        aria-expanded={open}
+        className={`h-7 w-7 inline-flex items-center justify-center rounded-lg transition-colors ${open ? `bg-black/70 ${theme.text}` : 'bg-black/50 text-slate-200 hover:text-white hover:bg-black/70'}`}
       >
-        <MoreHorizontal size={14} />
+        <MoreHorizontal size={16} />
       </button>
       {open && (
-        <div className={`pop-in origin-top-right absolute right-0 top-full mt-1 z-40 min-w-[150px] py-1 rounded-lg border shadow-xl ${theme.card} ${theme.cardBorder}`}>
+        <div className={`pop-in origin-top-right absolute right-0 top-full mt-1 z-40 min-w-[170px] py-1 rounded-lg border shadow-xl ${theme.card} ${theme.cardBorder}`}>
           {actions.map((a) => (
             <button
               key={a.label}
               type="button"
               onClick={() => { setOpen(false); a.onClick(); }}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors hover:bg-white/10 ${
-                a.danger ? 'text-red-400' : theme.textSecondary
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left transition-colors ${theme.itemHoverBg} ${
+                a.danger ? 'text-red-400' : `${theme.textSecondary} ${theme.textHover}`
               }`}
             >
               {a.icon}
@@ -540,11 +544,11 @@ function ItemCard({
 
   const menuItems = item.sold ? [] : [
     ...(item.pending
-      ? [{ label: 'Mark received', icon: <PackageCheck size={12} />, onClick: () => promotePendingItem && promotePendingItem(item.id) }]
-      : [{ label: 'Sell', icon: <ChevronRight size={12} />, onClick: () => setSellOpen(true) }]),
+      ? [{ label: 'Mark received', icon: <PackageCheck size={14} />, onClick: () => promotePendingItem && promotePendingItem(item.id) }]
+      : [{ label: 'Sell', icon: <ChevronRight size={14} />, onClick: () => setSellOpen(true) }]),
     {
       label: item.pending ? 'Cancel purchase' : 'Delete',
-      icon: <Trash2 size={12} />,
+      icon: <Trash2 size={14} />,
       danger: true,
       onClick: () => {
         if (window.confirm(item.pending ? 'Cancel this pending purchase? It will be removed entirely.' : 'Delete this item? This cannot be undone.')) onDelete();
@@ -575,14 +579,9 @@ function ItemCard({
       {/* Top-right action: X cancel-sell when sell open, trash in select mode */}
       {sellOpen ? (
         <div className="absolute top-1.5 right-1.5 z-30">
-          <button
-            type="button"
-            onClick={() => setSellOpen(false)}
-            title="Cancel sell"
-            className="p-1.5 rounded-lg transition bg-black/40 text-red-300/70 hover:text-red-400 hover:bg-red-500/20 active:text-red-500"
-          >
-            <X size={13} />
-          </button>
+          <IconButton label="Cancel sell" size="xs" onClick={() => setSellOpen(false)} className="bg-black/50">
+            <X size={14} />
+          </IconButton>
         </div>
       ) : selectMode ? (
         <div className="absolute top-1.5 right-1.5 z-30" onClick={(e) => e.stopPropagation()}>
@@ -592,7 +591,7 @@ function ItemCard({
         <ActionMenu
           actions={menuItems}
           theme={theme}
-          className="!absolute top-1.5 right-1.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+          className="!absolute top-1.5 right-1.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
         />
       ) : null}
 
@@ -714,18 +713,14 @@ function ItemCard({
                           placeholder={displayCurrency || currencySymbol}
                         />
                       </div>
-                      <button
-                        onClick={onSell}
-                        className={`px-2 h-8 rounded-lg text-xs font-medium transition active:scale-[0.97] flex items-center gap-1
-                          ${soldFeedback ? 'bg-profit text-white scale-95' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
-                      >
-                        {soldFeedback ? <><CheckCircle size={12} /> Sold!</> : 'Sell'}
-                      </button>
+                      <Button variant="success" size="sm" onClick={onSell} icon={soldFeedback ? <CheckCircle size={13} /> : null}>
+                        {soldFeedback ? 'Sold!' : 'Sell'}
+                      </Button>
                     </div>
                     {estProfit !== null && (
                       <div className={`rounded-md py-1 px-2 text-xs font-mono font-semibold text-center ${estProfit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
-                        {estProfit >= 0 ? '+' : ''}${estProfit.toFixed(2)}
-                        <span className="opacity-60 ml-1">({estProfitPct >= 0 ? '+' : ''}{estProfitPct.toFixed(0)}%)</span>
+                        {formatSignedUsd(estProfit)}
+                        <span className="opacity-60 ml-1">({formatSignedPercent(estProfitPct, 0)})</span>
                       </div>
                     )}
                 </div>
@@ -801,9 +796,9 @@ function StackedCard({ items, theme, onExpand, menuActions = false, sellPrices =
     >
       {menuActions && (
         <ActionMenu
-          actions={[{ label: `Show ${items.length} items`, icon: <Layers size={12} />, onClick: onExpand }]}
+          actions={[{ label: `Show ${items.length} items`, icon: <Layers size={14} />, onClick: onExpand }]}
           theme={theme}
-          className="!absolute top-1.5 right-1.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+          className="!absolute top-1.5 right-1.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
         />
       )}
       <CardMedia item={rep} wear={wear} countdown={countdown} count={items.length} keepNotesOnHover={!menuActions} theme={theme} />
@@ -814,11 +809,11 @@ function StackedCard({ items, theme, onExpand, menuActions = false, sellPrices =
         <div className={`flex flex-col gap-3 ${menuActions ? 'mt-auto' : ''}`}>
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <p className={`text-[11px] font-medium ${theme.subtext}`}>Cost each</p>
-            <p className={`font-mono text-base font-semibold ${theme.text} leading-tight`}>${rep.purchasePrice.toFixed(2)}</p>
+            <p className={`text-xs font-medium ${theme.subtext}`}>Cost each</p>
+            <p className={`font-mono text-base font-semibold ${theme.text} leading-tight`}>{formatUsd(rep.purchasePrice)}</p>
           </div>
-          <div className={`flex flex-col items-end gap-0.5 text-[11px] ${theme.textSecondary} min-w-0`}>
-            <span className={`font-mono ${theme.subtext}`} title="Total cost of the stack">Σ ${total.toFixed(2)}</span>
+          <div className={`flex flex-col items-end gap-0.5 text-xs ${theme.textSecondary} min-w-0`}>
+            <span className={`font-mono ${theme.subtext}`} title="Total cost of the stack">Σ {formatUsd(total)}</span>
             <span className={theme.subtext}>{formatShortDate(rep.datePurchased)}</span>
           </div>
         </div>
@@ -910,7 +905,7 @@ function ListRow({
     <React.Fragment>
       <tr className={rowCls} onClick={handleRowClick}>
         {/* Item */}
-        <td className="px-3 py-2">
+        <td className="px-3 py-2.5">
           <div className="flex items-center gap-2.5 min-w-0">
             {selectMode && !item.sold && !isStack && (
               <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
@@ -921,12 +916,12 @@ function ListRow({
             )}
             <ListThumb item={item} />
             <div className="min-w-0">
-              <p className={`text-xs font-medium ${theme.textSecondary} truncate leading-tight`}>{baseName}</p>
-              {wear && <p className={`text-[10px] ${theme.subtext} truncate leading-tight`}>{wear}</p>}
-              {item.notes && <p title={item.notes} className="text-[9px] font-medium text-warn truncate leading-tight mt-0.5">{item.notes}</p>}
+              <p className={`text-[13px] font-medium ${theme.text} truncate leading-tight`}>{baseName}</p>
+              {wear && <p className={`text-xs ${theme.subtext} truncate leading-tight mt-0.5`}>{wear}</p>}
+              {item.notes && <p title={item.notes} className="text-[11px] font-medium text-warn truncate leading-tight mt-0.5">{item.notes}</p>}
             </div>
             {count && count > 1 && (
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white leading-tight flex-shrink-0`}>
+              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white leading-tight flex-shrink-0`}>
                 ×{count}
               </span>
             )}
@@ -934,24 +929,24 @@ function ListRow({
         </td>
 
         {/* Cost */}
-        <td className="px-3 py-2 whitespace-nowrap">
-          <span className={`text-xs font-mono font-semibold ${item.isTransaction ? theme.subtext : theme.text}`}>
+        <td className="px-3 py-2.5 whitespace-nowrap">
+          <span className={`text-[13px] font-mono font-semibold ${item.isTransaction ? theme.subtext : theme.text}`}>
             {item.isTransaction
-              ? `$${item.transactionAmount?.toFixed(2)}`
-              : `$${item.purchasePrice.toFixed(2)}`
+              ? formatUsd(item.transactionAmount)
+              : formatUsd(item.purchasePrice)
             }
           </span>
         </td>
 
         {/* Sell prices (Home only) */}
         {sellPrices && (
-          <td className="px-3 py-2 whitespace-nowrap">
+          <td className="px-3 py-2.5 whitespace-nowrap">
             {!item.sold && !item.isTransaction && <SellPriceCell item={item} sellPrices={sellPrices} theme={theme} />}
           </td>
         )}
 
         {/* Acquired / Dates */}
-        <td className="px-3 py-2 whitespace-nowrap">
+        <td className="px-3 py-2.5 whitespace-nowrap">
           {item.isTransaction ? (
             <span className="text-[10px] text-slate-500">
               {item.dateSold ? new Date(item.dateSold).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
@@ -967,16 +962,16 @@ function ListRow({
               </span>
             </div>
           ) : (
-            <span className="text-xs text-slate-500">
+            <span className={`text-xs ${theme.subtext}`}>
               {item.datePurchased ? new Date(item.datePurchased).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
             </span>
           )}
         </td>
 
         {/* Platform */}
-        <td className="px-3 py-2">
+        <td className="px-3 py-2.5">
           {item.isTransaction ? (
-            item.platform ? <PlatformBadge platform={item.platform} size="xs" /> : <span className="text-slate-700 text-xs">—</span>
+            item.platform ? <PlatformBadge platform={item.platform} size="xs" /> : <span className={`${theme.subtext} text-xs`}>—</span>
           ) : item.sold ? (
             <div className="flex flex-col gap-0.5">
               {item.platform && <PlatformBadge platform={item.platform} size="xs" />}
@@ -985,12 +980,12 @@ function ListRow({
           ) : (
             item.platform
               ? <PlatformBadge platform={item.platform} size="xs" />
-              : <span className="text-slate-700 text-xs">—</span>
+              : <span className={`${theme.subtext} text-xs`}>—</span>
           )}
         </td>
 
         {/* Status */}
-        <td className="px-3 py-2 whitespace-nowrap">
+        <td className="px-3 py-2.5 whitespace-nowrap">
           {item.sold && item.isTransaction ? (
             <span className="inline-flex items-center rounded-md py-0.5 px-1.5 text-[10px] font-mono font-semibold bg-loss/10 text-loss">
               fee {item.transactionFeePercent}%
@@ -1000,32 +995,32 @@ function ListRow({
               {item.profit >= 0 ? '+' : ''}{item.profitPercent?.toFixed(1)}%
             </span>
           ) : item.pending && countdown ? (
-            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border inline-flex items-center gap-1 ${
+            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full border inline-flex items-center gap-1 ${
               countdown.overdue ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-black/50 text-warn border-warn/25'
             }`}>
-              {countdown.overdue ? <Unlock size={9} /> : <Lock size={9} />}{countdown.label}
+              {countdown.overdue ? <Unlock size={10} /> : <Lock size={10} />}{countdown.overdue ? countdown.label : `Hold ${countdown.label}`}
             </span>
           ) : (
-            <span className="text-slate-700 text-xs">—</span>
+            <span className={`${theme.subtext} text-xs`}>—</span>
           )}
         </td>
 
         {/* Action — a ⋯ menu on Home, buttons elsewhere */}
         {menuActions && !sellOpen ? (
-          <td className="px-3 py-2">
+          <td className="px-3 py-2.5">
             {!item.sold && (
               <div className="flex justify-end">
                 <ActionMenu
                   theme={theme}
                   actions={isStack ? [
-                    { label: `Show ${count} items`, icon: <Layers size={12} />, onClick: onExpandGroup },
+                    { label: `Show ${count} items`, icon: <Layers size={14} />, onClick: onExpandGroup },
                   ] : [
                     ...(item.pending
-                      ? [{ label: 'Mark received', icon: <PackageCheck size={12} />, onClick: () => promotePendingItem && promotePendingItem(item.id) }]
-                      : [{ label: 'Sell', icon: <ChevronRight size={12} />, onClick: () => setSellOpen(true) }]),
+                      ? [{ label: 'Mark received', icon: <PackageCheck size={14} />, onClick: () => promotePendingItem && promotePendingItem(item.id) }]
+                      : [{ label: 'Sell', icon: <ChevronRight size={14} />, onClick: () => setSellOpen(true) }]),
                     {
                       label: item.pending ? 'Cancel purchase' : 'Delete',
-                      icon: <Trash2 size={12} />,
+                      icon: <Trash2 size={14} />,
                       danger: true,
                       onClick: () => {
                         if (window.confirm(item.pending ? 'Cancel this pending purchase?' : 'Delete this item? This cannot be undone.')) handleDeleteItem(item.id);
@@ -1037,7 +1032,7 @@ function ListRow({
             )}
           </td>
         ) : (
-        <td className="px-3 py-2">
+        <td className="px-3 py-2.5">
           <div className="flex items-center gap-1.5 justify-end">
             {item.sold ? (
               <span className={`inline-flex items-center rounded-md py-0.5 px-1.5 text-[10px] font-mono font-semibold ${item.profit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
@@ -1147,18 +1142,14 @@ function ListRow({
                     placeholder={displayCurrency || currencySymbol}
                   />
                 </div>
-                <button
-                  onClick={onSell}
-                  className={`px-2 h-8 rounded-lg text-xs font-medium transition active:scale-[0.97] flex items-center gap-1
-                    ${soldFeedback ? 'bg-profit text-white scale-95' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
-                >
-                  {soldFeedback ? <><CheckCircle size={12} /> Sold!</> : 'Sell'}
-                </button>
+                <Button variant="success" size="sm" onClick={onSell} icon={soldFeedback ? <CheckCircle size={13} /> : null}>
+                  {soldFeedback ? 'Sold!' : 'Sell'}
+                </Button>
               </div>
               {estProfit !== null && (
                 <div className={`rounded-md py-1 px-2 text-xs font-mono font-semibold text-center ${estProfit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
-                  {estProfit >= 0 ? '+' : ''}${estProfit.toFixed(2)}
-                  <span className="opacity-60 ml-1">({estProfitPct >= 0 ? '+' : ''}{estProfitPct.toFixed(0)}%)</span>
+                  {formatSignedUsd(estProfit)}
+                  <span className="opacity-60 ml-1">({formatSignedPercent(estProfitPct, 0)})</span>
                 </div>
               )}
             </div>
@@ -1183,6 +1174,7 @@ export default function ItemGrid({
   viewMode = 'grid',
   menuActions = false,
   sellPrices = null,
+  onAddItem = null,
 }) {
   const accentHex = theme.dotColor;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -1234,9 +1226,14 @@ export default function ItemGrid({
 
   const emptyText =
     searchTerm ? 'No items match your search.'
-    : activeTab === 'active' ? 'No active items. Add your first purchase!'
+    : activeTab === 'active' ? 'No active items yet.'
     : activeTab === 'pending' ? 'No pending purchases.'
     : 'No sold items yet.';
+
+  // Nothing to show and nothing filtered out: offer the next step.
+  const emptyAction = !searchTerm && activeTab === 'active' && onAddItem ? (
+    <Button variant="primary" className="mt-4" onClick={onAddItem}>Add your first item</Button>
+  ) : null;
 
   const commonProps = {
     theme, sellData, setSellData, sellPlatform, setSellPlatform,
@@ -1248,11 +1245,11 @@ export default function ItemGrid({
   };
 
   const loadMore = hasMore ? (
-    <div ref={sentinelRef} className="w-full text-center py-6 text-xs text-slate-500">
+    <div ref={sentinelRef} className={`w-full text-center py-6 text-xs ${theme.subtext}`}>
       Loading more… ({visibleCount} of {flatRows.length})
     </div>
   ) : flatRows.length > INITIAL_VISIBLE ? (
-    <div className="w-full text-center py-4 text-xs text-slate-600">
+    <div className={`w-full text-center py-4 text-xs ${theme.subtext}`}>
       Showing all {flatRows.length} item{flatRows.length !== 1 ? 's' : ''}
     </div>
   ) : null;
@@ -1290,8 +1287,9 @@ export default function ItemGrid({
             ))}
             {flatRows.length === 0 && (
               <tr>
-                <td colSpan={sellPrices ? 7 : 6} className="text-center py-12 text-slate-400">
-                  <p className="text-base">{emptyText}</p>
+                <td colSpan={sellPrices ? 7 : 6} className={`text-center py-12 ${theme.subtext}`}>
+                  <p className="text-sm">{emptyText}</p>
+                  {emptyAction}
                 </td>
               </tr>
             )}
@@ -1305,7 +1303,7 @@ export default function ItemGrid({
   // --- Grid view (default) ---
   return (
     <>
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(172px, 1fr))' }}>
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
         <style>{`
           @keyframes fadeSlideIn {
             from { opacity: 0; transform: translateY(8px); }
@@ -1335,8 +1333,9 @@ export default function ItemGrid({
         ))}
 
         {flatRows.length === 0 && (
-          <div className="col-span-full text-center py-12 text-slate-400">
-            <p className="text-lg">{emptyText}</p>
+          <div className={`col-span-full text-center py-12 ${theme.subtext}`}>
+            <p className="text-sm">{emptyText}</p>
+            {emptyAction}
           </div>
         )}
       </div>

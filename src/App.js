@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { themes } from './themes/themes';
+import { ThemeContext } from './themes/ThemeContext';
 import './index.css';
 
 import { useAuth } from './hooks/useAuth';
@@ -10,14 +11,16 @@ import { useChartData } from './hooks/useChartData';
 import { useSteamSync } from './hooks/useSteamSync';
 import { useCsfloatAutoSync } from './hooks/useCsfloatAutoSync';
 import { usePortfolioView } from './hooks/usePortfolioView';
+import { usePageRoute } from './hooks/usePageRoute';
 import { useSellPrices } from './hooks/useSellPrices';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
 
 import Header from './components/Header';
-import ThemePicker from './components/ThemePicker';
+import BottomNav from './components/BottomNav';
 import ItemGrid from './components/ItemGrid';
-import TabsAndSearchbar from './components/TabsAndSearchbar';
+import ListToolbar from './components/ListToolbar';
+import { Button } from './components/ui/Button';
 import PortfolioHero from './components/PortfolioHero';
 import RecentSales from './components/RecentSales';
 import SellPriceStatus from './components/SellPriceStatus';
@@ -99,12 +102,11 @@ export default function CS2TradingTracker() {
   // Home shows active items only. Trades are handled in Handle Items; manual
   // sell / mark received / delete sit in the ⋯ menu on each Home card.
   const { searchTerm, setSearchTerm, sortBy, setSortBy, sortedItems } = usePortfolioView(items, 'active');
-  const [activePage, setActivePage] = useState(null); // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'snipes' | 'analytics' | 'about'
+  // null = Home | 'addItem' | 'handleItems' | 'transactions' | 'snipes' | 'analytics' | 'about'
+  const [activePage, setActivePage] = usePageRoute();
   const [chartPeriod, setChartPeriod] = useState('30d');
   // Dark is the default; a theme the user picked is kept in localStorage.
   const [theme, setTheme] = useState(() => { const t = localStorage.getItem('cs2-theme'); const r = t === 'v2' ? 'dark' : (t || 'dark'); return themes[r] ? r : 'dark'; });
-  const [showThemePicker, setShowThemePicker] = useState(false);
-  const [converterPinned, setConverterPinned] = useState(() => !!localStorage.getItem('skinroi-converter-pinned'));
   const [viewMode, setViewMode] = useState(() => {
     const saved = localStorage.getItem('skinroi-view-mode');
     return saved === 'list' ? 'list' : 'grid';
@@ -120,8 +122,7 @@ export default function CS2TradingTracker() {
   const isTransactionsPage = activePage === 'transactions';
   const isAboutPage        = activePage === 'about';
   const isSnipesPage       = activePage === 'snipes';
-  const openPage  = (name) => setActivePage(prev => prev === name ? null : name);
-  const closePage = () => setActivePage(null);
+  const openPage = (name) => setActivePage(name);
 
   const themeStyles = themes[theme];
   const { profitChartData, allTimeProfitChartData } = useChartData(items, chartPeriod);
@@ -132,11 +133,6 @@ export default function CS2TradingTracker() {
     document.documentElement.style.setProperty('--accent', themes[theme].accentColor || themes[theme].dotColor);
   }, [theme]);
   useEffect(() => { localStorage.setItem('skinroi-view-mode', viewMode); }, [viewMode]);
-  useEffect(() => {
-    if (converterPinned) localStorage.setItem('skinroi-converter-pinned', '1');
-    else localStorage.removeItem('skinroi-converter-pinned');
-  }, [converterPinned]);
-
   useEffect(() => {
     if (isHandleItemsPage) steamSync.refreshState();
   }, [isHandleItemsPage]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -164,10 +160,8 @@ export default function CS2TradingTracker() {
   };
 
   return (
-    <div
-      className="flex flex-col h-screen overflow-hidden"
-      onClick={() => showThemePicker && setShowThemePicker(false)}
-    >
+    <ThemeContext.Provider value={themeStyles}>
+    <div className="flex flex-col h-screen supports-[height:100dvh]:h-dvh overflow-hidden">
       <div className={`fixed inset-0 -z-10 pointer-events-none ${themeStyles.bg}`} />
 
       {showLanding && (
@@ -184,13 +178,7 @@ export default function CS2TradingTracker() {
       <Header
         theme={themeStyles}
         activePage={activePage}
-        onAnalyticsClick={() => openPage('analytics')}
-        onSnipesClick={() => openPage('snipes')}
-        onAddItemClick={() => openPage('addItem')}
-        onHandleItemsClick={() => openPage('handleItems')}
-        onTransactionClick={() => openPage('transactions')}
-        onAboutClick={() => openPage('about')}
-        onHomeClick={closePage}
+        onNavigate={setActivePage}
         pendingCount={steamSync.pendingCount}
         user={user}
         onLogin={signIn}
@@ -204,6 +192,8 @@ export default function CS2TradingTracker() {
           : null
         }
         onExtensionChange={steamSync.refreshState}
+        themeKey={theme}
+        setTheme={setTheme}
         usdAmount={usdAmount}
         rmbAmount={rmbAmount}
         sidebarRate={sidebarRate}
@@ -216,20 +206,7 @@ export default function CS2TradingTracker() {
         displayCurrency={displayCurrency}
         setDisplayCurrency={setDisplayCurrency}
         currencySymbol={currencySymbol}
-        converterPinned={converterPinned}
-        setConverterPinned={setConverterPinned}
-      >
-        <div onClick={e => e.stopPropagation()}>
-          <ThemePicker
-            themeStyles={themeStyles}
-            setShowThemePicker={setShowThemePicker}
-            showThemePicker={showThemePicker}
-            setTheme={setTheme}
-            theme={theme}
-            themes={themes}
-          />
-        </div>
-      </Header>
+      />
 
       {demo && (
         <DemoBanner
@@ -240,26 +217,28 @@ export default function CS2TradingTracker() {
       )}
 
       {/* ── Home view ─────────────────────────────────────────────────────── */}
+      {/* One main column (summary, toolbar, items) and a side rail on wide
+          screens. On phones the whole page scrolls; from md up only the item
+          list does, so the summary and toolbar stay in view. */}
       {isHome && (
-      <div className="flex flex-1 min-h-0 flex-col gap-4 px-4 md:px-6 pt-3 pb-4 overflow-hidden">
+      <div className="flex flex-1 min-h-0 gap-6 px-4 md:px-6 pt-4 overflow-y-auto md:overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col gap-4 md:min-h-0">
 
-        {user && !homeLoading && steamSync.extension && (
+          {user && !homeLoading && steamSync.extension && (
+            <div className="shrink-0">
+              <OnboardingChecklist
+                theme={themeStyles}
+                steamId={user.steamId}
+                extension={steamSync.extension}
+                items={items}
+                onExtensionChange={steamSync.refreshState}
+                onImportSteam={() => setImportOpen(true)}
+                onAddManually={() => openPage('addItem')}
+              />
+            </div>
+          )}
+
           <div className="shrink-0">
-            <OnboardingChecklist
-              theme={themeStyles}
-              steamId={user.steamId}
-              extension={steamSync.extension}
-              items={items}
-              onExtensionChange={steamSync.refreshState}
-              onImportSteam={() => setImportOpen(true)}
-              onAddManually={() => openPage('addItem')}
-            />
-          </div>
-        )}
-
-        {/* Row 1 — hero (centered) + currency converter (right, same height) */}
-        <div className="shrink-0 flex items-stretch gap-6">
-          <div className="flex-1 min-w-0">
             <PortfolioHero
               stats={stats}
               profitChartData={allTimeProfitChartData}
@@ -267,8 +246,59 @@ export default function CS2TradingTracker() {
               loading={homeLoading}
             />
           </div>
-          <div className="hidden lg:flex w-[280px] shrink-0 flex-col justify-center gap-3">
-            <p className={`text-xs font-medium ${themeStyles.subtext}`}>Currency converter</p>
+
+          <div className="shrink-0 space-y-2.5 md:pr-[18px]">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <h2 className={`text-base font-semibold ${themeStyles.text}`}>Active items</h2>
+              {!homeLoading && (
+                <span className={`text-sm font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
+              )}
+              {!homeLoading && stats.totalPending > 0 && (
+                <span className="text-[13px] text-warn whitespace-nowrap">· {stats.totalPending} on trade hold</span>
+              )}
+              {!homeLoading && (
+                <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
+              )}
+            </div>
+            <ListToolbar
+              searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+              sortBy={sortBy} setSortBy={setSortBy}
+              viewMode={viewMode} setViewMode={setViewMode}
+              actions={steamSync.pendingCount > 0 && (
+                <Button size="sm" onClick={() => openPage('handleItems')} iconRight={<ChevronRight size={14} />}>
+                  {steamSync.pendingCount} {steamSync.pendingCount === 1 ? 'trade' : 'trades'} to handle
+                </Button>
+              )}
+            />
+          </div>
+
+          <div className="pb-6 md:flex-1 md:min-h-0 md:overflow-y-auto md:pr-3 md:[scrollbar-gutter:stable]">
+            {homeLoading ? (
+              <ItemGridSkeleton theme={themeStyles} viewMode={viewMode} />
+            ) : (
+            <ItemGrid
+              menuActions
+              sellPlatform={sellPlatform} setSellData={setSellData}
+              sellData={sellData} setSellPlatform={setSellPlatform}
+              handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
+              promotePendingItem={promotePendingItem}
+              exchangeRate={exchangeRate}
+              currencySymbol={currencySymbol}
+              displayCurrency={displayCurrency}
+              theme={themeStyles} sortedItems={sortedItems}
+              searchTerm={searchTerm} activeTab="active"
+              viewMode={viewMode}
+              sellPrices={sellPrices}
+              onAddItem={() => openPage('addItem')}
+            />
+            )}
+          </div>
+        </div>
+
+        {/* Side rail — converter and recent sales */}
+        <aside className="hidden lg:flex w-[300px] shrink-0 flex-col gap-6 pb-6 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <section>
+            <h2 className={`text-[13px] font-medium ${themeStyles.subtext} mb-2`}>Currency converter</h2>
             <CurrencyConverter
               usdAmount={usdAmount}
               rmbAmount={rmbAmount}
@@ -283,77 +313,23 @@ export default function CS2TradingTracker() {
               setDisplayCurrency={setDisplayCurrency}
               currencySymbol={currencySymbol}
             />
-          </div>
-        </div>
-
-        {/* Row 2+3 — tabs + grid (left) and recent sales (right) */}
-        <div className="flex-1 min-h-0 flex gap-6 overflow-hidden">
-          <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden lg:px-10">
-            <div className="shrink-0 space-y-2 pr-3 md:pr-[18px]">
-              <div className="flex items-baseline gap-2">
-                <h2 className={`text-sm font-semibold ${themeStyles.text}`}>Active items</h2>
-                {!homeLoading && (
-                  <span className={`text-xs font-mono ${themeStyles.subtext}`}>{stats.totalActiveCount}</span>
-                )}
-                {!homeLoading && stats.totalPending > 0 && (
-                  <span className="text-xs text-warn">· {stats.totalPending} on trade hold</span>
-                )}
-                {!homeLoading && (
-                  <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
-                )}
-              </div>
-              <TabsAndSearchbar
-                theme={themeStyles}
-                activeTab="active"
-                showTabs={false}
-                allowSelect={false}
-                actions={
-                  <button
-                    onClick={() => openPage('handleItems')}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-[7px] rounded-lg border ${themeStyles.cardBorder} ${themeStyles.subtext} ${themeStyles.textHover} transition-colors`}
-                  >
-                    Manage items
-                    <ChevronRight size={12} />
-                  </button>
-                }
-                searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-                sortBy={sortBy} setSortBy={setSortBy}
-                viewMode={viewMode} setViewMode={setViewMode}
-              />
+          </section>
+          <section>
+            <div className="flex items-baseline justify-between mb-2">
+              <h2 className={`text-[13px] font-medium ${themeStyles.subtext}`}>Recent sales</h2>
+              <button
+                type="button"
+                onClick={() => openPage('analytics')}
+                className={`text-xs ${themeStyles.subtext} ${themeStyles.textHover} transition-colors`}
+              >
+                Analytics →
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable]">
-              {homeLoading ? (
-                <ItemGridSkeleton theme={themeStyles} viewMode={viewMode} />
-              ) : (
-              <ItemGrid
-                menuActions
-                sellPlatform={sellPlatform} setSellData={setSellData}
-                sellData={sellData} setSellPlatform={setSellPlatform}
-                handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
-                promotePendingItem={promotePendingItem}
-                exchangeRate={exchangeRate}
-                currencySymbol={currencySymbol}
-                displayCurrency={displayCurrency}
-                theme={themeStyles} sortedItems={sortedItems}
-                searchTerm={searchTerm} activeTab="active"
-                viewMode={viewMode}
-                sellPrices={sellPrices}
-              />
-              )}
-            </div>
-          </div>
-          <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div>
-              <p className={`text-xs font-medium ${themeStyles.subtext} mb-2 px-1`}>
-                Recent sales
-              </p>
-              {homeLoading
-                ? <RecentSalesSkeleton theme={themeStyles} />
-                : <RecentSales items={items} theme={themeStyles} />}
-            </div>
-          </div>
-        </div>
-
+            {homeLoading
+              ? <RecentSalesSkeleton theme={themeStyles} />
+              : <RecentSales items={items} theme={themeStyles} />}
+          </section>
+        </aside>
       </div>
       )}
 
@@ -419,6 +395,12 @@ export default function CS2TradingTracker() {
           onDismiss={steamSync.dismiss}
         />
       )}
+      <BottomNav
+        theme={themeStyles}
+        activePage={activePage}
+        onNavigate={setActivePage}
+        pendingCount={steamSync.pendingCount}
+      />
       </>)}
 
       {importOpen && user && (
@@ -430,5 +412,6 @@ export default function CS2TradingTracker() {
         />
       )}
     </div>
+    </ThemeContext.Provider>
   );
 }

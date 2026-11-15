@@ -8,6 +8,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { X, RefreshCw, Search, Download, AlertTriangle } from "lucide-react";
 import PlatformPicker from "./PlatformPicker";
+import { Button, IconButton } from "./ui/Button";
 import { PLATFORMS } from "../utils/platforms";
 
 const BASE = process.env.REACT_APP_STEAM_SYNC_URL || "";
@@ -116,9 +117,9 @@ export default function SteamImportModal({ theme, items, addItemDirect, onClose 
               Your public CS2 inventory. Items you already track are left out. Enter what you paid per item; rows without a price are skipped.
             </p>
           </div>
-          <button onClick={onClose} className={`ml-auto p-1 rounded-lg ${theme.subtext} ${theme.textHover}`} aria-label="Close">
+          <IconButton label="Close" className="ml-auto -mr-1.5 -mt-1" onClick={onClose}>
             <X size={18} />
-          </button>
+          </IconButton>
         </div>
 
         {done != null ? (
@@ -126,9 +127,7 @@ export default function SteamImportModal({ theme, items, addItemDirect, onClose 
             <p className={`text-sm ${theme.text}`}>
               Added <span className="font-mono">{done}</span> item{done === 1 ? "" : "s"} to your portfolio.
             </p>
-            <button onClick={onClose} className={`px-4 py-2 rounded-lg text-sm font-medium border ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97]`}>
-              Done
-            </button>
+            <Button variant="primary" onClick={onClose}>Done</Button>
           </div>
         ) : state.loading ? (
           <p className={`p-8 text-sm text-center ${theme.subtext}`}>Reading your Steam inventory…</p>
@@ -137,9 +136,7 @@ export default function SteamImportModal({ theme, items, addItemDirect, onClose 
             <p className="text-sm text-loss flex items-start justify-center gap-2">
               <AlertTriangle size={15} className="shrink-0 mt-0.5" /> {state.error}
             </p>
-            <button onClick={() => load(true)} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${theme.cardBorder} ${theme.text} hover:bg-white/5`}>
-              <RefreshCw size={12} /> Try again
-            </button>
+            <Button size="sm" onClick={() => load(true)} icon={<RefreshCw size={13} />}>Try again</Button>
           </div>
         ) : groups.length === 0 ? (
           <p className={`p-8 text-sm text-center ${theme.subtext}`}>
@@ -219,13 +216,16 @@ export default function SteamImportModal({ theme, items, addItemDirect, onClose 
                 <span className={`font-mono ${theme.text}`}>{readyCount}</span> item{readyCount === 1 ? "" : "s"} ready
                 {missingCount > 0 && <> · <span className="text-warn">{missingCount} ticked without a price</span></>}
               </p>
-              <button
+              <Button
+                variant="primary"
+                className="ml-auto"
                 onClick={importNow}
                 disabled={readyCount === 0}
-                className={`ml-auto flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none`}
+                title={readyCount === 0 ? "Enter a price on at least one row first" : undefined}
+                icon={<Download size={15} />}
               >
-                <Download size={14} /> Import {readyCount > 0 ? readyCount : ""}
-              </button>
+                {readyCount > 0 ? `Import ${readyCount} ${readyCount === 1 ? "item" : "items"}` : "Import"}
+              </Button>
             </div>
           </>
         )}

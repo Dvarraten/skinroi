@@ -3,6 +3,7 @@
 import React from "react";
 import { ArrowDownUp } from "lucide-react";
 import { useItemImage } from "../utils/itemImages";
+import { formatUsd, formatSignedUsd, formatSignedPercent } from "../utils/format";
 
 function SaleRow({ item, theme }) {
   const imgUrl = useItemImage({ directIconUrl: item.iconUrl, name: item.itemName });
@@ -20,23 +21,23 @@ function SaleRow({ item, theme }) {
         <div className="w-8 h-8 rounded shrink-0 bg-white/5" />
       )}
       <div className="flex-1 min-w-0">
-        <p className={`text-xs ${theme.textSecondary} truncate font-medium`}>{item.itemName}</p>
+        <p title={item.itemName} className={`text-[13px] ${theme.text} truncate font-medium`}>{item.itemName}</p>
         {item.isTransaction ? (
-          <p className={`text-[11px] ${theme.subtext} mt-0.5 font-mono capitalize`}>
-            ${item.transactionAmount?.toFixed(2)} · fee {item.transactionFeePercent}%
+          <p className={`text-xs ${theme.subtext} mt-0.5 font-mono capitalize`}>
+            {formatUsd(item.transactionAmount)} · fee {item.transactionFeePercent}%
           </p>
         ) : (
-          <p className={`text-[11px] ${theme.subtext} mt-0.5 font-mono`}>
-            ${item.purchasePrice.toFixed(2)} → ${(item.salePrice ?? 0).toFixed(2)}
+          <p className={`text-xs ${theme.subtext} mt-0.5 font-mono`}>
+            {formatUsd(item.purchasePrice)} → {formatUsd(item.salePrice ?? 0)}
           </p>
         )}
       </div>
       <div className="text-right shrink-0">
-        <p className={`text-xs font-mono font-semibold ${isGain ? "text-profit" : "text-loss"}`}>
-          {isGain ? "+" : ""}${profit.toFixed(2)}
+        <p className={`text-[13px] font-mono font-semibold ${isGain ? "text-profit" : "text-loss"}`}>
+          {formatSignedUsd(profit)}
         </p>
-        <p className={`text-[11px] font-mono mt-0.5 ${theme.subtext}`}>
-          {isGain ? "+" : ""}{(item.profitPercent ?? 0).toFixed(1)}%
+        <p className={`text-xs font-mono mt-0.5 ${theme.subtext}`}>
+          {formatSignedPercent(item.profitPercent ?? 0)}
         </p>
       </div>
     </div>
@@ -55,7 +56,7 @@ export default function RecentSales({ items, theme }) {
 
   if (!sold.length) {
     return (
-      <div className={`rounded-xl border ${theme.cardBorder} px-4 py-6 text-center text-xs ${theme.subtext}`}>
+      <div className={`rounded-xl border ${theme.cardBorder} px-4 py-6 text-center text-[13px] ${theme.subtext}`}>
         No sales yet. Items you mark sold show up here.
       </div>
     );

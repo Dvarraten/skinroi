@@ -2,16 +2,16 @@
 // (name autocomplete, price, platform, quantity, pending toggle, delivery
 // date) and calls back into useItems on submit.
 import React, { useState, useEffect } from "react";
-import { CheckCircle, Clock, PackagePlus } from "lucide-react";
+import { CheckCircle, Clock, PackagePlus, Plus } from "lucide-react";
 import ItemAutoComplete from "./ItemAutoComplete";
 import PlatformPicker from "./PlatformPicker";
 import PricePair from "./PricePair";
 import { useItemImage } from "../utils/itemImages";
 
 import { PLATFORMS } from "../utils/platforms";
+import { Button } from "./ui/Button";
+import { formatUsd } from "../utils/format";
 
-const label =
-  "block text-xs text-slate-500 font-medium mb-2";
 const inputH = "h-9";
 
 export default function AddItemForm({
@@ -26,6 +26,8 @@ export default function AddItemForm({
 }) {
   const [success, setSuccess] = useState(false);
   const [cnyPrice, setCnyPrice] = useState('');
+  const label = `block text-xs font-medium mb-1.5 ${theme.subtext}`;
+  const canAdd = !!formData.itemName && !!formData.purchasePrice;
 
   const resolvedIcon = useItemImage({ name: formData.itemName });
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function AddItemForm({
         {/* Item Name + Quantity row */}
         <div className="flex items-end gap-3">
           <div className="flex-1 min-w-0">
-            <label className={label}>Item Name</label>
+            <label className={label}>Item name</label>
             <ItemAutoComplete
               value={formData.itemName}
               onChange={(val) => setFormData({ ...formData, itemName: val })}
@@ -81,12 +83,7 @@ export default function AddItemForm({
           </div>
           <div className="shrink-0 w-[112px]">
             <label className={label}>
-              Qty
-              {formData.quantity > 1 && formData.purchasePrice && (
-                <span className="ml-1.5 text-profit normal-case font-mono tracking-normal text-[10px]">
-                  ${(parseFloat(formData.purchasePrice) * formData.quantity).toFixed(2)}
-                </span>
-              )}
+              Quantity
             </label>
             <div className={`flex items-center ${inputH} rounded-lg border ${theme.input} overflow-hidden`}>
               <button
@@ -134,7 +131,14 @@ export default function AddItemForm({
 
         {/* Purchase Price — USD + CNY linked pair */}
         <div>
-          <label className={label}>Purchase Price</label>
+          <label className={label}>
+            Purchase price{formData.quantity > 1 ? ' each' : ''}
+            {formData.quantity > 1 && formData.purchasePrice && (
+              <span className={`ml-2 font-mono ${theme.textSecondary}`}>
+                {formatUsd(parseFloat(formData.purchasePrice) * formData.quantity)} total
+              </span>
+            )}
+          </label>
           <PricePair
             usdValue={formData.purchasePrice}
             cnyValue={cnyPrice}
@@ -152,7 +156,7 @@ export default function AddItemForm({
 
         {/* Platform — full width so long names fit */}
         <div>
-          <label className={label}>Platform</label>
+          <label className={label}>Bought on</label>
           <PlatformPicker
             value={formData.platform}
             onChange={(val) => setFormData({ ...formData, platform: val, customFee: val === 'other' ? '0' : '' })}
@@ -175,42 +179,38 @@ export default function AddItemForm({
 
         {/* Notes */}
         <div>
-          <label className={label}>Notes</label>
+          <label className={label}>Notes <span className="font-normal opacity-70">(optional)</span></label>
           <input
             type="text"
             value={formData.notes}
             onChange={(e) =>
               setFormData({ ...formData, notes: e.target.value })
             }
-            className={`w-full ${inputH} ${theme.input} rounded-lg px-3 text-sm ${theme.text} placeholder-slate-600 focus:outline-none transition-colors border`}
+            className={`w-full ${inputH} ${theme.input} rounded-lg px-3 text-sm ${theme.text} placeholder-slate-500 focus:outline-none transition-colors border`}
             placeholder="Float, pattern, stickers"
           />
         </div>
       </div>
 
-      {/* Action row */}
+      {/* Action row — one primary action; the trade-hold switch is a toggle */}
       <div
-        className={`flex flex-wrap gap-3 mt-5 pt-4 border-t ${theme.cardBorder} items-center`}
+        className={`flex flex-wrap gap-2 mt-5 pt-4 border-t ${theme.cardBorder} items-center`}
       >
-        <button
+        <Button
+          variant={success ? "success" : "primary"}
           onClick={onAdd}
-          className={`relative group flex items-center gap-2 px-5 h-9 rounded-lg text-sm font-medium border transition duration-200
-            ${theme.card} ${theme.cardBorder} ${success ? "text-profit" : theme.text}`}
+          disabled={!canAdd && !success}
+          icon={success ? <CheckCircle size={15} /> : <Plus size={15} strokeWidth={2.5} />}
         >
-          {success ? (
-            <><CheckCircle size={15} /> Added!</>
-          ) : formData.pending ? (
-            <><Clock size={15} />{formData.quantity > 1 ? `Add ${formData.quantity} Pending` : "Add Pending"}</>
-          ) : formData.quantity > 1 ? (
-            `Add ${formData.quantity} Items`
-          ) : (
-            "Add Item"
-          )}
-          <span className={`absolute bottom-0 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-200 ${success ? `scale-x-100 bg-profit` : `scale-x-0 group-hover:scale-x-100 ${theme.dot}`}`} />
-        </button>
+          {success
+            ? "Added"
+            : formData.quantity > 1
+              ? `Add ${formData.quantity} items`
+              : "Add item"}
+        </Button>
 
-        <button
-          type="button"
+        <Button
+          pressed={!!formData.pending}
           onClick={() => {
             const next = !formData.pending;
             setFormData({
@@ -221,19 +221,15 @@ export default function AddItemForm({
                 : "",
             });
           }}
-          title="Item is Steam trade-protected (not yet received)"
-          className={`relative group flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium border transition
-            ${theme.card} ${theme.cardBorder}
-            ${formData.pending ? "text-warn" : `${theme.subtext} ${theme.textHover}`}`}
+          title="The item is still under Steam trade protection (not received yet)"
+          icon={<Clock size={15} className={formData.pending ? "text-warn" : ""} />}
         >
-          <Clock size={15} />
-          Protected
-          <span className={`absolute bottom-0 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-200 bg-warn ${formData.pending ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
-        </button>
+          On trade hold
+        </Button>
 
         {formData.pending && (
           <div className="flex items-center gap-2">
-            <span className={`text-xs ${theme.subtext}`}>Delivery:</span>
+            <span className={`text-xs ${theme.subtext}`}>Tradeable on</span>
             <input
               type="date"
               value={formData.expectedDelivery || defaultDeliveryISO}

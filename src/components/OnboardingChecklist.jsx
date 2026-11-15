@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from "react";
 import { Check, X, Puzzle, Link2, PackagePlus, Download } from "lucide-react";
 import ExtensionPairPanel from "./ExtensionPairPanel";
+import { Button, IconButton } from "./ui/Button";
 import { PROFIT_COLOR } from "../themes/themes";
 
 // Chrome Web Store link once the extension is published. Until then the
@@ -38,8 +39,8 @@ export default function OnboardingChecklist({ theme, steamId, extension, items, 
 
   const close = () => { write(doneKey); setHidden(true); };
   const doneCount = Object.values(steps).filter(Boolean).length;
-
-  const btn = `px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${theme.cardBorder} ${theme.text} hover:bg-white/5 active:scale-[0.97]`;
+  // The first step that is still open gets the primary button.
+  const current = ["install", "pair", "item"].find((k) => !steps[k]);
 
   const Step = ({ n, done, icon: Icon, title, text, children }) => (
     <li className={`flex-1 min-w-[200px] flex items-start gap-3 rounded-xl border px-3 py-2.5 ${theme.cardBorder} ${done ? "opacity-60" : ""}`}>
@@ -54,7 +55,7 @@ export default function OnboardingChecklist({ theme, steamId, extension, items, 
         <p className={`text-sm font-medium flex items-center gap-1.5 ${theme.text} ${done ? "line-through decoration-1" : ""}`}>
           <Icon size={13} className={theme.subtext} /> {title}
         </p>
-        <p className={`text-[11px] mt-0.5 ${theme.subtext}`}>{text}</p>
+        <p className={`text-xs mt-0.5 ${theme.subtext}`}>{text}</p>
         {!done && children && <div className="flex flex-wrap gap-1.5 mt-2">{children}</div>}
       </div>
     </li>
@@ -65,34 +66,37 @@ export default function OnboardingChecklist({ theme, steamId, extension, items, 
       <div className="flex items-center gap-2 mb-2.5">
         <h2 className={`text-sm font-semibold ${theme.text}`}>Get started</h2>
         <span className={`text-xs font-mono ${theme.subtext}`}>{doneCount}/3</span>
-        <button onClick={close} title="Hide" aria-label="Hide checklist" className={`ml-auto p-1 rounded-lg ${theme.subtext} ${theme.textHover}`}>
+        <IconButton size="xs" label="Hide checklist" className="ml-auto" onClick={close}>
           <X size={14} />
-        </button>
+        </IconButton>
       </div>
       <ol className="flex flex-wrap gap-2">
         <Step n={1} done={steps.install} icon={Puzzle} title="Install the extension" text="SkinROI Sync for Chrome or Edge picks up your Steam trades by itself.">
           {EXTENSION_URL ? (
-            <a href={EXTENSION_URL} target="_blank" rel="noreferrer" className={`${btn} inline-flex items-center gap-1`}>
-              <Download size={12} /> Get it for Chrome
-            </a>
+            <Button as="a" size="xs" variant={current === "install" ? "primary" : "secondary"} href={EXTENSION_URL} target="_blank" rel="noreferrer" icon={<Download size={12} />}>
+              Get it for Chrome
+            </Button>
           ) : (
-            <button onClick={() => setOpen(open === "install" ? null : "install")} className={btn}>How to install</button>
+            <Button size="xs" variant={current === "install" ? "primary" : "secondary"} onClick={() => setOpen(open === "install" ? null : "install")}>
+              How to install
+            </Button>
           )}
-          <button
+          <Button
+            size="xs"
+            variant="ghost"
             onClick={() => { write(installedKey); setInstalledTicked(true); setOpen(open === "install" ? null : open); }}
-            className={`px-2.5 py-1 rounded-lg text-xs ${theme.subtext} ${theme.textHover}`}
           >
             I've installed it
-          </button>
+          </Button>
         </Step>
         <Step n={2} done={steps.pair} icon={Link2} title="Pair it with your account" text="Generate a code here and paste it into the extension popup.">
-          <button onClick={() => setOpen(open === "pair" ? null : "pair")} className={btn}>
+          <Button size="xs" variant={current === "pair" ? "primary" : "secondary"} onClick={() => setOpen(open === "pair" ? null : "pair")}>
             {open === "pair" ? "Hide" : "Pair now"}
-          </button>
+          </Button>
         </Step>
         <Step n={3} done={steps.item} icon={PackagePlus} title="Add your first item" text="Import your whole Steam inventory at once, or add one by hand.">
-          <button onClick={onImportSteam} className={btn}>Import from Steam</button>
-          <button onClick={onAddManually} className={`px-2.5 py-1 rounded-lg text-xs ${theme.subtext} ${theme.textHover}`}>Add manually</button>
+          <Button size="xs" variant={current === "item" ? "primary" : "secondary"} onClick={onImportSteam}>Import from Steam</Button>
+          <Button size="xs" variant="ghost" onClick={onAddManually}>Add manually</Button>
         </Step>
       </ol>
 

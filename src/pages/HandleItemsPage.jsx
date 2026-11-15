@@ -1,14 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Clock, CheckCircle, Search, LayoutGrid, List } from 'lucide-react';
+import { X, Clock, CheckCircle, Search, Plus } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
 import PlatformPicker from '../components/PlatformPicker';
-import { TabButton } from '../components/TabsAndSearchbar';
+import { TabButton } from '../components/ui/Tabs';
+import { Button, IconButton } from '../components/ui/Button';
+import { Page, PageHeader } from '../components/ui/Page';
+import ListToolbar from '../components/ListToolbar';
 import RecentSales from '../components/RecentSales';
 import { PLATFORMS } from '../utils/platforms';
 import { SAP_CHART_COLORS } from '../themes/themes';
 import { getPlatformFee } from '../utils/platformFees';
 import { useLocalPriceSync } from '../hooks/useLocalPriceSync';
 import { nameMatchScore } from '../utils/nameMatch';
+import { formatUsd, formatSignedUsd, formatSignedPercent } from '../utils/format';
 
 const SORTS = [
   { label: 'Date', desc: 'date-new', asc: 'date-old' },
@@ -26,7 +30,7 @@ const detectedMs = (e) => {
 
 // ─── Name matching utilities ────────────────────────────────────────────────
 function formatCandidateLabel(c) {
-  const base = `${c.itemName} · $${c.purchasePrice.toFixed(2)}`;
+  const base = `${c.itemName} · ${formatUsd(c.purchasePrice)}`;
   if (c.matchType === 'fuzzy' && typeof c.matchScore === 'number') {
     const pct = Math.round(c.matchScore * 100);
     return `${base} (${pct}% match)`;
@@ -46,18 +50,18 @@ function InspectBadges({ entry, theme }) {
   return (
     <div className="flex items-center gap-1.5 mt-0.5 leading-tight">
       {hasFloat && (
-        <span className={`text-[10px] font-mono ${theme.subtext}`}>
-          fv {entry.floatValue.toFixed(4)}
+        <span className={`text-[11px] font-mono ${theme.subtext}`}>
+          Float {entry.floatValue.toFixed(4)}
         </span>
       )}
       {typeof entry.paintSeed === 'number' && (
-        <span className={`text-[10px] font-mono ${theme.subtext}`}>
-          seed {entry.paintSeed}
+        <span className={`text-[11px] font-mono ${theme.subtext}`}>
+          Seed {entry.paintSeed}
         </span>
       )}
       {(stickers.length > 0 || keychains.length > 0) && (
         <span
-          className="text-[10px] font-mono text-warn"
+          className="text-[11px] font-mono text-warn"
           title={stickerTip}
         >
           {stickers.length > 0 ? `${stickers.length}×✱` : ''}
@@ -90,11 +94,11 @@ function ItemImage({ iconUrl, alt, size = 36 }) {
 
 // ─── Inline compact USD + local currency pair ──────────────────────────────
 function PricePairCompact({ usdValue, localValue, onUsdChange, onLocalChange, theme, exchangeRate, currencySymbol, placeholderUsd = 'USD', placeholderLocal }) {
-  const inputCls = `h-7 ${theme.input} rounded-lg pr-2 text-xs font-mono ${theme.text} focus:outline-none border w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
+  const inputCls = `h-8 ${theme.input} rounded-lg pr-2 text-xs font-mono ${theme.text} placeholder-slate-500 focus:outline-none border w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
   return (
     <div className="flex items-center gap-1">
       <div className="relative w-[88px]">
-        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-mono pointer-events-none">$</span>
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[11px] font-mono pointer-events-none">$</span>
         <input
           type="number" step="0.01" min="0"
           value={usdValue}
@@ -104,7 +108,7 @@ function PricePairCompact({ usdValue, localValue, onUsdChange, onLocalChange, th
         />
       </div>
       <div className="relative w-[88px]">
-        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-mono pointer-events-none">{currencySymbol}</span>
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[11px] font-mono pointer-events-none">{currencySymbol}</span>
         <input
           type="number" step="0.01" min="0"
           value={localValue}
@@ -138,7 +142,7 @@ function useCsfloatPrefill(csfloatPrice, exchangeRate, usdValue, setUsd, setLoca
 }
 
 function CsfloatPriceNote() {
-  return <p className="mt-0.5 text-[10px] text-slate-500 leading-tight">CSFloat price</p>;
+  return <p className="mt-1 text-[11px] text-slate-400 leading-tight">CSFloat price</p>;
 }
 
 // ─── List/card shells ───────────────────────────────────────────────────────
@@ -147,7 +151,7 @@ function CsfloatPriceNote() {
 // block inside the card (`inline` puts the label and content on one line).
 function RowShell({ grid, theme, children }) {
   if (!grid) {
-    return <tr className={`border-b ${theme.cardBorder} hover:bg-white/[0.02] transition-colors`}>{children}</tr>;
+    return <tr className={`border-b last:border-b-0 ${theme.cardBorder} ${theme.itemHoverBg} transition-colors`}>{children}</tr>;
   }
   return (
     <div className={`relative flex flex-col gap-2.5 p-3 rounded-xl border ${theme.panel} ${theme.cardBorder} ${theme.cardHover} transition-colors`}>
@@ -159,7 +163,7 @@ function RowShell({ grid, theme, children }) {
 function Cell({ grid, className = '', gridClassName = '', label, inline, theme, children, ...rest }) {
   if (!grid) return <td className={className} {...rest}>{children}</td>;
   const labelEl = label && (
-    <p className={`text-[11px] font-medium ${theme.subtext} ${inline ? '' : 'mb-1'}`}>{label}</p>
+    <p className={`text-xs font-medium ${theme.subtext} ${inline ? '' : 'mb-1'}`}>{label}</p>
   );
   return (
     <div className={`${inline ? 'flex items-center justify-between gap-2' : ''} ${gridClassName}`}>
@@ -249,16 +253,16 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
         <div className="flex items-center gap-2 min-w-0">
           <ItemImage iconUrl={rep.iconUrl} alt={rep.marketHashName} size={grid ? 52 : 36} />
           <div className="min-w-0 flex-1">
-            <p title={rep.marketHashName} className={`${grid ? `text-[13px] font-semibold ${theme.text} line-clamp-2` : `text-xs font-medium ${theme.textSecondary} truncate`} leading-tight`}>
+            <p title={rep.marketHashName} className={`${grid ? `text-sm font-semibold ${theme.text} line-clamp-2` : `text-[13px] font-medium ${theme.text} truncate`} leading-tight`}>
               {rep.marketHashName}
             </p>
-            <p className="text-[10px] text-slate-600 leading-tight">
+            <p className={`text-[11px] ${theme.subtext} leading-tight mt-0.5`}>
               {new Date(rep.detectedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </p>
             <InspectBadges entry={rep} theme={theme} />
           </div>
           {count > 1 && (
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white flex-shrink-0`}>
+            <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${theme.accentBg} text-white flex-shrink-0`}>
               ×{count}
             </span>
           )}
@@ -291,43 +295,39 @@ function IncomingRow({ entries, onAddAll, onDismissGroup, theme, exchangeRate, c
           value={notes}
           onChange={e => setNotes(e.target.value)}
           placeholder="Notes"
-          className={`h-7 ${grid ? 'w-full' : 'w-28'} ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
+          className={`h-8 ${grid ? 'w-full' : 'w-28'} ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-500 focus:outline-none border`}
         />
       </Cell>
 
       <Cell grid={grid} theme={theme} label="Trade hold" inline className="px-2 py-2 align-middle text-center">
-        <button
-          type="button"
+        <IconButton
+          variant="secondary"
+          pressed={onHold}
           onClick={() => setOnHold(h => !h)}
-          title={onHold ? 'Trade-protected (on hold)' : 'Not protected'}
-          className={`h-7 w-7 rounded-lg border inline-flex items-center justify-center transition ${theme.card} ${theme.cardBorder} ${onHold ? 'text-warn' : 'text-slate-600'}`}
+          label={onHold ? 'On trade hold. Click to clear.' : 'Mark as on trade hold'}
         >
-          <Clock size={12} />
-        </button>
+          <Clock size={14} className={onHold ? 'text-warn' : ''} />
+        </IconButton>
       </Cell>
 
       <Cell grid={grid} theme={theme} className="px-3 py-2 align-middle text-right" gridClassName="mt-auto">
-        <button
-          type="button"
-          disabled={confirming || !parseFloat(usdPrice)}
-          onClick={submit}
-          className={`h-7 px-3 rounded-lg border text-xs font-medium transition inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
-            ${theme.card} ${theme.cardBorder} ${confirming ? 'text-profit' : theme.text}
-            disabled:opacity-40 disabled:cursor-not-allowed`}
+        <Button
+          variant={confirming ? 'success' : 'primary'}
+          size="sm"
+          block={grid}
+          disabled={!confirming && !parseFloat(usdPrice)}
+          onClick={confirming ? undefined : submit}
+          title={!parseFloat(usdPrice) ? 'Enter the price you paid first' : undefined}
+          icon={confirming ? <CheckCircle size={13} /> : <Plus size={13} strokeWidth={2.5} />}
         >
-          {confirming ? <><CheckCircle size={11} /> Added!</> : (count > 1 ? `Add ${count}` : 'Add')}
-        </button>
+          {confirming ? 'Added' : (count > 1 ? `Add ${count}` : 'Add')}
+        </Button>
       </Cell>
 
       <Cell grid={grid} theme={theme} className="px-2 py-2 align-middle text-right" gridClassName="absolute top-2 right-2">
-        <button
-          type="button"
-          onClick={() => onDismissGroup(entries.map(e => e.assetid))}
-          className="text-slate-600 hover:text-slate-300 p-1 rounded inline-flex"
-          title="Dismiss"
-        >
-          <X size={13} />
-        </button>
+        <IconButton size="xs" label="Dismiss: this trade is not a purchase" onClick={() => onDismissGroup(entries.map(e => e.assetid))}>
+          <X size={14} />
+        </IconButton>
       </Cell>
     </RowShell>
   );
@@ -413,7 +413,7 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
   const expansion = showExpansion && (
     <div className={`${grid ? '' : 'ml-12'} flex items-center gap-2 flex-wrap`}>
       {isFuzzyOnly && (
-        <span className="text-[10px] text-warn">
+        <span className="text-xs text-warn">
           Near-match only. Use search to confirm the right item.
         </span>
       )}
@@ -424,9 +424,9 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
             value={customFee}
             onChange={(e) => setCustomFee(e.target.value)}
             placeholder="Fee"
-            className={`w-16 h-7 ${theme.input} rounded-lg px-2 ${theme.text} text-xs font-mono focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            className={`w-16 h-8 ${theme.input} rounded-lg px-2 ${theme.text} text-xs font-mono focus:outline-none border [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
           />
-          <span className={`text-[10px] ${theme.subtext}`}>%</span>
+          <span className={`text-xs ${theme.subtext}`}>%</span>
         </div>
       )}
     </div>
@@ -439,10 +439,10 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
           <div className="flex items-center gap-2 min-w-0">
             <ItemImage iconUrl={entry.iconUrl} alt={entry.marketHashName} size={grid ? 52 : 36} />
             <div className="min-w-0 flex-1">
-              <p title={entry.marketHashName} className={`${grid ? `text-[13px] font-semibold ${theme.text} line-clamp-2` : `text-xs font-medium ${theme.textSecondary} truncate`} leading-tight`}>
+              <p title={entry.marketHashName} className={`${grid ? `text-sm font-semibold ${theme.text} line-clamp-2` : `text-[13px] font-medium ${theme.text} truncate`} leading-tight`}>
                 {entry.marketHashName}
               </p>
-              <p className="text-[10px] text-slate-600 leading-tight">
+              <p className={`text-[11px] ${theme.subtext} leading-tight mt-0.5`}>
                 Gone {new Date(entry.detectedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </p>
               <InspectBadges entry={entry} theme={theme} />
@@ -461,14 +461,14 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
                   value={browseQuery}
                   onChange={(e) => setBrowseQuery(e.target.value)}
                   placeholder="Search active items…"
-                  className={`h-7 w-full ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-600 focus:outline-none border`}
+                  className={`h-8 w-full ${theme.input} rounded-lg px-2 text-xs ${theme.text} placeholder-slate-500 focus:outline-none border`}
                 />
               )}
               {visibleCandidates.length > 0 && (
                 <select
                   value={selectedId}
                   onChange={(e) => setSelectedId(e.target.value)}
-                  className={`h-7 w-full ${theme.input} rounded-lg px-2 text-xs ${theme.text} focus:outline-none border`}
+                  className={`h-8 w-full ${theme.input} rounded-lg px-2 text-xs ${theme.text} focus:outline-none border`}
                 >
                   {visibleCandidates.map((c) => (
                     <option key={c.id} value={c.id}>{formatCandidateLabel(c)}</option>
@@ -476,18 +476,18 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
                 </select>
               )}
               {browseAll && browseQuery.trim() && visibleCandidates.length === 0 && (
-                <span className="text-[10px] text-slate-600">No active items match.</span>
+                <span className={`text-[11px] ${theme.subtext}`}>No active items match.</span>
               )}
             </div>
             {candidates.length > 0 && (
-              <button
-                type="button"
+              <IconButton
+                variant="secondary"
+                pressed={browseAll}
                 onClick={toggleBrowse}
-                title={browseAll ? 'Back to tracked match' : 'Search active items'}
-                className={`h-7 w-7 shrink-0 rounded-lg border inline-flex items-center justify-center transition ${theme.card} ${theme.cardBorder} ${browseAll ? theme.text : 'text-slate-600'}`}
+                label={browseAll ? 'Back to tracked match' : 'Search active items'}
               >
-                {browseAll ? <X size={11} /> : <Search size={11} />}
-              </button>
+                {browseAll ? <X size={14} /> : <Search size={14} />}
+              </IconButton>
             )}
           </div>
         </Cell>
@@ -506,9 +506,9 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
           />
           {fromCsfloat && <CsfloatPriceNote />}
           {estProfit !== null && (
-            <div className={`mt-1 rounded-md py-0.5 px-1.5 text-[10px] font-mono font-semibold text-center ${estProfit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
-              {estProfit >= 0 ? '+' : ''}${estProfit.toFixed(2)}
-              {estProfitPct !== null && <span className="opacity-60 ml-1">({estProfitPct >= 0 ? '+' : ''}{estProfitPct.toFixed(0)}%)</span>}
+            <div className={`mt-1 rounded-md py-0.5 px-1.5 text-[11px] font-mono font-semibold text-center ${estProfit >= 0 ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss'}`}>
+              {formatSignedUsd(estProfit)}
+              {estProfitPct !== null && <span className="opacity-60 ml-1">({formatSignedPercent(estProfitPct, 0)})</span>}
             </div>
           )}
         </Cell>
@@ -522,28 +522,28 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
         {grid && expansion}
 
         <Cell grid={grid} theme={theme} className="px-3 py-2 align-middle text-right" gridClassName="mt-auto">
-          <button
-            type="button"
-            disabled={confirming || !parseFloat(usdSalePrice) || !selectedId || isFuzzyOnly}
-            onClick={submit}
-            title={isFuzzyOnly ? 'No confident match. Use search to pick manually' : undefined}
-            className={`h-7 px-3 rounded-lg border text-xs font-medium transition active:scale-[0.97] inline-flex items-center justify-center gap-1 ${grid ? 'w-full h-8' : ''}
-              ${confirming ? 'bg-profit text-white border-transparent scale-95' : `${theme.card} ${theme.cardBorder} ${theme.text}`}
-              disabled:opacity-40 disabled:cursor-not-allowed`}
+          <Button
+            variant={confirming ? 'success' : 'primary'}
+            size="sm"
+            block={grid}
+            disabled={!confirming && (!parseFloat(usdSalePrice) || !selectedId || isFuzzyOnly)}
+            onClick={confirming ? undefined : submit}
+            title={
+              isFuzzyOnly ? 'No confident match. Use search to pick manually'
+              : !selectedId ? 'Pick the tracked item this sale belongs to first'
+              : !parseFloat(usdSalePrice) ? 'Enter the sale price first'
+              : undefined
+            }
+            icon={confirming ? <CheckCircle size={13} /> : null}
           >
-            {confirming ? <><CheckCircle size={11} /> Sold!</> : 'Mark sold'}
-          </button>
+            {confirming ? 'Sold' : 'Mark sold'}
+          </Button>
         </Cell>
 
         <Cell grid={grid} theme={theme} className="px-2 py-2 align-middle text-right" gridClassName="absolute top-2 right-2">
-          <button
-            type="button"
-            onClick={() => onDismiss(entry.assetid, 'outgoing')}
-            className="text-slate-600 hover:text-slate-300 p-1 rounded inline-flex"
-            title="Dismiss"
-          >
-            <X size={13} />
-          </button>
+          <IconButton size="xs" label="Dismiss: this trade is not a sale" onClick={() => onDismiss(entry.assetid, 'outgoing')}>
+            <X size={14} />
+          </IconButton>
         </Cell>
       </RowShell>
 
@@ -560,11 +560,11 @@ function OutgoingRow({ entry, candidates, allActiveItems, onMatch, onDismiss, th
 }
 
 // ─── Analytics ──────────────────────────────────────────────────────────────
-const fmtUsd = (v) => `$${Math.abs(v).toFixed(2)}`;
-const fmtSigned = (v) => `${v >= 0 ? '+' : '−'}${fmtUsd(v)}`;
+const fmtUsd = (v) => formatUsd(Math.abs(v));
+const fmtSigned = (v) => formatSignedUsd(v);
 
 function HandleStats({ items, incoming, outgoing, theme }) {
-  const tooltipStyle = { background: theme.chartTooltipBg, border: `1px solid ${theme.chartTooltipBorder}`, borderRadius: 6, fontSize: 11, padding: '4px 8px' };
+  const tooltipStyle = { background: theme.chartTooltipBg, border: `1px solid ${theme.chartTooltipBorder}`, borderRadius: 6, fontSize: 12, padding: '4px 8px' };
 
   // Value of everything waiting to be handled, at the CSFloat trade price.
   // Trades that did not go through CSFloat have no price and are left out.
@@ -626,20 +626,20 @@ function HandleStats({ items, incoming, outgoing, theme }) {
     return months;
   }, [items]);
 
-  const cardCls = `${theme.card} border ${theme.cardBorder} rounded-xl px-3 py-2.5 flex flex-col`;
+  const cardCls = `${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3 flex flex-col`;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div className={cardCls}>
-        <p className={`text-xs font-medium ${theme.subtext} mb-1`}>Pending value</p>
-        <p className={`text-lg font-mono font-semibold tabular-nums ${theme.text}`}>
+        <p className={`text-xs font-medium ${theme.subtext} mb-1`}>Waiting to be handled</p>
+        <p className={`text-xl font-mono font-semibold tabular-nums ${theme.text}`}>
           {pending.priced > 0 ? `≈ ${fmtUsd(pending.value)}` : '—'}
         </p>
         <p className={`text-xs ${theme.subtext}`}>
           {pending.total === 0
-            ? 'nothing waiting'
+            ? 'No trades waiting'
             : pending.priced === pending.total
-              ? `${pending.total} waiting · CSFloat price`
+              ? `${pending.total} ${pending.total === 1 ? 'trade' : 'trades'} · CSFloat price`
               : `${pending.priced} of ${pending.total} priced · CSFloat`}
         </p>
       </div>
@@ -662,10 +662,10 @@ function HandleStats({ items, incoming, outgoing, theme }) {
             <ResponsiveContainer width="100%" height={62}>
               <LineChart data={month.series} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
                 <CartesianGrid stroke={theme.chartGrid} vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 9, fill: theme.chartAxis }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: theme.chartAxis }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  labelStyle={{ color: theme.chartAxis, fontSize: 10 }}
+                  labelStyle={{ color: theme.chartAxis, fontSize: 11 }}
                   formatter={(v) => [fmtSigned(Number(v)), 'Profit']}
                 />
                 <Line type="monotone" dataKey="cumulative" stroke={theme.chartLine} strokeWidth={2} dot={false} activeDot={{ r: 3, fill: theme.chartLine }} />
@@ -687,10 +687,10 @@ function HandleStats({ items, incoming, outgoing, theme }) {
           <ResponsiveContainer width="100%" height={62}>
             <BarChart data={activity} margin={{ top: 4, right: 0, bottom: 0, left: 0 }} barCategoryGap={2}>
               <CartesianGrid stroke={theme.chartGrid} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 9, fill: theme.chartAxis }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: theme.chartAxis }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={tooltipStyle}
-                labelStyle={{ color: '#94a3b8', fontSize: 10 }}
+                labelStyle={{ color: theme.chartAxis, fontSize: 11 }}
                 cursor={{ fill: 'rgba(255,255,255,0.04)' }}
               />
               <Bar dataKey="bought" fill={theme.chartLine} radius={[2, 2, 0, 0]} maxBarSize={10} />
@@ -705,7 +705,7 @@ function HandleStats({ items, incoming, outgoing, theme }) {
 
 function EmptyState({ theme, text }) {
   return (
-    <div className={`text-center py-10 text-sm ${theme.subtext}`}>{text}</div>
+    <div className={`text-center px-5 py-12 text-sm ${theme.subtext}`}>{text}</div>
   );
 }
 
@@ -747,18 +747,6 @@ export default function HandleItemsPage({
     setTab(newTab);
     setSearchTerm('');
     setSortBy(newTab === 'outgoing' ? 'name-az' : 'date-new');
-  };
-
-  const isSortActive = (sort) => sortBy === sort.desc || sortBy === sort.asc;
-  const handleSortClick = (sort) => {
-    if (sortBy === sort.desc) setSortBy(sort.asc);
-    else if (sortBy === sort.asc) setSortBy(sort.desc);
-    else setSortBy(sort.desc);
-  };
-  const sortArrow = (sort) => {
-    if (sortBy === sort.desc) return ' ↓';
-    if (sortBy === sort.asc) return ' ↑';
-    return '';
   };
 
   const activeByName = useMemo(() => {
@@ -863,9 +851,13 @@ export default function HandleItemsPage({
   const grid = viewMode === 'grid';
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-4">
+    <Page width="max-w-[1500px]">
+      <PageHeader
+        title="Handle items"
+        description="Trades the extension has picked up from Steam. Add what came in at the price you paid, and mark what went out as sold."
+      />
       <div className="flex gap-6 items-start">
-        <div className="flex-1 min-w-0 md:min-w-[600px] space-y-4">
+        <div className="flex-1 min-w-0 space-y-4">
 
         {/* Analytics */}
         <HandleStats items={items} incoming={incoming} outgoing={outgoing} theme={theme} />
@@ -879,11 +871,7 @@ export default function HandleItemsPage({
             onClick={() => switchTab('incoming')}
             theme={theme}
             accentColor={theme.accentColor}
-            badgeClass={
-              incomingCount > 0
-                ? `bg-white/10 ${theme.text}`
-                : tab === 'incoming' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
-            }
+            badgeClass={`${theme.activeBg} ${incomingCount > 0 ? theme.text : theme.subtext}`}
           />
           <TabButton
             label="Outgoing"
@@ -892,66 +880,17 @@ export default function HandleItemsPage({
             onClick={() => switchTab('outgoing')}
             theme={theme}
             accentColor={theme.accentColor}
-            badgeClass={
-              outgoingCount > 0
-                ? `bg-white/10 ${theme.text}`
-                : tab === 'outgoing' ? `bg-white/15 ${theme.text}` : 'bg-white/5 text-slate-500'
-            }
+            badgeClass={`${theme.activeBg} ${outgoingCount > 0 ? theme.text : theme.subtext}`}
           />
         </div>
 
-        {/* Search + sort */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 sm:flex-none sm:w-72 min-w-[180px]">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={tab === 'incoming' ? `Search ${incomingCount} incoming items…` : `Search ${outgoingCount} outgoing items…`}
-              className={`w-full pl-8 pr-3 py-[6px] ${theme.card} border ${theme.cardBorder} rounded-lg text-xs ${theme.textSecondary} placeholder-slate-500 focus:outline-none transition-colors`}
-            />
-          </div>
-          <div className={`flex items-center rounded-lg border ${theme.cardBorder} overflow-hidden`}>
-            {SORTS.map((sort, i) => (
-              <button
-                key={sort.label}
-                onClick={() => handleSortClick(sort)}
-                className={`px-3 py-[7px] text-xs font-medium transition-colors whitespace-nowrap ${
-                  i > 0 ? `border-l ${theme.cardBorder}` : ''
-                } ${
-                  isSortActive(sort)
-                    ? `${theme.card} ${theme.textSecondary}`
-                    : `text-slate-600 hover:text-slate-300 ${theme.itemHoverBg}`
-                }`}
-              >
-                {sort.label}{sortArrow(sort)}
-              </button>
-            ))}
-          </div>
-
-          {/* View toggle — same as on Home */}
-          <div className={`flex items-center rounded-lg border ${theme.cardBorder} overflow-hidden`}>
-            <button
-              onClick={() => setViewMode('grid')}
-              title="Grid view"
-              className={`px-2 py-[7px] transition-colors ${
-                grid ? `${theme.card} ${theme.textSecondary}` : `text-slate-600 hover:text-slate-300 ${theme.itemHoverBg}`
-              }`}
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              title="List view"
-              className={`px-2 py-[7px] border-l ${theme.cardBorder} transition-colors ${
-                !grid ? `${theme.card} ${theme.textSecondary}` : `text-slate-600 hover:text-slate-300 ${theme.itemHoverBg}`
-              }`}
-            >
-              <List size={14} />
-            </button>
-          </div>
-        </div>
+        {/* Search + sort + view */}
+        <ListToolbar
+          searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+          placeholder={tab === 'incoming' ? 'Search incoming items…' : 'Search outgoing items…'}
+          sorts={SORTS} sortBy={sortBy} setSortBy={setSortBy}
+          viewMode={viewMode} setViewMode={setViewMode}
+        />
 
         {/* Table */}
         <div className={`${theme.panel} border ${theme.panelBorder} rounded-2xl overflow-x-auto`}>
@@ -963,13 +902,13 @@ export default function HandleItemsPage({
             ) : (
               <EntryList grid={grid} head={<>
                   <tr className={`border-b ${theme.cardBorder}`}>
-                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Item</th>
-                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Price</th>
-                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Platform</th>
-                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Notes</th>
-                    <th className={`text-center px-2 py-2 ${tableHeaderCls}`}>Hold</th>
-                    <th className={`text-right px-3 py-2 ${tableHeaderCls}`}>Action</th>
-                    <th className="w-8"></th>
+                    <th className={`text-left px-3 py-2.5 ${tableHeaderCls}`}>Item</th>
+                    <th className={`text-left px-3 py-2.5 ${tableHeaderCls}`}>Price</th>
+                    <th className={`text-left px-3 py-2.5 ${tableHeaderCls}`}>Platform</th>
+                    <th className={`text-left px-3 py-2.5 ${tableHeaderCls}`}>Notes</th>
+                    <th className={`text-center px-2 py-2.5 ${tableHeaderCls}`}>Hold</th>
+                    <th className={`text-right px-3 py-2.5 ${tableHeaderCls}`}><span className="sr-only">Action</span></th>
+                    <th className="w-10"></th>
                   </tr>
                 </>}>
                   {visibleIncomingGroups.map((group) => (
@@ -1003,12 +942,12 @@ export default function HandleItemsPage({
             ) : (
               <EntryList grid={grid} head={<>
                   <tr className={`border-b ${theme.cardBorder}`}>
-                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Item</th>
-                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Tracked match</th>
-                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Sale price</th>
-                    <th className={`text-left px-3 py-2 ${tableHeaderCls}`}>Platform</th>
-                    <th className={`text-right px-3 py-2 ${tableHeaderCls}`}>Action</th>
-                    <th className="w-8"></th>
+                    <th className={`text-left px-3 py-2.5 ${tableHeaderCls}`}>Item</th>
+                    <th className={`text-left px-3 py-2.5 ${tableHeaderCls}`}>Tracked match</th>
+                    <th className={`text-left px-3 py-2.5 ${tableHeaderCls}`}>Sale price</th>
+                    <th className={`text-left px-3 py-2.5 ${tableHeaderCls}`}>Platform</th>
+                    <th className={`text-right px-3 py-2.5 ${tableHeaderCls}`}><span className="sr-only">Action</span></th>
+                    <th className="w-10"></th>
                   </tr>
                 </>}>
                   {visibleOutgoing.map((entry) => (
@@ -1034,11 +973,11 @@ export default function HandleItemsPage({
           )}
         </div>
         </div>
-        <div className="hidden lg:flex w-[280px] shrink-0 flex-col gap-4 sticky top-0">
-          <p className={`text-xs font-medium ${theme.subtext} mb-2 px-1`}>Recent sales</p>
+        <aside className="hidden xl:block w-[300px] shrink-0 sticky top-0">
+          <h2 className={`text-[13px] font-medium ${theme.subtext} mb-2`}>Recent sales</h2>
           <RecentSales items={items} theme={theme} />
-        </div>
+        </aside>
       </div>
-    </div>
+    </Page>
   );
 }

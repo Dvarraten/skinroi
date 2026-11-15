@@ -10,6 +10,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle, RefreshCw, X, Puzzle } from 'lucide-react';
+import { Button, IconButton } from './ui/Button';
 
 const BASE = process.env.REACT_APP_STEAM_SYNC_URL || '';
 
@@ -110,7 +111,6 @@ export default function ExtensionPairPanel({ theme = {}, extension = null, onCha
   const border = theme.cardBorder || 'border-slate-700/50';
   const sub = theme.subtext || 'text-slate-400';
   const text = theme.text || 'text-white';
-  const accent = theme.accentBg || 'bg-indigo-600 hover:bg-indigo-500';
 
   if (extension?.connected) {
     return (
@@ -125,14 +125,9 @@ export default function ExtensionPairPanel({ theme = {}, extension = null, onCha
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={disconnect}
-          disabled={phase === 'disconnecting'}
-          className={`text-xs ${sub} hover:text-red-400 transition-colors shrink-0 disabled:opacity-40`}
-        >
+        <Button variant="danger" size="xs" onClick={disconnect} disabled={phase === 'disconnecting'}>
           Disconnect
-        </button>
+        </Button>
       </div>
     );
   }
@@ -148,16 +143,16 @@ export default function ExtensionPairPanel({ theme = {}, extension = null, onCha
               Click the SkinROI Sync icon in your browser toolbar and paste the code below.
             </p>
           </div>
-          <button type="button" onClick={cancel} className={`${sub} hover:text-red-400`}>
-            <X size={16} />
-          </button>
+          <IconButton size="xs" label="Cancel pairing" onClick={cancel}>
+            <X size={15} />
+          </IconButton>
         </div>
         <div className={`flex items-center justify-between px-4 py-3 rounded-lg bg-black/30 border ${border}`}>
           <code className={`font-mono text-2xl tracking-widest ${text}`}>{code}</code>
-          <RefreshCw size={16} className="text-indigo-400 animate-spin" />
+          <RefreshCw size={16} className={`${sub} animate-spin`} />
         </div>
         {secondsLeft !== null && (
-          <p className={`text-[11px] ${sub} text-center`}>
+          <p className={`text-xs ${sub} text-center`}>
             Code expires in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
           </p>
         )}
@@ -168,7 +163,7 @@ export default function ExtensionPairPanel({ theme = {}, extension = null, onCha
   return (
     <div className={`flex flex-col gap-3 px-4 py-4 rounded-xl ${card} border ${border}`}>
       <div className="flex items-start gap-2">
-        <Puzzle size={16} className="text-indigo-400 shrink-0 mt-0.5" />
+        <Puzzle size={16} className={`${sub} shrink-0 mt-0.5`} />
         <div>
           <p className={`text-sm font-semibold ${text}`}>Connect the SkinROI Sync extension</p>
           <p className={`text-xs mt-0.5 ${sub}`}>
@@ -186,14 +181,9 @@ export default function ExtensionPairPanel({ theme = {}, extension = null, onCha
           <span>Click "Generate pairing code" and paste it into the extension popup.</span>
         </li>
       </ol>
-      <button
-        type="button"
-        onClick={generate}
-        disabled={phase === 'requesting'}
-        className={`${accent} text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-40`}
-      >
+      <Button variant="primary" size="sm" onClick={generate} disabled={phase === 'requesting'}>
         {phase === 'requesting' ? 'Generating…' : 'Generate pairing code'}
-      </button>
+      </Button>
       {phase === 'error' && errorMsg && (
         <p className="text-xs text-red-400">{errorMsg}</p>
       )}

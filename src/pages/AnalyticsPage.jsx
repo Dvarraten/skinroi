@@ -2,6 +2,9 @@
 // weekly and monthly profit summaries, and a 30-day sale heatmap.
 import React, { useMemo } from "react";
 import { PROFIT_COLOR, LOSS_COLOR } from "../themes/themes";
+import { Page, PageHeader, StatCard } from "../components/ui/Page";
+import Segmented from "../components/ui/Segmented";
+import { formatUsd, formatSignedUsd } from "../utils/format";
 import {
   LineChart,
   Line,
@@ -62,69 +65,46 @@ export default function AnalyticsPage({
 
   const maxAbs = Math.max(...heatmapDays.map((d) => Math.abs(d.profit)), 0.01);
 
-  const summaryCards = [
-    {
-      label: "Invested",
-      value: `$${totalInvested.toFixed(2)}`,
-      colored: false,
-    },
-    {
-      label: "Total profit",
-      value: `${totalProfit >= 0 ? "+" : ""}$${totalProfit.toFixed(2)}`,
-      colored: true,
-      val: totalProfit,
-    },
-    {
-      label: "Profit rate",
-      value: winRate,
-      colored: false,
-    },
-  ];
-
   const PERIODS = [
-    { key: "7d", label: "7d" },
-    { key: "30d", label: "30d" },
+    { key: "7d", label: "7 days" },
+    { key: "30d", label: "30 days" },
     { key: "all", label: "All time" },
   ];
+  const periodLabel = PERIODS.find((p) => p.key === chartPeriod)?.label.toLowerCase() || '';
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-4">
-      <div className={`max-w-4xl mx-auto ${theme.panel} border ${theme.panelBorder} rounded-2xl overflow-hidden`}>
-        <div className={`flex items-center px-6 py-4 border-b ${theme.panelBorder}`}>
-          <h2 className={`font-semibold ${theme.text}`}>Profit analytics</h2>
+    <Page width="max-w-5xl">
+      <PageHeader
+        title="Analytics"
+        description="Profit on everything you have sold, after platform fees."
+      />
+
+      {/* Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard label="Invested" value={formatUsd(totalInvested)} hint="all purchases" />
+        <StatCard label="Total profit" value={formatSignedUsd(totalProfit)} tone={totalProfit >= 0 ? 'profit' : 'loss'} hint={`${soldItems.length} sold`} />
+        <StatCard label="Profitable sales" value={winRate} hint="share of sales with a profit" />
+      </div>
+
+      <section className={`${theme.panel} border ${theme.panelBorder} rounded-2xl`}>
+        <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 border-b ${theme.panelBorder}`}>
+          <h2 className={`text-[15px] font-semibold ${theme.text}`}>Profit over time</h2>
+          <span
+            className={`text-sm font-mono font-semibold ${totalInPeriod >= 0 ? "text-profit" : "text-loss"}`}
+            title={`Profit, ${periodLabel}`}
+          >
+            {formatSignedUsd(totalInPeriod)}
+          </span>
+          <Segmented
+            label="Period"
+            className="ml-auto"
+            items={PERIODS.map((p) => ({ key: p.key, label: p.label, active: chartPeriod === p.key, onClick: () => setChartPeriod(p.key) }))}
+          />
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Period selector + total in period */}
-          <div className="flex items-center gap-5">
-            {PERIODS.map((p) => {
-              const active = chartPeriod === p.key;
-              return (
-                <button
-                  key={p.key}
-                  onClick={() => setChartPeriod(p.key)}
-                  aria-pressed={active}
-                  className={`relative py-1 text-sm font-medium transition-colors ${
-                    active ? theme.text : `${theme.subtext} ${theme.textHover}`
-                  }`}
-                >
-                  {p.label}
-                  <span
-                    className={`absolute -bottom-0.5 left-0 h-[2px] w-full rounded-full origin-left transition-transform duration-200 ${active ? 'scale-x-100' : 'scale-x-0'}`}
-                    style={{ backgroundColor: theme.accentColor }}
-                  />
-                </button>
-              );
-            })}
-            <span
-              className={`ml-auto text-sm font-mono font-semibold ${totalInPeriod >= 0 ? "text-profit" : "text-loss"}`}
-            >
-              {totalInPeriod >= 0 ? "+" : ""}${totalInPeriod.toFixed(2)}
-            </span>
-          </div>
-
+        <div className="p-5 space-y-6">
           {/* Cumulative line chart */}
-          <div className="h-52">
+          <div className="h-60">
             {cumulativeData.length === 0 ? (
               <div className={`h-full flex items-center justify-center text-sm ${theme.subtext}`}>
                 No sales in this period yet
@@ -135,17 +115,17 @@ export default function AnalyticsPage({
                   <CartesianGrid stroke={theme.chartGrid} vertical={false} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fill: theme.chartAxis, fontSize: 11 }}
+                    tick={{ fill: theme.chartAxis, fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tick={{ fill: theme.chartAxis, fontSize: 11 }}
+                    tick={{ fill: theme.chartAxis, fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(v) => `$${v}`}
-                    width={52}
+                    tickFormatter={(v) => formatUsd(Math.round(v)).slice(0, -3)}
+                    width={60}
                   />
                   <Tooltip
                     contentStyle={{
@@ -155,8 +135,8 @@ export default function AnalyticsPage({
                     }}
                     labelStyle={{ color: theme.chartAxis, fontSize: 12 }}
                     formatter={(v) => [
-                      `$${parseFloat(v).toFixed(2)}`,
-                      "Cumulative",
+                      formatSignedUsd(parseFloat(v)),
+                      "Cumulative profit",
                     ]}
                   />
                   <Line
@@ -172,35 +152,11 @@ export default function AnalyticsPage({
             )}
           </div>
 
-          {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3">
-            {summaryCards.map((card) => (
-              <div
-                key={card.label}
-                className={`${theme.card} border ${theme.cardBorder} rounded-xl px-4 py-3`}
-              >
-                <p className={`text-xs ${theme.subtext} mb-1`}>{card.label}</p>
-                <p
-                  className={`text-lg font-mono font-semibold tabular-nums ${
-                    card.colored
-                      ? (card.val ?? 0) >= 0
-                        ? "text-profit"
-                        : "text-loss"
-                      : theme.text
-                  }`}
-                >
-                  {card.value}
-                </p>
-              </div>
-            ))}
-          </div>
-
           {/* Daily P&L heatmap */}
           <div>
-            <p className={`text-xs ${theme.subtext} mb-3`}>
-              Daily P&L, last 30 days
-            </p>
-            <div className="flex flex-wrap gap-1">
+            <p className={`text-[13px] font-medium ${theme.textSecondary} mb-1`}>Daily profit, last 30 days</p>
+            <p className={`text-xs ${theme.subtext} mb-3`}>One square per day. Brighter green means more profit, red is a loss. Hover for the amount.</p>
+            <div className="flex flex-wrap gap-1.5">
               {heatmapDays.map((d) => {
                 const intensity =
                   d.profit === 0 ? 0 : Math.min(Math.abs(d.profit) / maxAbs, 1);
@@ -217,13 +173,13 @@ export default function AnalyticsPage({
                 return (
                   <div key={d.date} className="relative group">
                     <div
-                      className="w-4 h-4 rounded-sm cursor-default transition duration-150 group-hover:scale-[1.5] group-hover:ring-1 group-hover:ring-white/20 group-hover:z-10"
+                      className="w-5 h-5 rounded cursor-default transition duration-150 group-hover:scale-[1.5] group-hover:ring-1 group-hover:ring-white/20 group-hover:z-10"
                       style={{ backgroundColor: bg }}
                     />
-                    <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 rounded-lg text-[10px] whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 ${theme.panel} border ${theme.cardBorder} shadow-lg`}>
-                      <div className="text-slate-500 mb-0.5">{d.date}</div>
+                    <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 rounded-lg text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 ${theme.panel} border ${theme.cardBorder} shadow-lg`}>
+                      <div className={`${theme.subtext} mb-0.5`}>{d.date}</div>
                       <div className={`font-mono font-semibold ${d.profit === 0 ? theme.subtext : d.profit > 0 ? 'text-profit' : 'text-loss'}`}>
-                        {d.profit === 0 ? '—' : `${d.profit > 0 ? '+' : ''}$${d.profit.toFixed(2)}`}
+                        {d.profit === 0 ? 'No sales' : formatSignedUsd(d.profit)}
                       </div>
                     </div>
                   </div>
@@ -232,7 +188,7 @@ export default function AnalyticsPage({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </Page>
   );
 }
