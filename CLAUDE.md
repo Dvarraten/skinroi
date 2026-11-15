@@ -34,7 +34,7 @@ skinroi/
 │   ├── items/
 │   │   └── index.js       GET/POST — load and save the tracked item portfolio
 │   └── snipes/
-│       └── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~45s);
+│       └── index.js       GET — deals below YouPin/Buff163 (rescans lazily, ~90s);
 │                          POST — extension pushes raw CSFloat listings (Bearer secret)
 ├── extension/            Chrome extension (Manifest V3, load unpacked)
 │   ├── manifest.json
@@ -129,7 +129,9 @@ float and paint seed). Everything else stays in Handle Items for the user.
 Items added via Handle Items store the Steam `assetid` for this matching.
 
 **Snipes**: `GET /api/snipes` (logged-in only) rescans server-fetched sources
-(DMarket) when the last scan is older than 45s, guarded by a Redis lock.
+(DMarket) when the last scan is older than 90s, guarded by a Redis lock. The page polls with
+`?since=<meta.updatedAt>` and gets `{ unchanged: true }` without the deal list
+when nothing changed (the deal list is several hundred KB; see Redis budget).
 CSFloat listings come from the extension instead: every poll (2 min) it fetches
 `csfloat.com/api/v1/listings?sort_by=most_recent` with the browser session (no
 API key) and POSTs the raw rows to `POST /api/snipes`. CSFloat answers 429
@@ -289,6 +291,16 @@ npm run items:update
 | `skinroi:snipes:steamdt:strikes` | SteamDT limit answers in a row (backoff)          |
 | `skinroi:snipes:csfl:{key}`      | Cheapest CSFloat listings per item (30 min TTL)   |
 | `skinroi:snipes:csfwant`         | Items waiting for an extension CSFloat lookup     |
+
+## Redis budget
+
+Production Redis is Upstash's free plan, which caps commands and bandwidth.
+Rules that keep us under it: poll only while the tab is visible (Snipes 30 s
+with `?since=`, pending list 60 s, sell prices 5 min); never rewrite a key when
+nothing changed (the trades push skips the state write, `touchLastSeen` writes
+at most every 10 min); reuse values already read in the same request instead of
+reading again; give every cache key a TTL. The Snipes deal list is the biggest
+value: every read or write of it costs several hundred KB of bandwidth.
 
 ## Hard Project Rules
 

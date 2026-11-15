@@ -32,6 +32,7 @@ export const MARKETS = ['csfloat'];
 const MAX_RESULTS = 1000;
 
 const key = (steamId) => `skinroi:sellprices:${steamId}`;
+const SELL_PRICES_TTL_S = 30 * 24 * 60 * 60;
 const itemsKey = (steamId) => `skinroi:items:${steamId}`;
 
 // One price target per distinct item+phase the user still owns (unsold, not
@@ -154,7 +155,8 @@ export async function handleSellPrices(req, res) {
     }
 
     const prices = mergeResults(stored, results, names, cnyPerUsd, now);
-    await redis.set(key(steamId), { prices, status });
+    // Refreshed on every extension push; expires if the extension stops for good.
+    await redis.set(key(steamId), { prices, status }, { ex: SELL_PRICES_TTL_S });
     return res.json({ ok: true, saved: results.length });
   }
 

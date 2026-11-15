@@ -23,7 +23,10 @@ const DEALS_KEY = 'skinroi:snipes:deals';
 const META_KEY = 'skinroi:snipes:meta';
 const LOCK_KEY = 'skinroi:snipes:lock';
 
-const SCAN_INTERVAL_MS = 45 * 1000;
+// Each scan reads and rewrites the whole deal list (several hundred KB), so
+// this is the main lever on Redis bandwidth. DMarket is the only source the
+// server fetches itself; CSFloat arrives from the extension every 2 min.
+const SCAN_INTERVAL_MS = 90 * 1000;
 const DEAL_TTL_MS = 30 * 60 * 1000;
 const MAX_DEALS = 500;
 // Server keeps anything at least this far under reference; fees, ROI and
@@ -56,27 +59,36 @@ export async function loadSnipes() {
   return { deals: Array.isArray(deals) ? deals : [], meta: meta || null };
 }
 
+// Meta only (small): the page polls with ?since=<meta.updatedAt> and the big
+// deal list is only read when it changed since.
+export async function loadSnipesMeta() {
+  return (await getRedis().get(META_KEY)) || null;
+}
+
+// Rescans when the last scan is old. Returns true when it scanned (the deal
+// list changed), false when the meta read showed it was still fresh.
 export async function ensureFresh() {
   const redis = getRedis();
   const meta = await redis.get(META_KEY);
-  if (meta?.lastScan && Date.now() - meta.lastScan < SCAN_INTERVAL_MS) return;
+  if (meta?.lastScan && Date.now() - meta.lastScan < SCAN_INTERVAL_MS) return false;
   const gotLock = await redis.set(LOCK_KEY, Date.now(), { nx: true, ex: 25 });
-  if (!gotLock) return;
+  if (!gotLock) return false;
   try {
     await scan(redis);
   } finally {
     await redis.del(LOCK_KEY);
   }
+  return true;
 }
 
 // Listings pushed by the extension. The answer also names items whose
 // cheapest CSFloat listing the extension should look up next.
 export async function ingestListings(source, listings) {
   return withLock(async (redis, now) => {
-    const result = await priceAndStore(redis, listings, now, {
+    const { want, ...result } = await priceAndStore(redis, listings, now, {
       [source]: { ok: true, count: listings.length, lastRun: now, via: 'extension' },
     }, {}, { fromFeed: true });
-    return { ...result, csfloatLookups: await takeLookups(redis, now) };
+    return { ...result, csfloatLookups: await takeLookups(redis, now, want) };
   });
 }
 
@@ -85,6 +97,9 @@ export async function ingestListings(source, listings) {
 export async function ingestCsfloatLowest(entries) {
   return withLock(async (redis, now) => {
     const { names, pending } = await storeLookups(redis, entries, now);
+    // Nothing was waiting on these items: the deal list doesn't change, so
+    // skip reading and rewriting it.
+    if (!pending.length) return { stored: names.length, matched: 0 };
     const result = await priceAndStore(redis, pending, now, {});
     return { stored: names.length, matched: result.matched };
   });
@@ -195,7 +210,7 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
   fresh.push(...found);
   // Only items that could sell above what they cost are worth a lookup.
   const candidates = [...lookups.values()].map(lookupCandidate).filter((c) => c.priority > 1 + MIN_DISCOUNT);
-  await queueLookups(redis, candidates, now);
+  const want = await queueLookups(redis, candidates, now);
 
   // Kept deals get the current CSFloat price for their item, or none once
   // the last lookup has expired.
@@ -218,11 +233,13 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
     sources: { ...keptSources(prevMeta?.sources), ...sourcePatch },
     refProvider: referenceProvider(),
     refError,
+    // Lets GET /api/snipes?since= skip re-reading an unchanged deal list.
+    updatedAt: now,
     // Listings dropped as illiquid in the latest feed batch, per reason.
     ...(fromFeed ? { skipped } : {}),
   };
   await redis.mset({ [DEALS_KEY]: deals, [META_KEY]: meta });
-  return { checked: listings.length, priced: priceable.length, matched: fresh.length };
+  return { checked: listings.length, priced: priceable.length, matched: fresh.length, want };
 }
 
 function bestSellPrice(refs, except) {
