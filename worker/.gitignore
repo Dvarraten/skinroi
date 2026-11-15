@@ -1,0 +1,5 @@
+node_modules/
+.env
+# Saved browser profile (CSFloat cookies) and worker state (pairing secret, rate-limit pause)
+.profile/
+.state/

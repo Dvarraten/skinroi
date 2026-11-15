@@ -1,0 +1,21 @@
+{
+  "name": "skinroi-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runs at home: fetches CSFloat listings and sell prices with Playwright and pushes them to SkinROI, like the extension does, without Chrome open.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "npm install && npx playwright install chromium",
+    "login": "node src/login.js",
+    "pair": "node src/pair.js",
+    "start": "node src/index.js",
+    "once": "node src/index.js --once",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
