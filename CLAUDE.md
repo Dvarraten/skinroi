@@ -282,7 +282,7 @@ npm run items:update
 | `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (5 min TTL) |
 | `skinroi:csfloat:trades-fail:{steamId}` | /me/trades failed: don't retry (5 min, 15 after 429) |
 | `skinroi:steaminv:{steamId}`     | Public Steam inventory for import (10 min TTL)   |
-| `skinroi:snipes:deals`           | Current snipe candidates (30 min window)          |
+| `skinroi:snipes:deals`           | Current snipe candidates (30 min window, max 250) |
 | `skinroi:snipes:meta`            | Last scan time + per-source status                |
 | `skinroi:snipes:lock`            | Scan lock (25s TTL)                               |
 | `skinroi:snipes:ref:{name}`      | Cached CSPriceAPI row per item (5 min TTL)        |
@@ -300,7 +300,11 @@ with `?since=`, pending list 60 s, sell prices 5 min); never rewrite a key when
 nothing changed (the trades push skips the state write, `touchLastSeen` writes
 at most every 10 min); reuse values already read in the same request instead of
 reading again; give every cache key a TTL. The Snipes deal list is the biggest
-value: every read or write of it costs several hundred KB of bandwidth.
+value: every read or write of it costs several hundred KB of bandwidth. The
+free plan's 10 GB/month bandwidth (not commands or storage) is what ran out in
+Nov 2026. So it is capped at 250 deals, null ref fields are dropped before
+storing, and `readDeals` in `scan.js` reads the small meta key first and reuses
+the warm instance's copy when `meta.updatedAt` matches.
 
 ## Hard Project Rules
 
