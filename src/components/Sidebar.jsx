@@ -8,8 +8,7 @@ import {
   AlertTriangle, ArrowLeftRight, Wallet, Crosshair, Sun, Moon,
 } from "lucide-react";
 import steamLogo from "../assets/platforms/steam.png";
-import logoSrc from "../utils/skinroi-logo.svg";
-import logoLightSrc from "../utils/skinroi-logo-light.svg";
+import Logo from "./Logo";
 import CurrencyConverter from "./CurrencyConverter";
 import ExtensionPairPanel from "./ExtensionPairPanel";
 import { PROFIT_COLOR, WARN_COLOR, LOSS_COLOR } from "../themes/themes";
@@ -120,9 +119,9 @@ export default function Sidebar({
         type="button"
         onClick={() => onNavigate(null)}
         title="Portfolio"
-        className="flex items-center md:px-1 md:mb-5 hover:opacity-80 transition-opacity"
+        className="flex items-center h-9 md:px-1.5 md:mb-5 hover:opacity-80 transition-opacity"
       >
-        <img src={isDark ? logoSrc : logoLightSrc} alt="SkinROI" className="h-11 w-auto" />
+        <Logo theme={theme} />
       </button>
 
       {/* Add: the one filled button in the app chrome. */}

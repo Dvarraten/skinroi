@@ -1,17 +1,9 @@
-<svg viewBox="0 0 128 128" width="128" height="128" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <clipPath id="clip">
-      <polygon points="64,6 122,64 64,122 6,64"/>
-    </clipPath>
-  </defs>
-  <!-- Black diamond background -->
-  <polygon points="64,6 122,64 64,122 6,64" fill="#0a0a0a" stroke="#F3BA2F" stroke-width="6"/>
-  <!-- Yellow filled area under chart line -->
-  <path d="M 14,92 L 32,76 L 50,84 L 64,66 L 80,72 L 100,50 L 114,38 L 122,38 L 122,122 L 6,122 Z"
-    fill="#F3BA2F" clip-path="url(#clip)"/>
-  <!-- Chart line on top -->
-  <polyline points="14,92 32,76 50,84 64,66 80,72 100,50 114,38"
-    fill="none" stroke="#F3BA2F" stroke-width="7"
-    stroke-linecap="round" stroke-linejoin="round"
-    clip-path="url(#clip)"/>
+<svg viewBox="0 0 48 48" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+  <!-- White tile on dark browser chrome, near-black tile on light. -->
+  <style>
+    .tile { fill: #18181b; } .s { stroke: #fafafa; }
+    @media (prefers-color-scheme: dark) { .tile { fill: #fafafa; } .s { stroke: #09090b; } }
+  </style>
+  <rect class="tile" x="3" y="3" width="42" height="42" rx="11"/>
+  <path class="s" d="M32.5 15.5H21.25a5.25 5.25 0 0 0 0 10.5h5.5a5.25 5.25 0 0 1 0 10.5H15.5" fill="none" stroke-width="4.6" stroke-linecap="round"/>
 </svg>
