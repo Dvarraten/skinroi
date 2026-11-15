@@ -14,7 +14,7 @@ import { getRedis } from '../redis.js';
 import { fetchDmarketListings } from './dmarket.js';
 import { getReferencePrices, referenceProvider } from './reference.js';
 import { itemKey, needsPhase } from './normalize.js';
-import { filterLiquid, isThinMarket } from './liquidity.js';
+import { filterLiquid, isLiquidEnough, isThinMarket } from './liquidity.js';
 import {
   csfloatRef, loadLowest, mergeFeedListings, queueLookups, storeLookups, takeLookups,
 } from './csfloat-lowest.js';
@@ -31,9 +31,10 @@ const DEAL_TTL_MS = 30 * 60 * 1000;
 // Every write of the deal list costs its full size in Upstash bandwidth (the
 // free plan's 10 GB/month ran out at 500), so keep it short.
 const MAX_DEALS = 250;
-// Server keeps anything at least this far under reference; fees, ROI and
-// liquidity are filtered in the browser so the user can tune them live.
-const MIN_DISCOUNT = 0.02;
+// Server keeps anything at least this far under reference. 5 % ROI after
+// fees needs more than 5 % under, so nothing the page would show is lost;
+// fees, ROI and the exact liquidity bar are filtered in the browser.
+const MIN_DISCOUNT = 0.05;
 
 // Sources the server fetches itself. After a 429 a source pauses for
 // RATE_LIMIT_PAUSE_MS so we don't keep making it worse.
@@ -213,11 +214,24 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
   for (const l of priceable) {
     const key = itemKey(l.name, l.phase);
     const base = { youpin: null, buff163: null, ...refs.get(key) };
+    // Only very liquid items are kept (liquidity.js). CSFloat's sales and
+    // Steam volume come from the cached lookup, else from the feed listing.
+    const csfloatStats = {
+      sales: lowest.get(key)?.sales ?? l.marketInfo?.quantity ?? null,
+      steamVolume: lowest.get(key)?.steamVolume ?? l.marketInfo?.steamVolume ?? null,
+    };
+    if (!isLiquidEnough({ ...base, csfloat: csfloatStats })) {
+      skipped.liquidity = (skipped.liquidity || 0) + 1;
+      continue;
+    }
     if (!items.has(key)) {
       items.set(key, { name: l.name, refs: { ...base, csfloat: csfloatRef(lowest.get(key)) }, image: l.image });
     }
     if (!lowest.has(key) && !needsPhase(l.name) && !isThinMarket(base)) addLookup(lookups, key, l, base);
     const ref = { ...base, csfloat: csfloatRef(lowest.get(key), l.market === 'csfloat' ? l.listingId : null) };
+    // A deal needs a market that is both liquid and has a price to sell at.
+    // One waiting on its CSFloat lookup is priced again when that answers.
+    if (!isLiquidEnough(ref)) continue;
     const best = bestSellPrice(ref);
     if (!best || l.priceUsd > best * (1 - MIN_DISCOUNT)) continue;
     fresh.push({ ...l, refs: ref, seenAt: now });
@@ -234,8 +248,10 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
     const csfloat = csfloatRef(lowest.get(itemKey(d.name, d.phase)), d.market === 'csfloat' ? d.listingId : null);
     byId.set(id, { ...d, refs: { ...d.refs, csfloat } });
   }
-  // An item deal re-checked this round that no longer qualifies is gone.
+  // An item deal re-checked this round that no longer qualifies is gone, and
+  // so is any kept deal that isn't liquid enough (e.g. from before the bar).
   for (const id of checkedIds) byId.delete(id);
+  for (const [id, d] of byId) if (!isLiquidEnough(d.refs)) byId.delete(id);
   // Merge with earlier finds: keep first-seen time, refresh price/ref data.
   for (const d of fresh) {
     const old = byId.get(d.id);
@@ -254,7 +270,8 @@ async function priceAndStore(redis, listings, now, sourcePatch, metaPatch = {}, 
     refError,
     // Lets GET /api/snipes?since= skip re-reading an unchanged deal list.
     updatedAt: now,
-    // Listings dropped as illiquid in the latest feed batch, per reason.
+    // Listings dropped as illiquid in the latest feed batch, per reason
+    // (souvenir, wear, non-skin, container, volume, liquidity).
     ...(fromFeed ? { skipped } : {}),
   };
   await redis.mset({ [DEALS_KEY]: deals, [META_KEY]: meta });
@@ -305,7 +322,7 @@ function itemDeals(items, now) {
   const deals = [];
   const checkedIds = [];
   for (const { name, refs, image } of items.values()) {
-    if (needsPhase(name)) continue;
+    if (needsPhase(name) || !isLiquidEnough(refs)) continue;
     for (const market of ['youpin', 'buff163']) {
       const ask = refs[market]?.askUsd;
       if (!ask) continue;

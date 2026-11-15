@@ -18,7 +18,7 @@ const MARKET_LABELS = { csfloat: "CSFloat", dmarket: "DMarket", youpin: "YouPin"
 
 // The demo preview only has deals 15+ minutes old and no saved filters, so
 // it starts from looser defaults to have something to show.
-const DEMO_FILTERS = { ...DEFAULT_SNIPE_FILTERS, sellMarkets: SELL_MARKETS, minLiquidity: 30, maxAgeMin: 60 };
+const DEMO_FILTERS = { ...DEFAULT_SNIPE_FILTERS, sellMarkets: SELL_MARKETS, maxAgeMin: 60 };
 
 function loadFilters(demo) {
   if (demo) return DEMO_FILTERS;
