@@ -3,17 +3,22 @@
 // so polling faster only re-reads Redis. Each poll sends ?since= so an
 // unchanged deal list costs one small read instead of the whole list.
 // demo = logged-out preview: delayed deals without buy links, polled slowly.
+// The preview starts with example deals (utils/demoSnipes) so it never opens
+// empty, and swaps them for the server's delayed deals once there are any.
+// example is true while the example deals are shown.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { buildDemoSnipes } from "../utils/demoSnipes";
 
 const BASE = process.env.REACT_APP_STEAM_SYNC_URL || "";
 const POLL_MS = 30 * 1000;
 const DEMO_POLL_MS = 60 * 1000;
 
 export function useSnipes({ demo = false } = {}) {
-  const [deals, setDeals] = useState([]);
+  const [deals, setDeals] = useState(() => (demo ? buildDemoSnipes() : []));
+  const [example, setExample] = useState(demo);
   const [meta, setMeta] = useState(null);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!demo);
   const aliveRef = useRef(true);
   const sinceRef = useRef(0);
 
@@ -32,12 +37,21 @@ export function useSnipes({ demo = false } = {}) {
       const data = await res.json();
       if (!aliveRef.current) return;
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-      if (!data.unchanged) setDeals(data.deals || []);
+      if (demo) {
+        // Keep the example deals until the delayed feed has something.
+        if (data.deals?.length) {
+          setDeals(data.deals);
+          setExample(false);
+        }
+      } else if (!data.unchanged) {
+        setDeals(data.deals || []);
+      }
       setMeta(data.meta || null);
       sinceRef.current = data.meta?.updatedAt || 0;
       setError(null);
     } catch (e) {
-      if (aliveRef.current) setError(e.message);
+      // The demo keeps showing its example deals instead of an error.
+      if (aliveRef.current && !demo) setError(e.message);
     } finally {
       if (aliveRef.current) setLoading(false);
     }
@@ -61,5 +75,5 @@ export function useSnipes({ demo = false } = {}) {
     };
   }, [refresh, demo]);
 
-  return { deals, meta, error, loading, refresh };
+  return { deals, meta, error, loading, refresh, example };
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { buildDemoTrades } from '../utils/demoTrades';
 
 // Frontend adapter for the extension-based sync.
 //
@@ -6,6 +7,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // only reads state (pending items, extension connection info) and dismisses
 // items the user resolves. There is no client-triggered "sync now" — the
 // extension pushes whenever it detects changes.
+//
+// Demo mode: the pending list is a set of example trades (utils/demoTrades)
+// that only lives in React state. Nothing is fetched and dismissing an item
+// never reaches the server.
 
 const BASE = process.env.REACT_APP_STEAM_SYNC_URL || '';
 // Only while the tab is visible; a hidden tab refreshes when it's shown again.
@@ -29,8 +34,10 @@ function tombstoneKey(assetid, type) {
   return `${type || '*'}:${assetid}`;
 }
 
-export function useSteamSync() {
-  const [state, setState] = useState(EMPTY_STATE);
+const demoState = () => ({ ...EMPTY_STATE, pending: buildDemoTrades() });
+
+export function useSteamSync({ demo = false } = {}) {
+  const [state, setState] = useState(() => (demo ? demoState() : EMPTY_STATE));
   const [reachable, setReachable] = useState(null);
   const aliveRef = useRef(true);
   // Map of tombstoneKey → expiryTimestamp. Any pending item whose
@@ -57,6 +64,7 @@ export function useSteamSync() {
   }, []);
 
   const fetchState = useCallback(async () => {
+    if (demo) return null;
     try {
       const res = await fetch(`${BASE}/api/inventory/state`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -74,7 +82,7 @@ export function useSteamSync() {
       setReachable(false);
       return null;
     }
-  }, [filterDismissed]);
+  }, [filterDismissed, demo]);
 
   const dismiss = useCallback(async (assetidOrIds, type) => {
     const assetids = Array.isArray(assetidOrIds) ? assetidOrIds : [assetidOrIds];
@@ -91,6 +99,7 @@ export function useSteamSync() {
         (p) => !(ids.has(String(p.assetid)) && (!type || p.type === type))
       ),
     }));
+    if (demo) return;
 
     // Batch into one request — collapses N Redis load-modify-save races
     // into a single atomic write, and keeps the network round-trip count
@@ -122,10 +131,15 @@ export function useSteamSync() {
     }
     // All retries failed — refetch to reconcile state with the server.
     fetchState();
-  }, [fetchState]);
+  }, [fetchState, demo]);
 
   useEffect(() => {
     aliveRef.current = true;
+    // Entering or leaving the demo starts from a clean list either way.
+    dismissedRef.current = new Map();
+    setState(demo ? demoState() : EMPTY_STATE);
+    setReachable(null);
+    if (demo) return () => { aliveRef.current = false; };
     fetchState();
     const id = setInterval(() => {
       if (document.visibilityState === 'visible') fetchState();
@@ -139,7 +153,7 @@ export function useSteamSync() {
       clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [fetchState]);
+  }, [fetchState, demo]);
 
   return {
     pending: state.pending,

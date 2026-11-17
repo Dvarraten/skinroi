@@ -247,9 +247,18 @@ saved anywhere (see below).
 in `public/landing/`). "Try the demo" sets `sessionStorage['skinroi-demo']`;
 `useItems(steamId, { demo })` then loads `utils/demoPortfolio.js` and never
 writes to localStorage or `/api/items` (production Redis is shared with local
-dev). Logged-out Snipes reads `GET /api/snipes?demo=1`: deals first seen 15+
-min ago, without buy links, CDN-cached 60 s, never rescans
-(`api/_lib/snipes/demo.js`). "Continue without an account" is guest mode
+dev). The demo is all local data and shows instantly (no skeletons):
+`useSteamSync({ demo })` serves example incoming/outgoing trades
+(`utils/demoTrades.js`, outgoing ones match held demo items) and never calls
+the API, Portfolio gets made-up sell prices (`buildDemoSellPrices`), and every
+demo item's image is built in (`utils/demoImages.js`, copied from items.json;
+add a line there when adding a demo item). Logged-out Snipes starts with example
+deals (`utils/demoSnipes.js`, labelled "Example deals") and swaps them for
+`GET /api/snipes?demo=1` once that has any: deals first seen 15+ min ago,
+without buy links, CDN-cached 60 s, never rescans (`api/_lib/snipes/demo.js`).
+Landing screenshots (`public/landing/*.webp`) are taken from the demo with
+`npm run landing:shots` (`scripts/landing-screenshots.js`, Playwright, needs
+`npm start` running and access to Steam's image CDN). "Continue without an account" is guest mode
 (`localStorage['cs2-auth-dismissed']`).
 
 **Onboarding + Steam import**: `OnboardingChecklist` on Portfolio (install, pair,

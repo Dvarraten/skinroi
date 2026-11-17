@@ -3,6 +3,7 @@
 // "Recent sales" always look current. Demo items only ever live in React
 // state: useItems never saves them to localStorage or /api/items.
 import { getPlatformFee } from './platformFees';
+import { demoImage } from './demoImages';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -51,7 +52,7 @@ export function buildDemoPortfolio(now = Date.now()) {
       profitPercent: null,
       pending: false,
       expectedDelivery: null,
-      iconUrl: null,
+      iconUrl: demoImage(itemName),
       floatValue,
       demo: true,
     };
@@ -81,11 +82,37 @@ export function buildDemoPortfolio(now = Date.now()) {
       platform,
       pending: false,
       expectedDelivery: null,
-      iconUrl: null,
+      iconUrl: demoImage(itemName),
       floatValue,
       demo: true,
     };
   });
 
   return [...active, ...sold];
+}
+
+// YouPin / CSFloat sell prices for the demo's held items, in the shape
+// GET /api/items?sellPrices=1 returns, so Portfolio shows the price column
+// and the "pays more" dot like it does for signed-in users.
+// [YouPin lowest, CSFloat lowest] in USD, per held item.
+const SELL_PRICES = {
+  '★ Karambit | Doppler (Factory New)': [868.0, 879.5],
+  'AWP | Asiimov (Field-Tested)': [118.4, 121.9],
+  'M4A1-S | Printstream (Minimal Wear)': [176.9, 174.2],
+  'AK-47 | Vulcan (Minimal Wear)': [244.6, 249.0],
+  'Desert Eagle | Blaze (Factory New)': [431.2, 438.0],
+  'USP-S | Kill Confirmed (Minimal Wear)': [59.8, 58.9],
+  '★ Sport Gloves | Vice (Field-Tested)': [1259.0, 1241.0],
+  'AK-47 | Slate (Field-Tested)': [4.48, 4.61],
+};
+
+export function buildDemoSellPrices(now = Date.now()) {
+  const prices = {};
+  for (const [name, [youpin, csfloat]] of Object.entries(SELL_PRICES)) {
+    prices[name] = {
+      youpin: { priceUsd: youpin, at: now - 12 * 60 * 1000 },
+      csfloat: { priceUsd: csfloat, at: now - 5 * 60 * 60 * 1000 },
+    };
+  }
+  return { prices, status: {} };
 }

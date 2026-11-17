@@ -20,6 +20,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "items:update": "node scripts/fetch-items.js",
+    "landing:shots": "node scripts/landing-screenshots.js",
     "prepare": "husky"
   },
   "eslintConfig": {

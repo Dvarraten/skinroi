@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { themes } from './themes/themes';
 import './index.css';
 
@@ -12,6 +12,7 @@ import { usePortfolioView } from './hooks/usePortfolioView';
 import { useSellPrices } from './hooks/useSellPrices';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
+import { buildDemoSellPrices } from './utils/demoPortfolio';
 
 import Sidebar, { MobileTabBar } from './components/Sidebar';
 import { Page } from './components/PageHeader';
@@ -76,7 +77,7 @@ export default function CS2TradingTracker() {
     reader.readAsText(file);
   };
 
-  const steamSync = useSteamSync();
+  const steamSync = useSteamSync({ demo });
   useCsfloatAutoSync({
     enabled: portfolioReady,
     pending: steamSync.pending,
@@ -109,9 +110,13 @@ export default function CS2TradingTracker() {
   });
 
   const isHome             = !activePage;
-  const sellPrices = useSellPrices(!!user && isHome);
+  const liveSellPrices = useSellPrices(!!user && isHome);
+  // The demo shows made-up sell prices for its example items.
+  const demoSellPrices = useMemo(() => (demo ? buildDemoSellPrices() : null), [demo]);
+  const sellPrices = demo ? demoSellPrices : liveSellPrices;
   // Auth or portfolio still on its way: Home shows skeletons, not empty states.
-  const homeLoading = authLoading || itemsLoading;
+  // The demo is all local data, so it never waits.
+  const homeLoading = !demo && (authLoading || itemsLoading);
   const isAnalyticsPage    = activePage === 'analytics';
   const isAddPage          = activePage === 'add';
   const isHandleItemsPage  = activePage === 'handleItems';
