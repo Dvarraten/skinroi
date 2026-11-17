@@ -9,3 +9,6 @@ coverage/
 
 # Local-only scripts (e.g. items.json updater) — Vercel doesn't run them
 scripts/
+
+# Home worker (runs on the user's own machine, see worker/README.md)
+worker/

@@ -67,6 +67,10 @@ skinroi/
 │   │   └── useSteamSync.js    Reads pending list + extension status (read-only)
 │   ├── utils/            Helpers (itemImages, fees, CSV import/export, etc.)
 │   └── themes/themes.js  Theme tokens (Dark, Light) and semantic colours
+├── worker/               Optional home worker (Node + Playwright, prototype):
+│                         does the extension's CSFloat work (Snipes feed +
+│                         lookups, sell prices) without Chrome open; same
+│                         endpoints, Bearer secret and rate limit. worker/README.md
 └── scripts/
     └── fetch-items.js    Pulls latest CS2 skin list → public/items.json
 ```
@@ -220,7 +224,9 @@ until `Retry-After`/`X-RateLimit-Reset`, else 10 min doubling to 60 min. Per
 5-min poll that is at most 1 feed + 2 lookups + 3 sell-price calls. CSFloat
 inspect (`api.csfloat.com`, `lib/inspect.js`) only looks at items from trades
 since pairing, at most 5 per poll, and caches failures for 24 h. Never add a
-CSFloat call that bypasses `csfloatFetch`.
+CSFloat call that bypasses `csfloatFetch` (in `worker/`: `gate.fetch`, same
+rules, state in `worker/.state/`; it skips its round while the user's Chrome
+is open so the two don't double up).
 
 **Sell prices on Portfolio**: each unsold item shows the lowest YouPin and
 CSFloat listing (YouPin at most 1 hour old, CSFloat at most 50 h), with a dot on the one that pays more after
