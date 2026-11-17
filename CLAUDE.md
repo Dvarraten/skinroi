@@ -152,6 +152,15 @@ is the same copy (same `assetid`, or for items without one: same name, exact
 float and paint seed). Everything else stays in Handle Items for the user.
 Items added via Handle Items store the Steam `assetid` for this matching.
 
+**Trades page** (`HandleItemsPage.jsx`): image-first cards, no list view.
+Trade hold is not asked for: an incoming item is on hold for 7 days from the
+trade's `detectedAt` (`utils/tradeHold.js`), shown as a chip, and is added as
+`pending` with `expectedDelivery` = hold end (App promotes it when that
+passes). Outgoing entries match a portfolio item by `assetid` first
+(`utils/tradeMatch.js`, Steam import and Trades both store it); only without
+an id match does the user pick from same-name items (no-assetid ones first),
+then near names, or search.
+
 **Snipes**: `GET /api/snipes` (logged-in only) rescans server-fetched sources
 (DMarket) when the last scan is older than 90s, guarded by a Redis lock. The page polls with
 `?since=<meta.updatedAt>` and gets `{ unchanged: true }` without the deal list
