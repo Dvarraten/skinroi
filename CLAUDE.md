@@ -66,6 +66,8 @@ skinroi/
 │   │   ├── useChartData.js    Derives chart series from sold items
 │   │   └── useSteamSync.js    Reads pending list + extension status (read-only)
 │   ├── utils/            Helpers (itemImages, fees, CSV import/export, etc.)
+│   ├── shared/           Plain JS used by both the site and api/ (liquidity
+│   │                     score, Doppler phase). No imports, no JSX
 │   └── themes/themes.js  Theme tokens (Dark, Light) and semantic colours
 └── scripts/
     └── fetch-items.js    Pulls latest CS2 skin list → public/items.json
@@ -200,8 +202,8 @@ kits/charms, containers (cases, capsules, packages, keys, pins: any name
 without " | " that isn't a ★ item) and items with a Steam daily volume under
 10 (from CSFloat's feed) are dropped, so they never cost a SteamDT batch slot
 or a CSFloat lookup. After pricing, an item must score at least 75 on the
-page's 0–100 liquidity score (`liquidityScore`, mirrored from
-`src/utils/snipes.js`) on a market it can be sold on, or it is dropped and
+page's 0–100 liquidity score (`liquidityScore` in `src/shared/liquidity.js`,
+used by both the page and the server) on a market it can be sold on, or it is dropped and
 never looked up; items with no liquidity data are dropped too. The page's
 "Min liquidity" defaults to 75 as well. CSFloat lookups also skip items with
 under 20 YouPin/Buff163 listings and items that can't sell above their buy
@@ -232,8 +234,8 @@ YouPin session. CSFloat is fetched by the extension (`lib/sellprices.js`):
 poll, POSTed to the same URL. Each CSFloat price is cached 48 h
 (`SELL_PRICES_REFRESH_AFTER_MS`); new items have no price and go first. The
 site hides YouPin prices older than 1 hour and CSFloat prices older than 50 h
-(`maxAgeMs` in `SELL_PRICE_MARKETS`). Prices are keyed per Doppler phase (`api/_lib/doppler-phase.js`,
-mirrored in `src/utils/sellPrices.js`): phase from the item name ("Doppler
+(`maxAgeMs` in `SELL_PRICE_MARKETS`). Prices are keyed per Doppler phase (`src/shared/dopplerPhase.js`, used by
+both `api/_lib/doppler-phase.js` and `src/utils/sellPrices.js`): phase from the item name ("Doppler
 Phase 2") or its paint index; CSFloat filters by `paint_index`. When the
 phase is unknown (or CSFloat has nothing for it), and always for YouPin
 (SteamDT has no per-phase prices), the price is the lowest of any phase,
