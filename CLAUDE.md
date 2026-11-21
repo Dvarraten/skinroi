@@ -50,10 +50,10 @@ skinroi/
 │           └── steam.js   Session token + GetTradeOffers + normalizer
 ├── src/                  React CRA frontend
 │   ├── App.js            Root component
-│   ├── pages/            Pages: Add (AddItemPage + TransactionPage as tabs),
-│   │                     HandleItems ("Trades" in the UI), Analytics, Snipes,
-│   │                     About, Connections, Landing. Portfolio (start page)
-│   │                     lives in App.js
+│   ├── pages/            Pages: Portfolio (start page), Add (AddItemPage +
+│   │                     TransactionPage as tabs), HandleItems ("Trades" in
+│   │                     the UI; its cards in pages/trades/), Analytics,
+│   │                     Snipes, About, Connections, Landing
 │   ├── components/Sidebar.jsx  Navigation: left sidebar on desktop, top bar +
 │   │                     bottom tab bar (MobileTabBar) on phones; account menu
 │   │                     with pairing, currency converter, Dark/Light toggle
@@ -239,7 +239,19 @@ phase is unknown (or CSFloat has nothing for it), and always for YouPin
 (SteamDT has no per-phase prices), the price is the lowest of any phase,
 flagged `anyPhase` and shown with a `*`; no "best" dot then.
 
+**Portfolio value history**: Portfolio works out today's market value (best
+fresh YouPin/CSFloat price after fees per held item, cost for unpriced ones,
+`utils/portfolioValue.js`) and `useValueHistory` posts it to
+`/api/items?history=1` (`api/_lib/value-history.js`) the first time each day,
+then at most every 6 h if it moved. Analytics draws it against holding cost,
+which comes from the items so it reaches back before the first snapshot.
+
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
+Saves carry `baseVersion`; the server bumps `skinroi:items-ver:{steamId}` on
+each save and answers 409 when another tab saved in between, so the stale tab
+reloads instead of overwriting (`useItems`, chip in `SaveStatusChip`). A failed
+save retries 5 s doubling to 60 s and shows "Not saved". The sidebar's data
+status dot (`utils/freshness.js`) sums up extension, sync, sell prices and saving.
 Guest users → `localStorage` key `cs2-trading-items`. Demo mode → nothing is
 saved anywhere (see below).
 
@@ -314,12 +326,14 @@ npm run items:update
 | Key                              | Contents                                          |
 | -------------------------------- | ------------------------------------------------- |
 | `skinroi:items:{steamId}`        | Portfolio item array                              |
+| `skinroi:items-ver:{steamId}`    | Portfolio version, bumped on every save (409 guard) |
 | `skinroi:sync:{steamId}:state`   | Pending list, tombstones, processed-trade dedup   |
 | `skinroi:profile:{steamId}`      | Cached Steam display name + avatar (24h TTL)      |
 | `skinroi:ext-pair:{code}`        | Short-lived pairing code (10 min TTL)             |
 | `skinroi:ext-secret:{secret}`    | Reverse lookup: Bearer secret → steamId           |
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
 | `skinroi:sellprices:{steamId}`   | CSFloat sell prices for owned items (from extension) |
+| `skinroi:valuehist:{steamId}`   | Daily portfolio cost + market value snapshots (max 730) |
 | `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (5 min TTL) |
 | `skinroi:csfloat:trades-fail:{steamId}` | /me/trades failed: don't retry (5 min, 15 after 429) |
 | `skinroi:conn:{steamId}`         | Sealed marketplace API keys + status per provider |
