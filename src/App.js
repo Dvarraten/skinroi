@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { themes } from './themes/themes';
 import './index.css';
 
@@ -10,6 +10,8 @@ import { useSteamSync } from './hooks/useSteamSync';
 import { useCsfloatAutoSync } from './hooks/useCsfloatAutoSync';
 import { usePortfolioView } from './hooks/usePortfolioView';
 import { useSellPrices } from './hooks/useSellPrices';
+import { useValueHistory } from './hooks/useValueHistory';
+import { portfolioSnapshot } from './utils/portfolioValue';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
 
@@ -110,6 +112,13 @@ export default function CS2TradingTracker() {
 
   const isHome             = !activePage;
   const sellPrices = useSellPrices(!!user && isHome);
+  // Today's holding cost vs. market value, from the sell prices Portfolio
+  // shows; stored once a day for the Analytics value chart.
+  const valueSnapshot = useMemo(
+    () => (portfolioReady && sellPrices ? portfolioSnapshot(items, sellPrices.prices) : null),
+    [portfolioReady, sellPrices, items]
+  );
+  const valueHistory = useValueHistory(user?.steamId, valueSnapshot);
   // Auth or portfolio still on its way: Home shows skeletons, not empty states.
   const homeLoading = authLoading || itemsLoading;
   const isAnalyticsPage    = activePage === 'analytics';
@@ -228,6 +237,7 @@ export default function CS2TradingTracker() {
           profitChartData={allTimeProfitChartData}
           theme={themeStyles}
           loading={homeLoading}
+          marketValue={valueSnapshot}
         />
 
         <div className={`mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-b ${themeStyles.cardBorder}`}>
@@ -314,6 +324,7 @@ export default function CS2TradingTracker() {
           stats={stats}
           theme={themeStyles}
           items={items}
+          valueHistory={valueHistory}
         />
       )}
 

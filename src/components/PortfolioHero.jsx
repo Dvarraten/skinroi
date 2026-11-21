@@ -22,7 +22,7 @@ function Stat({ theme, label, value, sub, tone = "", loading }) {
   );
 }
 
-export default function PortfolioHero({ stats, profitChartData, theme, loading = false }) {
+export default function PortfolioHero({ stats, profitChartData, theme, loading = false, marketValue = null }) {
   const profit = stats.totalProfit;
   const roi = stats.totalInvested > 0 ? (profit / stats.totalInvested) * 100 : 0;
 
@@ -65,6 +65,24 @@ export default function PortfolioHero({ stats, profitChartData, theme, loading =
               </span>{" "}
               return
             </p>
+            {marketValue?.priced > 0 && (() => {
+              const diff = marketValue.market - marketValue.cost;
+              return (
+                <p
+                  className={`mt-1 text-[13px] ${theme.subtext}`}
+                  title="Best YouPin / CSFloat price after fees; items without a fresh price count at what you paid."
+                >
+                  <span className={`font-mono font-medium ${theme.text}`}>${money(marketValue.market)}</span>{" "}
+                  at market
+                  <span className="mx-2 opacity-40">·</span>
+                  <span className={`font-mono font-medium ${diff >= 0 ? "text-profit" : "text-loss"}`}>{signed(diff)}</span>{" "}
+                  unrealised
+                  {marketValue.priced < marketValue.count && (
+                    <span className="opacity-70"> · {marketValue.priced} of {marketValue.count} priced</span>
+                  )}
+                </p>
+              );
+            })()}
           </>)}
         </div>
 

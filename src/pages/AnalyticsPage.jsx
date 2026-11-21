@@ -1,11 +1,12 @@
 // Analytics page: headline figures, the cumulative profit curve (7d / 30d /
-// all time), a 30-day daily heatmap, six months of buy/sell activity and the
+// all time), holding cost vs. market value over time, a 30-day daily heatmap, six months of buy/sell activity and the
 // latest sales.
 import React, { useMemo } from "react";
 import { PROFIT_COLOR, LOSS_COLOR } from "../themes/themes";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { valueSeries, localDay } from "../utils/portfolioValue";
 import PageHeader, { Page } from "../components/PageHeader";
 import RecentSales from "../components/RecentSales";
 
@@ -17,6 +18,11 @@ const PERIODS = [
 
 const money = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const signed = (n) => `${n >= 0 ? "+" : "−"}$${money(Math.abs(n))}`;
+// "2026-11-21" → "Nov 21", read as a local date.
+const shortDay = (d) => {
+  const [y, m, day] = String(d).split("-").map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
 const toRgba = (hex, a) => {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `rgba(${r},${g},${b},${a})`;
@@ -50,6 +56,7 @@ export default function AnalyticsPage({
   stats = {},
   theme,
   items = [],
+  valueHistory = null,
 }) {
   const totalInvested = stats?.totalInvested ?? 0;
   const totalProfit = stats?.totalProfit ?? 0;
@@ -113,6 +120,14 @@ export default function AnalyticsPage({
     }
     return months;
   }, [items]);
+
+  // Holding cost per day vs. the daily market value snapshots.
+  const valueRows = useMemo(() => {
+    const days = chartPeriod === "7d" ? 6 : chartPeriod === "30d" ? 29 : null;
+    const fromDay = days == null ? null : localDay(Date.now() - days * 24 * 60 * 60 * 1000);
+    return valueSeries(items, valueHistory || [], { fromDay });
+  }, [items, valueHistory, chartPeriod]);
+  const hasMarket = valueRows.some((r) => r.market != null);
 
   const tooltipStyle = {
     background: theme.chartTooltipBg,
@@ -208,6 +223,50 @@ export default function AnalyticsPage({
         <Figure theme={theme} label="Profitable sales" value={winRate} />
         <Figure theme={theme} label="Average per sale" value={avgProfit} />
       </div>
+
+      <Section
+        theme={theme}
+        className="mt-10"
+        title="Portfolio value"
+        aside={
+          <span className={`flex items-center gap-3 text-xs ${theme.subtext}`}>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded" style={{ backgroundColor: theme.chartLine }} />Market value</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded" style={{ backgroundColor: theme.chartMuted }} />Cost</span>
+          </span>
+        }
+      >
+        <div className="h-56">
+          {valueRows.length < 2 ? (
+            <div className={`h-full flex items-center justify-center text-sm rounded-xl border border-dashed ${theme.cardBorder} ${theme.subtext}`}>
+              Your value curve appears here once you hold items.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={valueRows} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={theme.chartGrid} vertical={false} />
+                <XAxis dataKey="d" tickFormatter={shortDay} tick={{ fill: theme.chartAxis, fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={40} />
+                <YAxis tick={{ fill: theme.chartAxis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} width={56} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelStyle={{ color: theme.chartAxis, fontSize: 12 }}
+                  labelFormatter={shortDay}
+                  formatter={(v, name, { payload }) => [
+                    `$${money(Number(v))}${name === "Market value" && payload.priced < payload.count ? ` (${payload.priced} of ${payload.count} priced)` : ""}`,
+                    name,
+                  ]}
+                />
+                <Line type="stepAfter" dataKey="cost" name="Cost" stroke={theme.chartMuted} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="market" name="Market value" stroke={theme.chartLine} strokeWidth={1.75} connectNulls dot={{ r: 2, fill: theme.chartLine, strokeWidth: 0 }} activeDot={{ r: 4 }} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        {!hasMarket && valueRows.length >= 2 && (
+          <p className={`mt-2 text-xs ${theme.subtext}`}>
+            Market value is recorded once a day while you open Portfolio, starting today. Cost reaches back to your first purchase.
+          </p>
+        )}
+      </Section>
 
       <div className="mt-10 grid lg:grid-cols-[1fr_340px] gap-x-12 gap-y-10">
         <div className="space-y-10 min-w-0">
