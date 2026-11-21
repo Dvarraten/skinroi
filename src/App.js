@@ -8,23 +8,18 @@ import { useExchangeRate } from './hooks/useExchangeRate';
 import { useChartData } from './hooks/useChartData';
 import { useSteamSync } from './hooks/useSteamSync';
 import { useCsfloatAutoSync } from './hooks/useCsfloatAutoSync';
-import { usePortfolioView } from './hooks/usePortfolioView';
 import { useSellPrices } from './hooks/useSellPrices';
 import { freshnessRows } from './utils/freshness';
 import { useValueHistory } from './hooks/useValueHistory';
 import { portfolioSnapshot } from './utils/portfolioValue';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
+import { portfolioStats } from './utils/portfolioStats';
 
 import Sidebar, { MobileTabBar } from './components/Sidebar';
 import SaveStatusChip from './components/SaveStatusChip';
-import { Page } from './components/PageHeader';
-import ItemGrid from './components/ItemGrid';
-import TabsAndSearchbar, { TabButton } from './components/TabsAndSearchbar';
-import PortfolioHero from './components/PortfolioHero';
-import SellPriceStatus from './components/SellPriceStatus';
-import { ItemGridSkeleton } from './components/Skeleton';
 import HandleItemsPage from './pages/HandleItemsPage';
+import PortfolioPage from './pages/PortfolioPage';
 import AboutPage from './pages/AboutPage';
 import ConnectionsPage from './pages/ConnectionsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
@@ -32,7 +27,6 @@ import AddPage from './pages/AddPage';
 import SnipesPage from './pages/SnipesPage';
 import LandingPage from './pages/LandingPage';
 import DemoBanner from './components/DemoBanner';
-import OnboardingChecklist from './components/OnboardingChecklist';
 import SteamImportModal from './components/SteamImportModal';
 
 // Demo mode lasts for the browser tab, so a reload keeps the visitor in it.
@@ -102,16 +96,11 @@ export default function CS2TradingTracker() {
   // Trades are handled on the Trades page; manual sell / mark received / delete
   // sit in the ⋯ menu on each card.
   const [portfolioTab, setPortfolioTab] = useState('active'); // 'active' | 'sold'
-  const { searchTerm, setSearchTerm, sortBy, setSortBy, sortedItems } = usePortfolioView(items, portfolioTab);
   const [activePage, setActivePage] = useState(null); // null = Portfolio | 'add' | 'handleItems' | 'snipes' | 'analytics' | 'about' | 'connections'
   const [chartPeriod, setChartPeriod] = useState('30d');
   // Dark is the default; a theme the user picked is kept in localStorage.
   // (Older saved themes that no longer exist fall back to Dark.)
   const [theme, setTheme] = useState(() => (localStorage.getItem('cs2-theme') === 'light' ? 'light' : 'dark'));
-  const [viewMode, setViewMode] = useState(() => {
-    const saved = localStorage.getItem('skinroi-view-mode');
-    return saved === 'list' ? 'list' : 'grid';
-  });
 
   const isHome             = !activePage;
   const sellPrices = useSellPrices(!!user && isHome);
@@ -146,7 +135,6 @@ export default function CS2TradingTracker() {
     document.documentElement.style.setProperty('--accent', themes[theme].accentColor);
     document.documentElement.style.colorScheme = theme;
   }, [theme]);
-  useEffect(() => { localStorage.setItem('skinroi-view-mode', viewMode); }, [viewMode]);
 
   useEffect(() => {
     if (isHandleItemsPage) steamSync.refreshState();
@@ -164,15 +152,7 @@ export default function CS2TradingTracker() {
       });
   }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stats = {
-    totalActive:      items.filter(i => !i.sold).reduce((sum, i) => sum + i.purchasePrice, 0),
-    totalActiveCount: items.filter(i => !i.sold).length,
-    totalPending:     items.filter(i => !i.sold && i.pending).length,
-    totalSold:        items.filter(i => i.sold).reduce((sum, i) => sum + i.purchasePrice + i.profit, 0),
-    totalSoldCount:   items.filter(i => i.sold).length,
-    totalProfit:      items.filter(i => i.sold).reduce((sum, i) => sum + i.profit, 0),
-    totalInvested:    items.reduce((sum, i) => sum + i.purchasePrice, 0),
-  };
+  const stats = useMemo(() => portfolioStats(items), [items]);
 
   return (
     <div className={`flex flex-col md:flex-row h-[100dvh] overflow-hidden ${themeStyles.bg} ${themeStyles.text}`}>
@@ -233,80 +213,29 @@ export default function CS2TradingTracker() {
 
       {/* ── Portfolio ─────────────────────────────────────────────────────── */}
       {isHome && (
-      <Page>
-        {user && !homeLoading && steamSync.extension && (
-          <div className="mb-8 empty:hidden">
-            <OnboardingChecklist
-              theme={themeStyles}
-              steamId={user.steamId}
-              extension={steamSync.extension}
-              items={items}
-              onExtensionChange={steamSync.refreshState}
-              onImportSteam={() => setImportOpen(true)}
-              onAddManually={() => openPage('add')}
-            />
-          </div>
-        )}
-
-        <PortfolioHero
+        <PortfolioPage
+          theme={themeStyles}
+          user={user}
+          loading={homeLoading}
+          items={items}
           stats={stats}
           profitChartData={allTimeProfitChartData}
-          theme={themeStyles}
-          loading={homeLoading}
           marketValue={valueSnapshot}
+          sellPrices={sellPrices}
+          extension={steamSync.extension}
+          onExtensionChange={steamSync.refreshState}
+          onImportSteam={() => setImportOpen(true)}
+          onAddManually={() => openPage('add')}
+          portfolioTab={portfolioTab}
+          setPortfolioTab={setPortfolioTab}
+          itemActions={{
+            sellData, setSellData, sellPlatform, setSellPlatform,
+            handleSellItem, handleDeleteItem, promotePendingItem,
+          }}
+          exchangeRate={exchangeRate}
+          currencySymbol={currencySymbol}
+          displayCurrency={displayCurrency}
         />
-
-        <div className={`mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-b ${themeStyles.cardBorder}`}>
-          <TabButton
-            label="Holding" count={homeLoading ? '' : stats.totalActiveCount}
-            isActive={portfolioTab === 'active'} onClick={() => setPortfolioTab('active')}
-            theme={themeStyles} accentColor={themeStyles.accentColor}
-            badgeClass={themeStyles.subtext}
-          />
-          <TabButton
-            label="Sold" count={homeLoading ? '' : stats.totalSoldCount}
-            isActive={portfolioTab === 'sold'} onClick={() => setPortfolioTab('sold')}
-            theme={themeStyles} accentColor={themeStyles.accentColor}
-            badgeClass={themeStyles.subtext}
-          />
-          {!homeLoading && portfolioTab === 'active' && (
-            <SellPriceStatus sellPrices={sellPrices} hasItems={stats.totalActiveCount > 0} />
-          )}
-        </div>
-
-        <div className="mt-4">
-          <TabsAndSearchbar
-            theme={themeStyles}
-            activeTab={portfolioTab}
-            showTabs={false}
-            allowSelect={false}
-            searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-            sortBy={sortBy} setSortBy={setSortBy}
-            viewMode={viewMode} setViewMode={setViewMode}
-          />
-        </div>
-
-        <div className="mt-4">
-          {homeLoading ? (
-            <ItemGridSkeleton theme={themeStyles} viewMode={viewMode} />
-          ) : (
-            <ItemGrid
-              menuActions={portfolioTab === 'active'}
-              sellPlatform={sellPlatform} setSellData={setSellData}
-              sellData={sellData} setSellPlatform={setSellPlatform}
-              handleSellItem={handleSellItem} handleDeleteItem={handleDeleteItem}
-              promotePendingItem={promotePendingItem}
-              exchangeRate={exchangeRate}
-              currencySymbol={currencySymbol}
-              displayCurrency={displayCurrency}
-              theme={themeStyles} sortedItems={sortedItems}
-              searchTerm={searchTerm} activeTab={portfolioTab}
-              viewMode={viewMode}
-              sellPrices={portfolioTab === 'active' ? sellPrices : null}
-            />
-          )}
-        </div>
-      </Page>
       )}
 
       {/* ── Add (item or deposit / withdrawal) ────────────────────────────── */}

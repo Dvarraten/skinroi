@@ -50,10 +50,10 @@ skinroi/
 │           └── steam.js   Session token + GetTradeOffers + normalizer
 ├── src/                  React CRA frontend
 │   ├── App.js            Root component
-│   ├── pages/            Pages: Add (AddItemPage + TransactionPage as tabs),
-│   │                     HandleItems ("Trades" in the UI), Analytics, Snipes,
-│   │                     About, Connections, Landing. Portfolio (start page)
-│   │                     lives in App.js
+│   ├── pages/            Pages: Portfolio (start page), Add (AddItemPage +
+│   │                     TransactionPage as tabs), HandleItems ("Trades" in
+│   │                     the UI; its cards in pages/trades/), Analytics,
+│   │                     Snipes, About, Connections, Landing
 │   ├── components/Sidebar.jsx  Navigation: left sidebar on desktop, top bar +
 │   │                     bottom tab bar (MobileTabBar) on phones; account menu
 │   │                     with pairing, currency converter, Dark/Light toggle
