@@ -239,6 +239,13 @@ phase is unknown (or CSFloat has nothing for it), and always for YouPin
 (SteamDT has no per-phase prices), the price is the lowest of any phase,
 flagged `anyPhase` and shown with a `*`; no "best" dot then.
 
+**Portfolio value history**: Portfolio works out today's market value (best
+fresh YouPin/CSFloat price after fees per held item, cost for unpriced ones,
+`utils/portfolioValue.js`) and `useValueHistory` posts it to
+`/api/items?history=1` (`api/_lib/value-history.js`) the first time each day,
+then at most every 6 h if it moved. Analytics draws it against holding cost,
+which comes from the items so it reaches back before the first snapshot.
+
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
 Guest users → `localStorage` key `cs2-trading-items`. Demo mode → nothing is
 saved anywhere (see below).
@@ -320,6 +327,7 @@ npm run items:update
 | `skinroi:ext-secret:{secret}`    | Reverse lookup: Bearer secret → steamId           |
 | `skinroi:ext-info:{steamId}`     | Extension version, pairedAt, lastSeen             |
 | `skinroi:sellprices:{steamId}`   | CSFloat sell prices for owned items (from extension) |
+| `skinroi:valuehist:{steamId}`   | Daily portfolio cost + market value snapshots (max 730) |
 | `skinroi:csfloat:trades:{steamId}` | Slim CSFloat trades for price prefill (5 min TTL) |
 | `skinroi:csfloat:trades-fail:{steamId}` | /me/trades failed: don't retry (5 min, 15 after 429) |
 | `skinroi:conn:{steamId}`         | Sealed marketplace API keys + status per provider |
