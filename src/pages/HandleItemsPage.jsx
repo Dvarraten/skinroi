@@ -492,7 +492,7 @@ function NotPairedState({ theme, extension, onChange }) {
       <p className={`text-[13px] max-w-sm ${theme.subtext}`}>
         The SkinROI extension reads your accepted Steam trades and sends them here. Install it, then generate a code and paste it into the extension.
       </p>
-      <div className={`mt-4 w-full max-w-md text-left rounded-xl border p-4 ${theme.card} ${theme.cardBorder}`}>
+      <div className="mt-4 w-full max-w-md text-left">
         <ExtensionPairPanel theme={theme} extension={extension} onChange={onChange} />
       </div>
     </div>
