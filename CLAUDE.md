@@ -412,6 +412,11 @@ step required. To deploy manually:
 vercel --prod
 ```
 
+Error reporting: set `SENTRY_DSN` (API functions, wrapped with `withSentry`
+from `api/_lib/sentry.js`) and `REACT_APP_SENTRY_DSN` (site, loaded in
+`src/index.js`) to turn on Sentry; both are off without them. New route
+files export `withSentry(handler)`.
+
 Environment variables (Redis, session secret) live in the Vercel project
 settings and are never committed. Pull them locally with `vercel env pull`.
 

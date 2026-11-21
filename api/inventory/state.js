@@ -16,8 +16,9 @@ import { getSessionSteamId } from '../_lib/auth.js';
 import { loadExtensionInfo } from '../_lib/extension-store.js';
 import { loadCsfloatTrades, attachCsfloatPrices } from '../_lib/csfloat-trades.js';
 import { loadSteamInventory } from '../_lib/steam-inventory.js';
+import { withSentry } from '../_lib/sentry.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'method not allowed' });
@@ -63,3 +64,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
+export default withSentry(handler);

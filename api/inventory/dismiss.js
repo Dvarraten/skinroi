@@ -10,6 +10,7 @@
 
 import { loadState, saveState } from '../_lib/state.js';
 import { getSessionSteamId } from '../_lib/auth.js';
+import { withSentry } from '../_lib/sentry.js';
 
 function normaliseEntry(raw) {
   const assetid = typeof raw?.assetid === 'string' ? raw.assetid : null;
@@ -18,7 +19,7 @@ function normaliseEntry(raw) {
   return { assetid, type };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'method not allowed' });
@@ -91,3 +92,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 }
+
+export default withSentry(handler);

@@ -27,12 +27,13 @@ import {
   ensureFresh, ingestCsfloatLowest, ingestListings, loadSnipes, loadSnipesMeta, minPriceCents,
 } from '../_lib/snipes/scan.js';
 import { DEMO_DELAY_MS, demoDeals } from '../_lib/snipes/demo.js';
+import { withSentry } from '../_lib/sentry.js';
 
 const MAX_LISTINGS = 200;
 const MAX_LOOKUPS = 10;
 const MAX_LOOKUP_ROWS = 10;
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handleIngest(req, res);
   res.setHeader('Allow', 'GET, POST');
@@ -114,3 +115,5 @@ async function handleIngest(req, res) {
     return res.status(503).json({ error: e.message });
   }
 }
+
+export default withSentry(handler);

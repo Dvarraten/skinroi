@@ -7,8 +7,9 @@
 // chrome.storage.local and uses it as a Bearer token for /api/extension/trades.
 
 import { claimPairing } from '../_lib/extension-store.js';
+import { withSentry } from '../_lib/sentry.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
   if (req.method !== 'POST') {
@@ -41,3 +42,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message || String(err) });
   }
 }
+
+export default withSentry(handler);
