@@ -10,9 +10,11 @@
 // { error: 'conflict', version } when another tab saved in between, so a
 // stale tab can't overwrite newer edits. A POST without baseVersion (an
 // older open tab) is still accepted.
+// /api/items?history=1 — daily portfolio value snapshots (see _lib/value-history.js)
 import { getSessionSteamId } from '../_lib/auth.js';
 import { handleSellPrices } from '../_lib/sell-prices.js';
 import { handleConnections } from '../_lib/connections.js';
+import { handleValueHistory } from '../_lib/value-history.js';
 import { Redis } from '@upstash/redis';
 
 function getClient() {
@@ -38,6 +40,7 @@ function legacyItemsKey(steamId) {
 export default async function handler(req, res) {
   if (req.query?.sellPrices) return handleSellPrices(req, res);
   if (req.query?.connections) return handleConnections(req, res);
+  if (req.query?.history) return handleValueHistory(req, res);
 
   const steamId = getSessionSteamId(req);
   if (!steamId) return res.status(401).json({ error: 'not authenticated' });
