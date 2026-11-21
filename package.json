@@ -20,7 +20,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "items:update": "node scripts/fetch-items.js",
-    "prepare": "husky"
+    "prepare": "husky",
+    "backup": "node scripts/restore-backup.js"
   },
   "eslintConfig": {
     "extends": [

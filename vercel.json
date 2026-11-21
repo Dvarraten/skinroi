@@ -4,5 +4,11 @@
     "api/**/*.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/items?backup=1",
+      "schedule": "17 3 * * *"
+    }
+  ]
 }
