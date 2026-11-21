@@ -1,7 +1,7 @@
 // Snipes page — items to buy on one market and sell on another after fees,
 // filtered for liquidity so hard-to-sell items stay hidden.
 import React, { useEffect, useMemo, useState } from "react";
-import { ExternalLink, RefreshCw, RotateCcw, AlertTriangle, Lock, Sticker, SlidersHorizontal, Search, ChevronDown } from "lucide-react";
+import { Check, ExternalLink, RefreshCw, RotateCcw, AlertTriangle, Lock, Sticker, SlidersHorizontal, Search, ChevronDown } from "lucide-react";
 import { useSnipes } from "../hooks/useSnipes";
 import {
   BUY_MARKETS, DEFAULT_SNIPE_FILTERS, SELL_MARKETS, SNIPE_MARKETS, migrateFilters, selectSnipes,
@@ -41,7 +41,7 @@ function ago(ms, now) {
   return `${Math.round(s / 3600)}h ago`;
 }
 
-export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
+export default function SnipesPage({ theme, rates, demo = false, onLogin, onTrack, trackedIds = new Set() }) {
   const { deals, meta, error, loading, refresh } = useSnipes({ demo });
   const [filters, setFilters] = useState(() => loadFilters(demo));
   const [currency, setCurrency] = useState(() => {
@@ -175,7 +175,7 @@ export default function SnipesPage({ theme, rates, demo = false, onLogin }) {
             </p>
           )}
           {visible.map((d) => (
-            <SnipeRow key={d.id} deal={d} theme={theme} money={money} now={now} onLogin={demo ? onLogin : null} />
+            <SnipeRow key={d.id} deal={d} theme={theme} money={money} now={now} onLogin={demo ? onLogin : null} onTrack={demo ? null : onTrack} tracked={trackedIds.has(d.id)} />
           ))}
         </div>
       </div>
@@ -246,7 +246,9 @@ function SnipeImage({ image, name }) {
 
 // onLogin is set in the demo: deals come without links, so the button asks
 // the visitor to sign in instead.
-function SnipeRow({ deal: d, theme, money, now, onLogin }) {
+function SnipeRow({ deal: d, theme, money, now, onLogin, onTrack, tracked }) {
+  // After Buy opens the listing, the row asks whether the buy went through.
+  const [asking, setAsking] = useState(false);
   const liq = d.liquidity;
   const liquidityText = liq.score != null ? `Liquidity ${liq.score}` : "Liquidity unknown";
   const liquidityDetail = [
@@ -258,7 +260,8 @@ function SnipeRow({ deal: d, theme, money, now, onLogin }) {
   ].filter(Boolean).join(" · ");
 
   return (
-    <div className={`flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 px-4 md:px-8 py-3 border-b ${theme.panelBorder} ${theme.itemHoverBg}`}>
+    <div className={`border-b ${theme.panelBorder}`}>
+    <div className={`flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 px-4 md:px-8 py-3 ${theme.itemHoverBg}`}>
       <SnipeImage image={d.image} name={d.name} />
 
       <div className="flex-1 min-w-0 basis-[calc(100%-4rem)] md:basis-auto">
@@ -308,15 +311,43 @@ function SnipeRow({ deal: d, theme, money, now, onLogin }) {
           <Lock size={12} /> Buy
         </button>
       ) : (
-        <a
-          href={d.url}
-          target="_blank"
-          rel="noreferrer"
-          className={`shrink-0 w-[68px] flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${theme.primary}`}
-        >
-          Buy <ExternalLink size={12} />
-        </a>
+        tracked ? (
+          <span className={`shrink-0 w-[68px] flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium border ${theme.cardBorder} ${theme.subtext}`} title="Added to your portfolio">
+            <Check size={12} className="text-profit" /> Bought
+          </span>
+        ) : (
+          <a
+            href={d.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => onTrack && setAsking(true)}
+            className={`shrink-0 w-[68px] flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${theme.primary}`}
+          >
+            Buy <ExternalLink size={12} />
+          </a>
+        )
       )}
+    </div>
+    {asking && !tracked && (
+      <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-4 md:px-8 pb-3 -mt-1 text-[13px] ${theme.subtext}`}>
+        <span className="md:ml-20">Did you buy it?</span>
+        <span className="text-[12px]">It goes into your portfolio as a snipe on trade hold, so you can see later if it paid off.</span>
+        <span className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => { onTrack(d); setAsking(false); }}
+            className={`h-7 px-3 rounded-lg text-xs font-medium ${theme.primary}`}
+          >
+            Yes, track it
+          </button>
+          <button
+            onClick={() => setAsking(false)}
+            className={`h-7 px-3 rounded-lg text-xs font-medium border ${theme.cardBorder} ${theme.subtext} ${theme.itemHoverBg}`}
+          >
+            No
+          </button>
+        </span>
+      </div>
+    )}
     </div>
   );
 }

@@ -200,6 +200,8 @@ export const useItems = (steamId, { demo = false } = {}) => {
     // sits in this inventory, so a later sale can be matched to exactly this
     // copy (see useCsfloatAutoSync).
     assetid = null,
+    // Bought from a Snipes deal: what the page expected, to compare later.
+    snipe = null,
   }) => {
     if (!itemName || !purchasePrice) return null;
     const newItem = {
@@ -217,6 +219,7 @@ export const useItems = (steamId, { demo = false } = {}) => {
       expectedDelivery,
       iconUrl,
     };
+    if (snipe) newItem.snipe = snipe;
     if (typeof floatValue === 'number' && Number.isFinite(floatValue)) {
       newItem.floatValue = floatValue;
     }

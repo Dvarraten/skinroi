@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import PageHeader, { Page } from "../components/PageHeader";
 import RecentSales from "../components/RecentSales";
+import SnipeOutcomes from "../components/SnipeOutcomes";
 
 const PERIODS = [
   { key: "7d", label: "7 days" },
@@ -208,6 +209,10 @@ export default function AnalyticsPage({
         <Figure theme={theme} label="Profitable sales" value={winRate} />
         <Figure theme={theme} label="Average per sale" value={avgProfit} />
       </div>
+
+      <Section theme={theme} className="mt-10" title="Snipe outcomes" aside={<span className={`text-xs ${theme.subtext}`}>did the deals pay off?</span>}>
+        <SnipeOutcomes items={items} theme={theme} />
+      </Section>
 
       <div className="mt-10 grid lg:grid-cols-[1fr_340px] gap-x-12 gap-y-10">
         <div className="space-y-10 min-w-0">

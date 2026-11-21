@@ -82,9 +82,21 @@ function CardMedia({ item, wear, countdown, count, hideWear, hideNotes, keepNote
   return (
     <div className="relative h-28 px-4 flex justify-center items-center bg-gradient-to-b from-white/[0.06] to-black/25">
       <ItemThumbnail item={item} />
-      {wearShort && !hideWear && (
-        <span title={wear} className="absolute top-2 left-2 text-[10px] font-semibold tracking-wide px-1.5 py-0.5 rounded-md bg-black/50 text-slate-200">
-          {wearShort}
+      {((wearShort && !hideWear) || item.snipe) && (
+        <span className="absolute top-2 left-2 flex items-center gap-1">
+          {wearShort && !hideWear && (
+            <span title={wear} className="text-[10px] font-semibold tracking-wide px-1.5 py-0.5 rounded-md bg-black/50 text-slate-200">
+              {wearShort}
+            </span>
+          )}
+          {item.snipe && (
+            <span
+              title={`Bought from Snipes · expected +$${Number(item.snipe.expectedProfitUsd || 0).toFixed(2)} on ${item.snipe.sellMarket}`}
+              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-black/50 text-slate-200"
+            >
+              Snipe
+            </span>
+          )}
         </span>
       )}
       {item.notes && !hideNotes && (

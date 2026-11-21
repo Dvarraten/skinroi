@@ -303,7 +303,28 @@ export default function CS2TradingTracker() {
       {isConnectionsPage && <ConnectionsPage theme={themeStyles} signedIn={!!user} onLogin={signIn} />}
 
       {isSnipesPage && (
-        <SnipesPage key={user ? 'live' : 'demo'} theme={themeStyles} rates={allRates} demo={!user} onLogin={signIn} />
+        <SnipesPage
+          key={user ? 'live' : 'demo'} theme={themeStyles} rates={allRates} demo={!user} onLogin={signIn}
+          trackedIds={new Set(items.filter((i) => i.snipe?.dealId).map((i) => i.snipe.dealId))}
+          onTrack={(d) => addItemDirect({
+            itemName: d.name,
+            purchasePrice: d.priceUsd,
+            platform: d.market,
+            iconUrl: d.image || null,
+            pending: true,
+            expectedDelivery: Date.now() + 7 * 24 * 60 * 60 * 1000,
+            floatValue: d.float ?? null,
+            snipe: {
+              dealId: d.id,
+              boughtAt: Date.now(),
+              sellMarket: d.refMarket,
+              expectedSellUsd: d.netSellUsd,
+              expectedProfitUsd: d.profitUsd,
+              expectedRoi: d.roi,
+              liquidity: d.liquidity?.score ?? null,
+            },
+          })}
+        />
       )}
 
       {isAnalyticsPage && (
