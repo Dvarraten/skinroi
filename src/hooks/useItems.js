@@ -31,6 +31,14 @@ export const useItems = (steamId, { demo = false } = {}) => {
   // instead of an empty state.
   const [settledFor, setSettledFor] = useState(null);
   const saveTimerRef = useRef(null);
+  // Signed-in saves: 'saved', or 'failed' after a POST that didn't go through
+  // (network down, Redis over its quota). A failed save is retried with the
+  // latest list, 5 s, 10 s, 20 s … up to 60 s apart, and the page shows a
+  // "Not saved" chip until one succeeds.
+  const [saveStatus, setSaveStatus] = useState('saved');
+  const latestItemsRef = useRef(items);
+  latestItemsRef.current = items;
+  const saveAttemptsRef = useRef(0);
   const [formData, setFormData] = useState({
     itemName: '',
     purchasePrice: '',
@@ -85,6 +93,47 @@ export const useItems = (steamId, { demo = false } = {}) => {
     }
   }, [steamId, source]);
 
+  // Sends the latest list to the API. On failure it marks the save failed and
+  // schedules a retry; any new change replaces that timer with its own save.
+  const saveNowRef = useRef(null);
+  saveNowRef.current = () => {
+    clearTimeout(saveTimerRef.current);
+    const savingFor = steamId;
+    fetch('/api/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: latestItemsRef.current }),
+    })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+      .then(() => {
+        saveAttemptsRef.current = 0;
+        setSaveStatus('saved');
+      })
+      .catch(() => {
+        if (savingFor !== steamIdRef.current) return;
+        const delay = Math.min(60000, 5000 * 2 ** saveAttemptsRef.current);
+        saveAttemptsRef.current += 1;
+        setSaveStatus('failed');
+        saveTimerRef.current = setTimeout(() => saveNowRef.current(), delay);
+      });
+  };
+  const steamIdRef = useRef(steamId);
+  steamIdRef.current = steamId;
+
+  // A new user (or logging out) drops any pending retry for the old one.
+  useEffect(() => {
+    saveAttemptsRef.current = 0;
+    setSaveStatus('saved');
+  }, [steamId]);
+
+  // Warn before closing the tab while changes aren't saved.
+  useEffect(() => {
+    if (saveStatus !== 'failed') return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [saveStatus]);
+
   // Save items — API (debounced) when logged in, localStorage otherwise.
   // Only once the list on screen belongs to the current source: right after a
   // switch (e.g. demo → guest) the old list is still in state for one render
@@ -96,13 +145,7 @@ export const useItems = (steamId, { demo = false } = {}) => {
     if (steamId) {
       if (loadedFor !== steamId) return;
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        fetch('/api/items', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items }),
-        }).catch(() => {});
-      }, 1500);
+      saveTimerRef.current = setTimeout(() => saveNowRef.current(), 1500);
       return () => clearTimeout(saveTimerRef.current);
     } else {
       try {
@@ -333,6 +376,9 @@ export const useItems = (steamId, { demo = false } = {}) => {
     portfolioReady: !!steamId && loadedFor === steamId,
     // True until the list for the current user (or guest) has been loaded.
     itemsLoading: settledFor !== source,
+    // 'saved' or 'failed' (signed-in only); retrySave sends the list now.
+    saveStatus,
+    retrySave: () => { saveAttemptsRef.current = 0; saveNowRef.current(); },
     formData,
     setFormData,
     sellData,

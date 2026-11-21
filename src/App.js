@@ -14,6 +14,7 @@ import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
 
 import Sidebar, { MobileTabBar } from './components/Sidebar';
+import SaveStatusChip from './components/SaveStatusChip';
 import { Page } from './components/PageHeader';
 import ItemGrid from './components/ItemGrid';
 import TabsAndSearchbar, { TabButton } from './components/TabsAndSearchbar';
@@ -63,6 +64,7 @@ export default function CS2TradingTracker() {
     items, setItems, portfolioReady, itemsLoading, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
     addItemDirect, sellItemDirect, promotePendingItem, handleAddTransaction,
+    saveStatus, retrySave,
   } = useItems(user?.steamId, { demo });
 
   const handleImportCSV = (file) => {
@@ -344,6 +346,7 @@ export default function CS2TradingTracker() {
         onNavigate={openPage}
         pendingCount={steamSync.pendingCount}
       />
+      <SaveStatusChip theme={themeStyles} status={saveStatus} onRetry={retrySave} />
       </>)}
 
       {importOpen && user && (
