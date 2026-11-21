@@ -1,8 +1,9 @@
 // GET /api/auth/callback — Steam posts back here after login.
 // We verify the assertion with Steam, then set a signed session cookie.
 import { setSessionCookie } from '../_lib/auth.js';
+import { withSentry } from '../_lib/sentry.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const query = req.query || {};
 
   // Re-validate the OpenID assertion with Steam.
@@ -31,3 +32,5 @@ export default async function handler(req, res) {
   setSessionCookie(res, steamId);
   res.redirect(302, '/');
 }
+
+export default withSentry(handler);

@@ -7,6 +7,7 @@ import { getSessionSteamId } from '../_lib/auth.js';
 import { handleSellPrices } from '../_lib/sell-prices.js';
 import { handleConnections } from '../_lib/connections.js';
 import { Redis } from '@upstash/redis';
+import { withSentry } from '../_lib/sentry.js';
 
 function getClient() {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
@@ -24,7 +25,7 @@ function legacyItemsKey(steamId) {
   return `cs2-tracker:items:${steamId}`;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.query?.sellPrices) return handleSellPrices(req, res);
   if (req.query?.connections) return handleConnections(req, res);
 
@@ -65,3 +66,5 @@ export default async function handler(req, res) {
   res.setHeader('Allow', 'GET, POST');
   res.status(405).json({ error: 'method not allowed' });
 }
+
+export default withSentry(handler);
