@@ -10,10 +10,12 @@ import { useSteamSync } from './hooks/useSteamSync';
 import { useCsfloatAutoSync } from './hooks/useCsfloatAutoSync';
 import { usePortfolioView } from './hooks/usePortfolioView';
 import { useSellPrices } from './hooks/useSellPrices';
+import { freshnessRows } from './utils/freshness';
 import { exportToCSV } from './utils/exportCSV';
 import { importFromCSV } from './utils/importCSV';
 
 import Sidebar, { MobileTabBar } from './components/Sidebar';
+import SaveStatusChip from './components/SaveStatusChip';
 import { Page } from './components/PageHeader';
 import ItemGrid from './components/ItemGrid';
 import TabsAndSearchbar, { TabButton } from './components/TabsAndSearchbar';
@@ -63,6 +65,7 @@ export default function CS2TradingTracker() {
     items, setItems, portfolioReady, itemsLoading, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
     addItemDirect, sellItemDirect, promotePendingItem, handleAddTransaction,
+    saveStatus, retrySave, dismissConflict,
   } = useItems(user?.steamId, { demo });
 
   const handleImportCSV = (file) => {
@@ -110,6 +113,11 @@ export default function CS2TradingTracker() {
 
   const isHome             = !activePage;
   const sellPrices = useSellPrices(!!user && isHome);
+  // Last sell prices seen this session, so the sidebar's data status still
+  // knows them on other pages (they are only fetched on Portfolio).
+  const [lastSellPrices, setLastSellPrices] = useState(null);
+  useEffect(() => { if (sellPrices) setLastSellPrices(sellPrices); }, [sellPrices]);
+  useEffect(() => { setLastSellPrices(null); }, [user?.steamId]);
   // Auth or portfolio still on its way: Home shows skeletons, not empty states.
   const homeLoading = authLoading || itemsLoading;
   const isAnalyticsPage    = activePage === 'analytics';
@@ -190,6 +198,14 @@ export default function CS2TradingTracker() {
         isDark={theme === 'dark'}
         onToggleTheme={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))}
         lastUpdated={lastUpdated}
+        freshness={user ? freshnessRows({
+          extension: steamSync.extension,
+          sellPrices: lastSellPrices,
+          saveStatus,
+          reachable: steamSync.reachable,
+          lastSyncOk: steamSync.lastSyncOk,
+          lastError: steamSync.lastError,
+        }) : null}
         converter={{
           usdAmount, rmbAmount, sidebarRate, handleUsdChange, handleRmbChange,
           currency1, setCurrency1, currency1Symbol,
@@ -344,6 +360,7 @@ export default function CS2TradingTracker() {
         onNavigate={openPage}
         pendingCount={steamSync.pendingCount}
       />
+      <SaveStatusChip theme={themeStyles} status={saveStatus} onRetry={retrySave} onDismiss={dismissConflict} />
       </>)}
 
       {importOpen && user && (

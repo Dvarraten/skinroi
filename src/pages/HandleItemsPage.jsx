@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Check, Search, Lock, Unlock, StickyNote, Inbox, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { X, Check, Search, Lock, Unlock, StickyNote, Inbox, ArrowDownLeft, ArrowUpRight, Puzzle } from 'lucide-react';
 import PlatformPicker from '../components/PlatformPicker';
 import { PlatformBadge } from '../components/PlatformBadge';
 import { TabButton } from '../components/TabsAndSearchbar';
 import PageHeader, { Page } from '../components/PageHeader';
 import { Input, Select } from '../components/ui';
+import ExtensionPairPanel from '../components/ExtensionPairPanel';
 import { PLATFORMS } from '../utils/platforms';
 import { getPlatformFee } from '../utils/platformFees';
 import { useLocalPriceSync } from '../hooks/useLocalPriceSync';
@@ -479,6 +480,25 @@ function EmptyState({ theme, icon: Icon = Inbox, title, text }) {
   );
 }
 
+// Signed in but no extension paired: nothing will ever show up here, so say
+// how to fix that instead of "You're all caught up".
+function NotPairedState({ theme, extension, onChange }) {
+  return (
+    <div className="flex flex-col items-center text-center py-14 gap-2">
+      <span className={`h-11 w-11 rounded-full inline-flex items-center justify-center bg-zinc-500/10 ${theme.subtext}`}>
+        <Puzzle size={18} />
+      </span>
+      <p className={`text-sm font-medium ${theme.text}`}>Pair the extension to see your trades</p>
+      <p className={`text-[13px] max-w-sm ${theme.subtext}`}>
+        The SkinROI extension reads your accepted Steam trades and sends them here. Install it, then generate a code and paste it into the extension.
+      </p>
+      <div className="mt-4 w-full max-w-md text-left">
+        <ExtensionPairPanel theme={theme} extension={extension} onChange={onChange} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ──────────────────────────────────────────────────────────────
 export default function HandleItemsPage({
   theme,
@@ -491,6 +511,8 @@ export default function HandleItemsPage({
   exchangeRate,
   currencySymbol = '¥',
   displayCurrency = 'CNY',
+  extension = null,
+  refreshState,
 }) {
   const [tab, setTab] = useState('incoming');
   const [searchTerm, setSearchTerm] = useState('');
@@ -611,7 +633,9 @@ export default function HandleItemsPage({
         )}
       </div>
 
-      {list.length === 0 ? (
+      {list.length === 0 && extension && !extension.connected ? (
+        <NotPairedState theme={theme} extension={extension} onChange={refreshState} />
+      ) : list.length === 0 ? (
         tab === 'incoming'
           ? <EmptyState theme={theme} icon={ArrowDownLeft} title="No new items" text="Items you receive in Steam trades show up here. You're all caught up." />
           : <EmptyState theme={theme} icon={ArrowUpRight} title="Nothing sent" text="Items that leave your inventory in a trade show up here." />

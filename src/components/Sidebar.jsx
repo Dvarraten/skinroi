@@ -44,6 +44,9 @@ function useClickOutside(ref, open, close) {
   }, [ref, open, close]);
 }
 
+// Dot colours for the data status button (utils/freshness.js states).
+const STATE_COLOR = { ok: PROFIT_COLOR, warn: WARN_COLOR, bad: LOSS_COLOR };
+
 // Popovers drop down from the top bar on phones and open upward from the
 // bottom of the sidebar on desktop.
 const POPOVER_POS =
@@ -68,6 +71,8 @@ export default function Sidebar({
   onToggleTheme,
   converter,
   lastUpdated,
+  // { rows, state, summary } from utils/freshness.js; signed-in only.
+  freshness = null,
 }) {
   const importInputRef = useRef(null);
   const extStatus = syncError ? "error" : extension?.connected ? "connected" : "disconnected";
@@ -80,6 +85,9 @@ export default function Sidebar({
 
   const [accountOpen, setAccountOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
+  const [freshOpen, setFreshOpen] = useState(false);
+  const freshRef = useRef(null);
+  useClickOutside(freshRef, freshOpen, () => setFreshOpen(false));
   // A broken Steam avatar URL falls back to the placeholder icon.
   const [avatarFailed, setAvatarFailed] = useState(false);
   useEffect(() => { setAvatarFailed(false); }, [user?.avatarUrl]);
@@ -89,6 +97,7 @@ export default function Sidebar({
   useClickOutside(currencyRef, currencyOpen, () => setCurrencyOpen(false));
 
   const quiet = `${theme.subtext} ${theme.textHover} ${theme.itemHoverBg}`;
+  const stateColor = (state) => STATE_COLOR[state] || theme.chartAxis;
   const toolBtn = (active) =>
     `p-2 rounded-lg transition-colors ${active ? theme.navActive : quiet}`;
   const menuRow = `w-full flex items-center gap-3 px-4 py-2 text-[13px] ${theme.textSecondary} ${theme.textHover} ${theme.itemHoverBg} transition-colors`;
@@ -156,6 +165,35 @@ export default function Sidebar({
 
       {/* Tools */}
       <div className="flex items-center gap-0.5 md:mb-2 md:px-0.5">
+        {user && freshness && (
+          <div className="relative" ref={freshRef}>
+            <button
+              onClick={() => setFreshOpen((o) => !o)}
+              title={freshness.summary}
+              aria-label={`Data status: ${freshness.summary}`}
+              className={`${toolBtn(freshOpen)} flex items-center justify-center`}
+            >
+              <span className="relative flex w-4 h-4 items-center justify-center">
+                {freshness.state !== "ok" && (
+                  <span className="absolute inset-0.5 rounded-full opacity-30 motion-safe:animate-ping" style={{ backgroundColor: stateColor(freshness.state) }} />
+                )}
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: stateColor(freshness.state) }} />
+              </span>
+            </button>
+            {freshOpen && (
+              <div className={`pop-in ${POPOVER_POS} w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border ${theme.panelBorder} ${theme.panel} shadow-2xl p-1.5`}>
+                <p className={`px-2.5 pt-1.5 pb-2 text-xs font-medium ${theme.subtext}`}>Data status</p>
+                {freshness.rows.map((r) => (
+                  <div key={r.id} className="flex items-start gap-2.5 px-2.5 py-1.5">
+                    <span className="mt-[5px] w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: stateColor(r.state) }} />
+                    <span className={`w-28 shrink-0 text-[13px] ${theme.text}`}>{r.label}</span>
+                    <span className={`flex-1 min-w-0 text-[12px] leading-5 break-words ${r.state === "bad" ? "text-loss" : theme.subtext}`}>{r.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="relative" ref={currencyRef}>
           <button
             onClick={() => setCurrencyOpen((o) => !o)}
