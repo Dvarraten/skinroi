@@ -1,5 +1,6 @@
 // Helpers for the YouPin / CSFloat sell prices shown on Home.
 import { getPlatformFee } from "./platformFees";
+import { sellPriceTarget } from "../shared/dopplerPhase.js";
 
 // maxAgeMs: prices older than this are not shown. YouPin is re-read from
 // SteamDT on every load, so an hour is plenty. CSFloat prices for owned items
@@ -11,30 +12,10 @@ export const SELL_PRICE_MARKETS = [
   { id: "csfloat", label: "CSFloat", maxAgeMs: 50 * 60 * 60 * 1000 },
 ];
 
-// Doppler phase handling, mirrored from api/_lib/doppler-phase.js (keep in
-// step). Prices are stored under name + "|Phase 2" etc. for Dopplers.
-const PAINT_INDEX_PHASES = {
-  415: "Ruby", 416: "Sapphire", 417: "Black Pearl",
-  418: "Phase 1", 419: "Phase 2", 420: "Phase 3", 421: "Phase 4",
-  852: "Phase 1", 853: "Phase 2", 854: "Phase 3", 855: "Phase 4",
-  568: "Emerald", 569: "Phase 1", 570: "Phase 2", 571: "Phase 3", 572: "Phase 4",
-  1119: "Emerald", 1120: "Phase 1", 1121: "Phase 2", 1122: "Phase 3", 1123: "Phase 4",
-};
-const PHASE_IN_NAME = /\b((?:Gamma )?Doppler) (Phase [1-4]|Ruby|Sapphire|Black Pearl|Emerald)\b/;
-
+// Prices are stored under name + "|Phase 2" etc. for Dopplers; the phase
+// logic is shared with the API (src/shared/dopplerPhase.js).
 export function sellPriceKey(item) {
-  const raw = typeof item?.itemName === "string" ? item.itemName.trim() : "";
-  let name = raw;
-  let phase = null;
-  const m = raw.match(PHASE_IN_NAME);
-  if (m) {
-    phase = m[2];
-    name = raw.replace(m[0], m[1]);
-  }
-  if (!phase && /\bDoppler\b/.test(name) && Number.isInteger(item?.paintIndex)) {
-    phase = PAINT_INDEX_PHASES[item.paintIndex] || null;
-  }
-  return phase ? `${name}|${phase}` : name;
+  return sellPriceTarget(item).key;
 }
 
 // Default for markets without their own maxAgeMs; also how long a market's

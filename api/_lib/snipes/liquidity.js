@@ -17,6 +17,8 @@
 // 75) on at least one market it can be sold on. Items with no liquidity data
 // at all are dropped too. Items below the bar are never looked up on CSFloat.
 
+import { liquidityScore } from '../../../src/shared/liquidity.js';
+
 const DEFAULT_SKIP_WEARS = ['Well-Worn', 'Battle-Scarred'];
 const NON_SKIN = /^(Sticker|Sealed Graffiti|Graffiti|Patch|Music Kit|StatTrak™ Music Kit|Charm) \|/;
 // A market with fewer listings than this counts as thin on SteamDT.
@@ -80,26 +82,8 @@ export function isThinMarket(refs) {
   return counts.length > 0 && Math.max(...counts) < MIN_SELL_COUNT;
 }
 
-// 0..1 helpers: log scale reaches 1 at `full`, linear maps lo..hi to 0..1.
-const logScale = (v, full) => (v == null ? null : Math.min(1, Math.log10(1 + Math.max(0, v)) / Math.log10(1 + full)));
-const linear = (v, lo, hi) => (v == null ? null : Math.max(0, Math.min(1, (v - lo) / (hi - lo))));
-
-// How easily the item sells on `market`, 0-100. Mirrors liquidityScore in
-// src/utils/snipes.js (the page can't import from api/), so keep them equal.
-// YouPin / Buff163: buy orders 40 %, best buy order / lowest ask 40 %,
-// listings 20 %. CSFloat: recorded sales 60 %, Steam daily volume 40 %.
-// Missing parts are left out and the rest re-weighted; null if none known.
-export function liquidityScore(market, ref) {
-  if (!ref) return null;
-  const bidAsk = ref.bidUsd && ref.askUsd ? ref.bidUsd / ref.askUsd : null;
-  const parts = market === 'csfloat'
-    ? [[logScale(ref.sales, 50), 0.6], [logScale(ref.steamVolume, 50), 0.4]]
-    : [[logScale(ref.bidCount, 100), 0.4], [linear(bidAsk, 0.75, 0.97), 0.4], [logScale(ref.count, 200), 0.2]];
-  const known = parts.filter(([v]) => v != null);
-  if (!known.length) return null;
-  const weight = known.reduce((sum, [, w]) => sum + w, 0);
-  return Math.round((100 * known.reduce((sum, [v, w]) => sum + v * w, 0)) / weight);
-}
+// The 0–100 score is shared with the Snipes page (src/shared/liquidity.js).
+export { liquidityScore };
 
 // Best score over the markets the item can be sold on, or null if none is known.
 export function bestLiquidity(refs) {

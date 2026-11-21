@@ -2,6 +2,7 @@
 // Buff163 lowest ask) it found under what some other market pays; this picks
 // the best market to sell on after fees and checks the item will sell again.
 import { getPlatformFee } from "./platformFees";
+import { liquidityScore } from "../shared/liquidity.js";
 
 // Sources the scanner reads listings from (shown in the scan status).
 export const SNIPE_MARKETS = ["csfloat", "dmarket"];
@@ -54,28 +55,8 @@ export function migrateFilters(saved) {
   };
 }
 
-// 0..1 helpers: log scale reaches 1 at `full`, linear maps lo..hi to 0..1.
-const logScale = (v, full) => (v == null ? null : Math.min(1, Math.log10(1 + Math.max(0, v)) / Math.log10(1 + full)));
-const linear = (v, lo, hi) => (v == null ? null : Math.max(0, Math.min(1, (v - lo) / (hi - lo))));
-
-// How easily the item sells on `market`, 0–100, from what that market tells
-// us. YouPin / Buff163: buy orders waiting (demand), how close the best buy
-// order is to the lowest ask (a tight spread sells fast) and listings.
-// CSFloat: the sales CSFloat has recorded for the item and Steam's daily volume.
-// Missing parts are left out and the rest re-weighted; null if none known.
-// The server uses the same formula to drop items under 75 before storing
-// them (api/_lib/snipes/liquidity.js): keep the two equal.
-export function liquidityScore(market, ref) {
-  if (!ref) return null;
-  const bidAsk = ref.bidUsd && ref.askUsd ? ref.bidUsd / ref.askUsd : null;
-  const parts = market === "csfloat"
-    ? [[logScale(ref.sales, 50), 0.6], [logScale(ref.steamVolume, 50), 0.4]]
-    : [[logScale(ref.bidCount, 100), 0.4], [linear(bidAsk, 0.75, 0.97), 0.4], [logScale(ref.count, 200), 0.2]];
-  const known = parts.filter(([v]) => v != null);
-  if (!known.length) return null;
-  const weight = known.reduce((sum, [, w]) => sum + w, 0);
-  return Math.round((100 * known.reduce((sum, [v, w]) => sum + v * w, 0)) / weight);
-}
+// The 0–100 liquidity score is shared with the server prefilter.
+export { liquidityScore };
 
 function sellOption(market, ref, cost) {
   const netSell = ref.priceUsd * (1 - getPlatformFee(market));
