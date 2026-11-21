@@ -240,6 +240,11 @@ phase is unknown (or CSFloat has nothing for it), and always for YouPin
 flagged `anyPhase` and shown with a `*`; no "best" dot then.
 
 **Item persistence**: Logged-in users → `GET/POST /api/items` backed by Redis.
+Saves carry `baseVersion`; the server bumps `skinroi:items-ver:{steamId}` on
+each save and answers 409 when another tab saved in between, so the stale tab
+reloads instead of overwriting (`useItems`, chip in `SaveStatusChip`). A failed
+save retries 5 s doubling to 60 s and shows "Not saved". The sidebar's data
+status dot (`utils/freshness.js`) sums up extension, sync, sell prices and saving.
 Guest users → `localStorage` key `cs2-trading-items`. Demo mode → nothing is
 saved anywhere (see below).
 
@@ -314,6 +319,7 @@ npm run items:update
 | Key                              | Contents                                          |
 | -------------------------------- | ------------------------------------------------- |
 | `skinroi:items:{steamId}`        | Portfolio item array                              |
+| `skinroi:items-ver:{steamId}`    | Portfolio version, bumped on every save (409 guard) |
 | `skinroi:sync:{steamId}:state`   | Pending list, tombstones, processed-trade dedup   |
 | `skinroi:profile:{steamId}`      | Cached Steam display name + avatar (24h TTL)      |
 | `skinroi:ext-pair:{code}`        | Short-lived pairing code (10 min TTL)             |

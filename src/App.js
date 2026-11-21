@@ -65,7 +65,7 @@ export default function CS2TradingTracker() {
     items, setItems, portfolioReady, itemsLoading, formData, setFormData, sellData, setSellData,
     sellPlatform, setSellPlatform, handleAddItem, handleSellItem, handleDeleteItem,
     addItemDirect, sellItemDirect, promotePendingItem, handleAddTransaction,
-    saveStatus, retrySave,
+    saveStatus, retrySave, dismissConflict,
   } = useItems(user?.steamId, { demo });
 
   const handleImportCSV = (file) => {
@@ -360,7 +360,7 @@ export default function CS2TradingTracker() {
         onNavigate={openPage}
         pendingCount={steamSync.pendingCount}
       />
-      <SaveStatusChip theme={themeStyles} status={saveStatus} onRetry={retrySave} />
+      <SaveStatusChip theme={themeStyles} status={saveStatus} onRetry={retrySave} onDismiss={dismissConflict} />
       </>)}
 
       {importOpen && user && (

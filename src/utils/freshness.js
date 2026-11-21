@@ -49,7 +49,9 @@ export function freshnessRows({ extension, sellPrices, saveStatus, reachable, la
   for (const m of SELL_PRICE_MARKETS) rows.push(marketRow(m, sellPrices, now));
   rows.push(saveStatus === "failed"
     ? { id: "save", label: "Portfolio", state: "bad", text: "Not saved · retrying" }
-    : { id: "save", label: "Portfolio", state: "ok", text: "Saved" });
+    : saveStatus === "conflict"
+      ? { id: "save", label: "Portfolio", state: "warn", text: "Reloaded after a change in another tab" }
+      : { id: "save", label: "Portfolio", state: "ok", text: "Saved" });
 
   const worst = rows.reduce((w, r) => (RANK[r.state] > RANK[w.state] ? r : w), { state: "unknown" });
   const summary = worst.state === "ok" || worst.state === "unknown"

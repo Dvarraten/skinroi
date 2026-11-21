@@ -31,14 +31,22 @@ export const useItems = (steamId, { demo = false } = {}) => {
   // instead of an empty state.
   const [settledFor, setSettledFor] = useState(null);
   const saveTimerRef = useRef(null);
-  // Signed-in saves: 'saved', or 'failed' after a POST that didn't go through
-  // (network down, Redis over its quota). A failed save is retried with the
+  // Signed-in saves: 'saved', 'conflict' when another tab had saved first
+  // (this tab then reloads that list), or 'failed' after a POST that didn't
+  // go through (network down, Redis over its quota). A failed save is retried with the
   // latest list, 5 s, 10 s, 20 s … up to 60 s apart, and the page shows a
   // "Not saved" chip until one succeeds.
   const [saveStatus, setSaveStatus] = useState('saved');
   const latestItemsRef = useRef(items);
   latestItemsRef.current = items;
   const saveAttemptsRef = useRef(0);
+  // Version of the stored portfolio this tab's list is based on (from GET
+  // and each successful save). Sent with every save so the server can refuse
+  // one from a tab that missed another tab's edits. null = unknown.
+  const versionRef = useRef(null);
+  // Set when the list is replaced from the server, so that replacement
+  // isn't saved straight back.
+  const skipSaveRef = useRef(false);
   const [formData, setFormData] = useState({
     itemName: '',
     purchasePrice: '',
@@ -60,7 +68,8 @@ export const useItems = (steamId, { demo = false } = {}) => {
     if (steamId) {
       fetch('/api/items')
         .then(r => r.json())
-        .then(({ items, firstLogin }) => {
+        .then(({ items, firstLogin, version }) => {
+          versionRef.current = Number.isInteger(version) ? version : null;
           if (firstLogin) {
             // Key never written — migrate any existing localStorage items so
             // they aren't lost when the user logs in for the first time.
@@ -102,12 +111,26 @@ export const useItems = (steamId, { demo = false } = {}) => {
     fetch('/api/items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: latestItemsRef.current }),
+      body: JSON.stringify({ items: latestItemsRef.current, baseVersion: versionRef.current ?? undefined }),
     })
-      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
-      .then(() => {
+      .then(async (r) => {
+        if (r.status === 409) return 'conflict';
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const json = await r.json().catch(() => ({}));
+        if (Number.isInteger(json.version)) versionRef.current = json.version;
+        return 'saved';
+      })
+      .then((result) => {
+        if (savingFor !== steamIdRef.current) return;
         saveAttemptsRef.current = 0;
-        setSaveStatus('saved');
+        if (result === 'conflict') {
+          // Another tab saved first: take its list instead of overwriting it.
+          // This tab's last change is dropped, and the chip says so.
+          setSaveStatus('conflict');
+          reloadRef.current();
+        } else {
+          setSaveStatus((s) => (s === 'conflict' ? s : 'saved'));
+        }
       })
       .catch(() => {
         if (savingFor !== steamIdRef.current) return;
@@ -119,6 +142,41 @@ export const useItems = (steamId, { demo = false } = {}) => {
   };
   const steamIdRef = useRef(steamId);
   steamIdRef.current = steamId;
+
+  // Replaces the list with the stored one (after a conflict, or when another
+  // tab saved while this one was in the background).
+  const reloadRef = useRef(null);
+  reloadRef.current = () => {
+    const forId = steamId;
+    if (!forId) return;
+    fetch('/api/items')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(({ items: stored, version }) => {
+        if (forId !== steamIdRef.current || !Array.isArray(stored)) return;
+        clearTimeout(saveTimerRef.current);
+        versionRef.current = Number.isInteger(version) ? version : null;
+        skipSaveRef.current = true;
+        setItems(stored);
+      })
+      .catch(() => {});
+  };
+
+  // Coming back to the tab: if another tab saved meanwhile, load its list
+  // before this tab's next change would be refused. Costs one small read.
+  useEffect(() => {
+    if (!steamId || loadedFor !== steamId) return undefined;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || versionRef.current == null) return;
+      fetch('/api/items?v=1')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json) => {
+          if (json && Number.isInteger(json.version) && json.version !== versionRef.current) reloadRef.current();
+        })
+        .catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [steamId, loadedFor]);
 
   // A new user (or logging out) drops any pending retry for the old one.
   useEffect(() => {
@@ -144,6 +202,7 @@ export const useItems = (steamId, { demo = false } = {}) => {
     if (!isLoaded || settledFor !== source || source === 'demo') return;
     if (steamId) {
       if (loadedFor !== steamId) return;
+      if (skipSaveRef.current) { skipSaveRef.current = false; return; }
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => saveNowRef.current(), 1500);
       return () => clearTimeout(saveTimerRef.current);
@@ -376,9 +435,11 @@ export const useItems = (steamId, { demo = false } = {}) => {
     portfolioReady: !!steamId && loadedFor === steamId,
     // True until the list for the current user (or guest) has been loaded.
     itemsLoading: settledFor !== source,
-    // 'saved' or 'failed' (signed-in only); retrySave sends the list now.
+    // 'saved', 'failed' or 'conflict' (signed-in only). retrySave sends the
+    // list now; dismissConflict hides the "changed in another tab" note.
     saveStatus,
     retrySave: () => { saveAttemptsRef.current = 0; saveNowRef.current(); },
+    dismissConflict: () => setSaveStatus((s) => (s === 'conflict' ? 'saved' : s)),
     formData,
     setFormData,
     sellData,
