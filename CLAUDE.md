@@ -297,6 +297,18 @@ development.
 POST /api/inventory/reset?confirm=yes
 ```
 
+**Daily backup**: a Vercel cron (`vercel.json`, 03:17 UTC) calls
+`/api/items?backup=1` (`api/_lib/backup.js`), which copies every
+`skinroi:items:*` (and `skinroi:valuehist:*`) to a second Upstash database:
+`backup:{day}:…` kept 30 days and `backup:latest:…` (an empty list never
+replaces a non-empty one). Needs `CRON_SECRET`, `BACKUP_REDIS_REST_URL`,
+`BACKUP_REDIS_REST_TOKEN`; without them it does nothing. Restore locally:
+
+```
+npm run backup -- list [steamId]
+npm run backup -- restore <steamId> <day|latest> --yes
+```
+
 **Revoke the extension** (frontend does this via the Disconnect button):
 
 ```

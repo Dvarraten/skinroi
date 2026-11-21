@@ -3,9 +3,12 @@
 // /api/items?sellPrices=1 — YouPin/CSFloat sell prices for owned items
 //                           (see _lib/sell-prices.js)
 // /api/items?connections=1 — marketplace API keys (see _lib/connections.js)
+// /api/items?backup=1 — daily cron: copy portfolios to the backup database
+//                       (see _lib/backup.js)
 import { getSessionSteamId } from '../_lib/auth.js';
 import { handleSellPrices } from '../_lib/sell-prices.js';
 import { handleConnections } from '../_lib/connections.js';
+import { handleBackup } from '../_lib/backup.js';
 import { Redis } from '@upstash/redis';
 
 function getClient() {
@@ -27,6 +30,7 @@ function legacyItemsKey(steamId) {
 export default async function handler(req, res) {
   if (req.query?.sellPrices) return handleSellPrices(req, res);
   if (req.query?.connections) return handleConnections(req, res);
+  if (req.query?.backup) return handleBackup(req, res);
 
   const steamId = getSessionSteamId(req);
   if (!steamId) return res.status(401).json({ error: 'not authenticated' });
